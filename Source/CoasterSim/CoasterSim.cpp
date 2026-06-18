@@ -1,0 +1,4 @@
+#include "CoasterSim.h"
+#include "Modules/ModuleManager.h"
+
+IMPLEMENT_PRIMARY_GAME_MODULE(FDefaultGameModuleImpl, CoasterSim, "CoasterSim");

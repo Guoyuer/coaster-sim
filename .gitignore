@@ -1,8 +1,19 @@
-node_modules/
-dist/
-coverage/
-test-results/
-playwright-report/
 .env
 .DS_Store
 *.log
+
+# Unreal Engine
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+.vs/
+*.sln
+*.VC.db
+*.opensdf
+*.opendb
+*.suo
+*.user
+*.userosscache
+*.sdf
+*.tmp

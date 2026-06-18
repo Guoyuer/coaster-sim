@@ -2,9 +2,9 @@
 
 ## Goal
 
-Build an original high-quality 3D roller coaster simulator for desktop browsers
-that prioritizes realistic first-person ride feel, transparent physical
-telemetry, and visually convincing coaster environments.
+Build an original high-quality native desktop 3D roller coaster simulator that
+prioritizes realistic first-person ride feel, transparent physical telemetry,
+and visually convincing coaster environments.
 
 The first milestone is a polished playable ride, not a full park-management
 game. Track editing arrives after the ride model and rendering pipeline are
@@ -16,7 +16,9 @@ credible.
   coaster models, or proprietary workflows.
 - Do not target engineering certification or real-world safety approval.
 - Do not build park-management economics in the first phase.
-- Do not prioritize mobile performance until desktop quality is established.
+- Do not build a browser/Web version in the first phase.
+- Do not prioritize mobile or low-end hardware until desktop quality is
+  established.
 
 ## Target User
 
@@ -76,7 +78,7 @@ credible.
 - Environment presets.
 - Spatial audio for wheels, wind, lift chain, launch, brakes, tunnels, and
   station ambience.
-- WebXR investigation after desktop frame pacing is stable.
+- VR investigation after desktop frame pacing and ride comfort are stable.
 
 ## Success Criteria
 

@@ -3,22 +3,28 @@
 ## Objective
 
 Create visuals that communicate realistic scale, speed, height, and material
-weight while staying performant in a browser. Visual quality should serve the
+weight with a high-end native desktop renderer. Visual quality should serve the
 ride sensation first.
 
 ## Rendering Stack
 
-- Three.js with WebGL2 initially.
+- Unreal Engine 5.
+- Lumen for dynamic global illumination where performance allows.
+- Nanite for dense static environment geometry where it fits the asset type.
+- Virtual Shadow Maps or equivalent high-quality shadowing for track, train,
+  supports, and terrain.
 - PBR materials for train, rails, supports, terrain objects, and station assets.
 - HDR environment lighting where practical.
 - Directional sun, ambient sky light, contact shadows, and optional baked or
   cached lighting for static scenery.
-- Post-processing: tone mapping, subtle bloom for lights, fog, color grading,
-  and motion cues used conservatively.
+- Post-processing: tone mapping, subtle bloom for lights, volumetric fog, color
+  grading, depth of field only for non-ride cameras, and motion cues used
+  conservatively.
 
 ## Visual Quality Targets
 
 - Stable 60 FPS on a modern desktop GPU for M1 showcase scene.
+- Headroom for 90 FPS VR exploration after desktop mode is stable.
 - Track and train scale should read correctly from first-person and external
   cameras.
 - No visible rail discontinuities, tie popping, or support flicker during the
@@ -83,6 +89,8 @@ M2+ adds:
 - Terrain editing.
 - Water, tunnels, themed structures, queue/station details.
 - Weather and time-of-day presets.
+- Higher-detail authored environment set pieces once the procedural track and
+  ride model are stable.
 
 ## Camera Requirements
 

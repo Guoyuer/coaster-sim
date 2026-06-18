@@ -86,6 +86,7 @@ For each showcase track iteration, capture notes:
 - All physics unit checks pass.
 - Golden track telemetry stays within documented tolerance.
 - Showcase track completes without NaN or section-state errors.
-- Desktop browser render stays stable enough for a full run.
+- Native desktop render stays stable enough for a full run at the target visual
+  preset.
 - First-person ride has no camera flips or major clipping.
 - HUD telemetry updates continuously and matches exported samples.
