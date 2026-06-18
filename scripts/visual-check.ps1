@@ -4,7 +4,8 @@ param(
     [int[]]$WaitSeconds = @(2, 6, 10, 15),
     [int]$ResX = 1280,
     [int]$ResY = 720,
-    [string]$Name = "VisualCheck-latest"
+    [string]$Name = "VisualCheck-latest",
+    [string]$ExecCmds = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,6 +29,11 @@ if ($Build) {
 
 Get-Process UnrealEditor -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
+$CombinedExecCmds = "DisableAllScreenMessages"
+if (-not [string]::IsNullOrWhiteSpace($ExecCmds)) {
+    $CombinedExecCmds = "$CombinedExecCmds;$ExecCmds"
+}
+
 $Process = Start-Process -FilePath $Editor -ArgumentList @(
     $Project,
     "-game",
@@ -37,7 +43,7 @@ $Process = Start-Process -FilePath $Editor -ArgumentList @(
     "-NoSplash",
     "-NoLoadingScreen",
     "-NoLiveCoding",
-    "-ExecCmds=DisableAllScreenMessages"
+    "-ExecCmds=$CombinedExecCmds"
 ) -WorkingDirectory $RepoRoot -PassThru
 
 $GameWindow = $null

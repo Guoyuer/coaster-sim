@@ -40,6 +40,14 @@ struct FCoasterTelemetry
     FName SectionName = TEXT("Station");
 };
 
+struct FEnvironmentRiverSample
+{
+    FVector Center = FVector::ZeroVector;
+    FVector Forward = FVector::ForwardVector;
+    FVector Right = FVector::RightVector;
+    float Ratio = 0.0f;
+};
+
 UCLASS()
 class COASTERSIM_API ACoasterRideActor : public AActor
 {
@@ -105,12 +113,6 @@ protected:
     TObjectPtr<UInstancedStaticMeshComponent> MistBands;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UInstancedStaticMeshComponent> SnowCaps;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UProceduralMeshComponent> CanyonTerrainMesh;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UProceduralMeshComponent> RiverRibbonMesh;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
@@ -145,10 +147,18 @@ private:
     void RebuildSpline();
     void RebuildVisuals();
     void RebuildEnvironment();
+    void ClearEnvironmentVisuals();
+    void BuildSkyDome();
+    void BuildCloudLayer();
+    void BuildDistantRidges();
+    void BuildRiverEffects();
+    void BuildRiverSamples(TArray<FEnvironmentRiverSample>& OutSamples, int32 SampleCount) const;
+    void BuildRiverRibbon(const TArray<FEnvironmentRiverSample>& Samples, float RiverHalfWidth);
+    void BuildFoamRibbon(const TArray<FEnvironmentRiverSample>& Samples, float RiverHalfWidth);
+    void BuildRapids(const TArray<FEnvironmentRiverSample>& Samples, float RiverHalfWidth);
     void ApplyVisualMaterials();
     void AdvanceRide(float DeltaSeconds);
     void UpdateFirstPersonCamera();
-    bool HasImportedLandscape() const;
     void SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const;
     FName GetSectionName(float TrackRatio) const;
 
@@ -158,6 +168,4 @@ private:
     float CurrentSpeedCms = 0.0f;
     float TrackLengthCm = 1.0f;
 
-    UPROPERTY(EditAnywhere, Category = "Environment")
-    bool bUseImportedLandscapeWhenPresent = true;
 };

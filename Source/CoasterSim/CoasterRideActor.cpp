@@ -11,8 +11,6 @@
 #include "Components/SplineComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
-#include "EngineUtils.h"
-#include "Landscape.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
@@ -39,83 +37,6 @@ void AddDoubleSidedQuad(TArray<int32>& Triangles, int32 A, int32 B, int32 C, int
 }
 
 using YarlungCoaster::Smooth01;
-
-float YarlungRiverCenterY(float X)
-{
-    return -1150.0f
-        + 1050.0f * FMath::Sin(X * 0.00048f + 0.7f)
-        + 420.0f * FMath::Sin(X * 0.00115f - 0.6f);
-}
-
-float YarlungTerrainHeight(float X, float Y)
-{
-    const float RiverY = YarlungRiverCenterY(X);
-    const float Lateral = FMath::Abs(Y - RiverY);
-    const float WideValley = Smooth01((Lateral - 1150.0f) / 9400.0f);
-    const float OuterMountain = Smooth01((Lateral - 5800.0f) / 7600.0f);
-    const float CliffBand = Smooth01((Lateral - 3100.0f) / 4200.0f);
-    const float LongRidge = 155.0f * FMath::Sin(X * 0.00075f + Y * 0.00018f);
-    const float FoldNoise = 82.0f * FMath::Sin(X * 0.0018f - Y * 0.00072f)
-        + 46.0f * FMath::Sin(X * 0.0034f + Y * 0.0011f);
-    const float Terraces = 58.0f * FMath::Sin((Lateral - 1200.0f) * 0.0018f + X * 0.00042f);
-
-    float Height = RiverZCm - 22.0f
-        + WideValley * 520.0f
-        + CliffBand * 1420.0f
-        + OuterMountain * 1900.0f
-        + LongRidge + FoldNoise + Terraces;
-
-    if (Lateral < 980.0f)
-    {
-        const float Channel = Smooth01(Lateral / 980.0f);
-        Height = FMath::Lerp(RiverZCm - 46.0f, RiverZCm + 34.0f, Channel);
-    }
-
-    return YarlungCoaster::ApplyTrackClearanceCut(X, Y, Height);
-}
-
-float YarlungForestAmount(float X, float Y, float Height)
-{
-    const float Lateral = FMath::Abs(Y - YarlungRiverCenterY(X));
-    const float ForestBand = Smooth01((Lateral - 3300.0f) / 1300.0f) * (1.0f - Smooth01((Lateral - 7800.0f) / 1500.0f));
-    const float ForestHeight = 1.0f - Smooth01((Height - 1650.0f) / 550.0f);
-    const float PatchNoise = 0.5f
-        + 0.32f * FMath::Sin(X * 0.0021f + Y * 0.0013f)
-        + 0.18f * FMath::Sin(X * 0.0053f - Y * 0.0031f);
-    return FMath::Clamp(ForestBand * ForestHeight * Smooth01((PatchNoise - 0.28f) / 0.42f), 0.0f, 1.0f);
-}
-
-FLinearColor YarlungTerrainColor(float X, float Y, float Height)
-{
-    const float Lateral = FMath::Abs(Y - YarlungRiverCenterY(X));
-    if (Height > 2860.0f)
-    {
-        const float SnowT = Smooth01((Height - 2860.0f) / 520.0f);
-        return FLinearColor(
-            FMath::Lerp(0.36f, 0.68f, SnowT),
-            FMath::Lerp(0.40f, 0.74f, SnowT),
-            FMath::Lerp(0.38f, 0.73f, SnowT),
-            1.0f);
-    }
-    if (Lateral < 2350.0f)
-    {
-        return FLinearColor(0.18f, 0.20f, 0.17f, 1.0f);
-    }
-
-    const float ForestAmount = YarlungForestAmount(X, Y, Height);
-    if (ForestAmount > 0.08f)
-    {
-        const FLinearColor RockBase(0.19f, 0.21f, 0.18f, 1.0f);
-        const FLinearColor ForestBase(0.060f, 0.15f, 0.070f, 1.0f);
-        return FMath::Lerp(RockBase, ForestBase, ForestAmount);
-    }
-    const float RockT = Smooth01((Height - 450.0f) / 2200.0f);
-    return FLinearColor(
-        FMath::Lerp(0.19f, 0.17f, RockT),
-        FMath::Lerp(0.21f, 0.20f, RockT),
-        FMath::Lerp(0.18f, 0.17f, RockT),
-        1.0f);
-}
 
 float Hash01(float A, float B)
 {
@@ -232,11 +153,6 @@ ACoasterRideActor::ACoasterRideActor()
     Rapids->SetupAttachment(SceneRoot);
     MistBands = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("MistBands"));
     MistBands->SetupAttachment(SceneRoot);
-    SnowCaps = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("SnowCaps"));
-    SnowCaps->SetupAttachment(SceneRoot);
-    CanyonTerrainMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("CanyonTerrainMesh"));
-    CanyonTerrainMesh->SetupAttachment(SceneRoot);
-    CanyonTerrainMesh->bUseAsyncCooking = true;
     RiverRibbonMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("RiverRibbonMesh"));
     RiverRibbonMesh->SetupAttachment(SceneRoot);
     RiverRibbonMesh->bUseAsyncCooking = true;
@@ -256,8 +172,6 @@ ACoasterRideActor::ACoasterRideActor()
     RiverSurface->SetCastShadow(false);
     Rapids->SetCastShadow(false);
     MistBands->SetCastShadow(false);
-    SnowCaps->SetCastShadow(true);
-    CanyonTerrainMesh->SetCastShadow(false);
     RiverRibbonMesh->SetCastShadow(false);
     FoamRibbonMesh->SetCastShadow(false);
     DistantRidgeMesh->SetCastShadow(false);
@@ -275,13 +189,6 @@ ACoasterRideActor::ACoasterRideActor()
         RiverSurface->SetStaticMesh(CubeMesh.Object);
         Rapids->SetStaticMesh(CubeMesh.Object);
         MistBands->SetStaticMesh(CubeMesh.Object);
-        SnowCaps->SetStaticMesh(CubeMesh.Object);
-    }
-
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-    if (SphereMesh.Succeeded())
-    {
-        SnowCaps->SetStaticMesh(SphereMesh.Object);
     }
 
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
@@ -295,8 +202,6 @@ ACoasterRideActor::ACoasterRideActor()
         RiverSurface->SetMaterial(0, BasicMaterial.Object);
         Rapids->SetMaterial(0, BasicMaterial.Object);
         MistBands->SetMaterial(0, BasicMaterial.Object);
-        SnowCaps->SetMaterial(0, BasicMaterial.Object);
-        CanyonTerrainMesh->SetMaterial(0, BasicMaterial.Object);
         RiverRibbonMesh->SetMaterial(0, BasicMaterial.Object);
         FoamRibbonMesh->SetMaterial(0, BasicMaterial.Object);
         DistantRidgeMesh->SetMaterial(0, BasicMaterial.Object);
@@ -307,7 +212,6 @@ ACoasterRideActor::ACoasterRideActor()
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> VertexColorMaterial(TEXT("/Engine/EngineDebugMaterials/VertexColorMaterial.VertexColorMaterial"));
     if (VertexColorMaterial.Succeeded())
     {
-        CanyonTerrainMesh->SetMaterial(0, VertexColorMaterial.Object);
         DistantRidgeMesh->SetMaterial(0, VertexColorMaterial.Object);
         SkyDomeMesh->SetMaterial(0, VertexColorMaterial.Object);
         CloudLayerMesh->SetMaterial(0, VertexColorMaterial.Object);
@@ -474,197 +378,210 @@ void ACoasterRideActor::RebuildVisuals()
 
 void ACoasterRideActor::RebuildEnvironment()
 {
+    ClearEnvironmentVisuals();
+    BuildSkyDome();
+    BuildCloudLayer();
+    BuildDistantRidges();
+    BuildRiverEffects();
+}
+
+void ACoasterRideActor::ClearEnvironmentVisuals()
+{
     RiverSurface->ClearInstances();
     Rapids->ClearInstances();
     MistBands->ClearInstances();
-    SnowCaps->ClearInstances();
-    CanyonTerrainMesh->ClearAllMeshSections();
     RiverRibbonMesh->ClearAllMeshSections();
     FoamRibbonMesh->ClearAllMeshSections();
     DistantRidgeMesh->ClearAllMeshSections();
     SkyDomeMesh->ClearAllMeshSections();
     CloudLayerMesh->ClearAllMeshSections();
+}
 
+void ACoasterRideActor::BuildSkyDome()
+{
+    TArray<FVector> SkyVertices;
+    TArray<int32> SkyTriangles;
+    TArray<FVector> SkyNormals;
+    TArray<FVector2D> SkyUVs;
+    TArray<FLinearColor> SkyColors;
+    TArray<FProcMeshTangent> SkyTangents;
+    constexpr int32 RingCount = 9;
+    constexpr int32 SegmentCount = 56;
+    constexpr float SkyRadius = 92000.0f;
+    SkyVertices.Reserve(RingCount * SegmentCount);
+
+    for (int32 Ring = 0; Ring < RingCount; ++Ring)
     {
-        TArray<FVector> SkyVertices;
-        TArray<int32> SkyTriangles;
-        TArray<FVector> SkyNormals;
-        TArray<FVector2D> SkyUVs;
-        TArray<FLinearColor> SkyColors;
-        TArray<FProcMeshTangent> SkyTangents;
-        constexpr int32 RingCount = 9;
-        constexpr int32 SegmentCount = 56;
-        constexpr float SkyRadius = 92000.0f;
-        SkyVertices.Reserve(RingCount * SegmentCount);
+        const float V = static_cast<float>(Ring) / static_cast<float>(RingCount - 1);
+        const float Theta = V * UE_HALF_PI;
+        const float RadiusAtRing = FMath::Cos(Theta) * SkyRadius;
+        const float Z = FMath::Sin(Theta) * SkyRadius - 2200.0f;
+        const FLinearColor HorizonColor(0.54f, 0.69f, 0.88f, 1.0f);
+        const FLinearColor ZenithColor(0.08f, 0.30f, 0.70f, 1.0f);
+        const FLinearColor RingColor = FMath::Lerp(HorizonColor, ZenithColor, Smooth01(V));
 
-        for (int32 Ring = 0; Ring < RingCount; ++Ring)
+        for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
         {
-            const float V = static_cast<float>(Ring) / static_cast<float>(RingCount - 1);
-            const float Theta = V * UE_HALF_PI;
-            const float RadiusAtRing = FMath::Cos(Theta) * SkyRadius;
-            const float Z = FMath::Sin(Theta) * SkyRadius - 2200.0f;
-            const FLinearColor HorizonColor(0.54f, 0.69f, 0.88f, 1.0f);
-            const FLinearColor ZenithColor(0.08f, 0.30f, 0.70f, 1.0f);
-            const FLinearColor RingColor = FMath::Lerp(HorizonColor, ZenithColor, Smooth01(V));
-
-            for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
-            {
-                const float U = static_cast<float>(Segment) / static_cast<float>(SegmentCount);
-                const float Angle = U * UE_TWO_PI;
-                SkyVertices.Add(FVector(FMath::Cos(Angle) * RadiusAtRing, FMath::Sin(Angle) * RadiusAtRing, Z));
-                SkyNormals.Add(-SkyVertices.Last().GetSafeNormal());
-                SkyUVs.Add(FVector2D(U, V));
-                SkyColors.Add(RingColor);
-                SkyTangents.Add(FProcMeshTangent(FVector::ForwardVector, false));
-            }
+            const float U = static_cast<float>(Segment) / static_cast<float>(SegmentCount);
+            const float Angle = U * UE_TWO_PI;
+            SkyVertices.Add(FVector(FMath::Cos(Angle) * RadiusAtRing, FMath::Sin(Angle) * RadiusAtRing, Z));
+            SkyNormals.Add(-SkyVertices.Last().GetSafeNormal());
+            SkyUVs.Add(FVector2D(U, V));
+            SkyColors.Add(RingColor);
+            SkyTangents.Add(FProcMeshTangent(FVector::ForwardVector, false));
         }
-
-        for (int32 Ring = 0; Ring < RingCount - 1; ++Ring)
-        {
-            for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
-            {
-                const int32 NextSegment = (Segment + 1) % SegmentCount;
-                const int32 A = Ring * SegmentCount + Segment;
-                const int32 B = (Ring + 1) * SegmentCount + Segment;
-                const int32 C = Ring * SegmentCount + NextSegment;
-                const int32 D = (Ring + 1) * SegmentCount + NextSegment;
-                AddDoubleSidedQuad(SkyTriangles, A, B, C, D);
-            }
-        }
-
-        SkyDomeMesh->CreateMeshSection_LinearColor(0, SkyVertices, SkyTriangles, SkyNormals, SkyUVs, SkyColors, SkyTangents, false);
     }
 
+    for (int32 Ring = 0; Ring < RingCount - 1; ++Ring)
     {
-        TArray<FVector> CloudVertices;
-        TArray<int32> CloudTriangles;
-        TArray<FVector> CloudNormals;
-        TArray<FVector2D> CloudUVs;
-        TArray<FLinearColor> CloudColors;
-        TArray<FProcMeshTangent> CloudTangents;
-        constexpr int32 CloudPatchCount = 12;
-        constexpr int32 CloudSegments = 18;
-        for (int32 Patch = 0; Patch < CloudPatchCount; ++Patch)
+        for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
         {
-            const float Row = static_cast<float>(Patch / 6);
-            const float Column = static_cast<float>(Patch % 6);
-            const float X = FMath::Lerp(-43000.0f, 46000.0f, Column / 5.0f) + 3200.0f * FMath::Sin(Patch * 1.7f);
-            const float Y = FMath::Lerp(-24500.0f, 21000.0f, Row / 2.0f) + 2600.0f * FMath::Cos(Patch * 0.9f);
-            const float Z = 21400.0f + 1700.0f * FMath::Sin(Patch * 0.47f);
-            const float RadiusX = 1750.0f + 860.0f * Hash01(Patch * 1.3f, 2.1f);
-            const float RadiusY = 420.0f + 300.0f * Hash01(3.4f, Patch * 2.2f);
-            const float Yaw = Hash01(Patch * 4.1f, Patch * 0.6f) * UE_TWO_PI;
-            const FVector Center(X, Y, Z);
-            const FVector AxisX(FMath::Cos(Yaw), FMath::Sin(Yaw), 0.0f);
-            const FVector AxisY(-FMath::Sin(Yaw), FMath::Cos(Yaw), 0.0f);
-            const int32 BaseIndex = CloudVertices.Num();
+            const int32 NextSegment = (Segment + 1) % SegmentCount;
+            const int32 A = Ring * SegmentCount + Segment;
+            const int32 B = (Ring + 1) * SegmentCount + Segment;
+            const int32 C = Ring * SegmentCount + NextSegment;
+            const int32 D = (Ring + 1) * SegmentCount + NextSegment;
+            AddDoubleSidedQuad(SkyTriangles, A, B, C, D);
+        }
+    }
 
-            CloudVertices.Add(Center);
+    SkyDomeMesh->CreateMeshSection_LinearColor(0, SkyVertices, SkyTriangles, SkyNormals, SkyUVs, SkyColors, SkyTangents, false);
+}
+
+void ACoasterRideActor::BuildCloudLayer()
+{
+    TArray<FVector> CloudVertices;
+    TArray<int32> CloudTriangles;
+    TArray<FVector> CloudNormals;
+    TArray<FVector2D> CloudUVs;
+    TArray<FLinearColor> CloudColors;
+    TArray<FProcMeshTangent> CloudTangents;
+    constexpr int32 CloudPatchCount = 12;
+    constexpr int32 CloudSegments = 18;
+    for (int32 Patch = 0; Patch < CloudPatchCount; ++Patch)
+    {
+        const float Row = static_cast<float>(Patch / 6);
+        const float Column = static_cast<float>(Patch % 6);
+        const float X = FMath::Lerp(-43000.0f, 46000.0f, Column / 5.0f) + 3200.0f * FMath::Sin(Patch * 1.7f);
+        const float Y = FMath::Lerp(-24500.0f, 21000.0f, Row / 2.0f) + 2600.0f * FMath::Cos(Patch * 0.9f);
+        const float Z = 21400.0f + 1700.0f * FMath::Sin(Patch * 0.47f);
+        const float RadiusX = 1750.0f + 860.0f * Hash01(Patch * 1.3f, 2.1f);
+        const float RadiusY = 420.0f + 300.0f * Hash01(3.4f, Patch * 2.2f);
+        const float Yaw = Hash01(Patch * 4.1f, Patch * 0.6f) * UE_TWO_PI;
+        const FVector Center(X, Y, Z);
+        const FVector AxisX(FMath::Cos(Yaw), FMath::Sin(Yaw), 0.0f);
+        const FVector AxisY(-FMath::Sin(Yaw), FMath::Cos(Yaw), 0.0f);
+        const int32 BaseIndex = CloudVertices.Num();
+
+        CloudVertices.Add(Center);
+        CloudNormals.Add(FVector::DownVector);
+        CloudUVs.Add(FVector2D(0.5f, 0.5f));
+        CloudColors.Add(FLinearColor(0.78f, 0.82f, 0.84f, 1.0f));
+        CloudTangents.Add(FProcMeshTangent(AxisX, false));
+
+        for (int32 Segment = 0; Segment < CloudSegments; ++Segment)
+        {
+            const float Angle = (static_cast<float>(Segment) / static_cast<float>(CloudSegments)) * UE_TWO_PI;
+            const float EdgeJitter = 0.84f + 0.20f * Hash01(Patch * 11.0f, Segment * 5.0f);
+            const FVector Edge = Center
+                + AxisX * (FMath::Cos(Angle) * RadiusX * EdgeJitter)
+                + AxisY * (FMath::Sin(Angle) * RadiusY * EdgeJitter);
+            CloudVertices.Add(Edge);
             CloudNormals.Add(FVector::DownVector);
-            CloudUVs.Add(FVector2D(0.5f, 0.5f));
-            CloudColors.Add(FLinearColor(0.78f, 0.82f, 0.84f, 1.0f));
+            CloudUVs.Add(FVector2D(FMath::Cos(Angle) * 0.5f + 0.5f, FMath::Sin(Angle) * 0.5f + 0.5f));
+            const float Bright = 0.70f + 0.09f * Hash01(Segment * 0.7f, Patch * 1.9f);
+            CloudColors.Add(FLinearColor(Bright, Bright + 0.04f, Bright + 0.06f, 1.0f));
             CloudTangents.Add(FProcMeshTangent(AxisX, false));
-
-            for (int32 Segment = 0; Segment < CloudSegments; ++Segment)
-            {
-                const float Angle = (static_cast<float>(Segment) / static_cast<float>(CloudSegments)) * UE_TWO_PI;
-                const float EdgeJitter = 0.84f + 0.20f * Hash01(Patch * 11.0f, Segment * 5.0f);
-                const FVector Edge = Center
-                    + AxisX * (FMath::Cos(Angle) * RadiusX * EdgeJitter)
-                    + AxisY * (FMath::Sin(Angle) * RadiusY * EdgeJitter);
-                CloudVertices.Add(Edge);
-                CloudNormals.Add(FVector::DownVector);
-                CloudUVs.Add(FVector2D(FMath::Cos(Angle) * 0.5f + 0.5f, FMath::Sin(Angle) * 0.5f + 0.5f));
-                const float Bright = 0.70f + 0.09f * Hash01(Segment * 0.7f, Patch * 1.9f);
-                CloudColors.Add(FLinearColor(Bright, Bright + 0.04f, Bright + 0.06f, 1.0f));
-                CloudTangents.Add(FProcMeshTangent(AxisX, false));
-            }
-
-            for (int32 Segment = 0; Segment < CloudSegments; ++Segment)
-            {
-                const int32 Next = (Segment + 1) % CloudSegments;
-                CloudTriangles.Append({ BaseIndex, BaseIndex + 1 + Segment, BaseIndex + 1 + Next });
-                CloudTriangles.Append({ BaseIndex, BaseIndex + 1 + Next, BaseIndex + 1 + Segment });
-            }
         }
 
-        CloudLayerMesh->CreateMeshSection_LinearColor(0, CloudVertices, CloudTriangles, CloudNormals, CloudUVs, CloudColors, CloudTangents, false);
-    }
-
-    {
-        TArray<FVector> RidgeVertices;
-        TArray<int32> RidgeTriangles;
-        TArray<FVector> RidgeNormals;
-        TArray<FVector2D> RidgeUVs;
-        TArray<FLinearColor> RidgeColors;
-        TArray<FProcMeshTangent> RidgeTangents;
-        constexpr int32 RidgeSamples = 42;
-        const TArray<float> RidgeYValues = { -23200.0f, 21400.0f };
-
-        for (int32 RidgeIndex = 0; RidgeIndex < RidgeYValues.Num(); ++RidgeIndex)
+        for (int32 Segment = 0; Segment < CloudSegments; ++Segment)
         {
-            const float RidgeY = RidgeYValues[RidgeIndex];
-            const int32 BaseIndex = RidgeVertices.Num();
-            for (int32 Sample = 0; Sample < RidgeSamples; ++Sample)
-            {
-                const float T = static_cast<float>(Sample) / static_cast<float>(RidgeSamples - 1);
-                const float X = FMath::Lerp(-11200.0f, 18400.0f, T);
-                const float RidgeNoise = 0.45f * FMath::Sin(T * UE_TWO_PI * 2.4f + RidgeIndex)
-                    + 0.32f * FMath::Sin(T * UE_TWO_PI * 5.7f + 0.6f);
-                const float BaseZ = 420.0f + 260.0f * FMath::Sin(T * UE_TWO_PI * 1.2f + RidgeIndex);
-                const float MidZ = 2440.0f + 360.0f * RidgeIndex + RidgeNoise * 520.0f;
-                const float PeakZ = 4860.0f + RidgeNoise * 880.0f + 540.0f * Hash01(Sample * 1.7f, RidgeIndex);
-
-                RidgeVertices.Append({
-                    FVector(X, RidgeY, BaseZ),
-                    FVector(X, RidgeY, MidZ),
-                    FVector(X, RidgeY, PeakZ)
-                });
-                RidgeNormals.Append({ FVector::ForwardVector, FVector::ForwardVector, FVector::ForwardVector });
-                RidgeUVs.Append({ FVector2D(T, 0.0f), FVector2D(T, 0.55f), FVector2D(T, 1.0f) });
-                RidgeColors.Append({
-                    FLinearColor(0.10f, 0.13f, 0.13f, 1.0f),
-                    FLinearColor(0.20f, 0.24f, 0.24f, 1.0f),
-                    FLinearColor(0.38f, 0.45f, 0.46f, 1.0f)
-                });
-                RidgeTangents.Append({
-                    FProcMeshTangent(FVector::ForwardVector, false),
-                    FProcMeshTangent(FVector::ForwardVector, false),
-                    FProcMeshTangent(FVector::ForwardVector, false)
-                });
-            }
-
-            for (int32 Sample = 0; Sample < RidgeSamples - 1; ++Sample)
-            {
-                const int32 A = BaseIndex + Sample * 3;
-                const int32 B = BaseIndex + (Sample + 1) * 3;
-                const int32 C = BaseIndex + Sample * 3 + 1;
-                const int32 D = BaseIndex + (Sample + 1) * 3 + 1;
-                const int32 E = BaseIndex + Sample * 3 + 2;
-                const int32 F = BaseIndex + (Sample + 1) * 3 + 2;
-                AddDoubleSidedQuad(RidgeTriangles, A, B, C, D);
-                AddDoubleSidedQuad(RidgeTriangles, C, D, E, F);
-            }
+            const int32 Next = (Segment + 1) % CloudSegments;
+            CloudTriangles.Append({ BaseIndex, BaseIndex + 1 + Segment, BaseIndex + 1 + Next });
+            CloudTriangles.Append({ BaseIndex, BaseIndex + 1 + Next, BaseIndex + 1 + Segment });
         }
-
-        DistantRidgeMesh->CreateMeshSection_LinearColor(0, RidgeVertices, RidgeTriangles, RidgeNormals, RidgeUVs, RidgeColors, RidgeTangents, false);
     }
 
+    CloudLayerMesh->CreateMeshSection_LinearColor(0, CloudVertices, CloudTriangles, CloudNormals, CloudUVs, CloudColors, CloudTangents, false);
+}
+
+void ACoasterRideActor::BuildDistantRidges()
+{
+    TArray<FVector> RidgeVertices;
+    TArray<int32> RidgeTriangles;
+    TArray<FVector> RidgeNormals;
+    TArray<FVector2D> RidgeUVs;
+    TArray<FLinearColor> RidgeColors;
+    TArray<FProcMeshTangent> RidgeTangents;
+    constexpr int32 RidgeSamples = 42;
+    const TArray<float> RidgeYValues = { -23200.0f, 21400.0f };
+
+    for (int32 RidgeIndex = 0; RidgeIndex < RidgeYValues.Num(); ++RidgeIndex)
+    {
+        const float RidgeY = RidgeYValues[RidgeIndex];
+        const int32 BaseIndex = RidgeVertices.Num();
+        for (int32 Sample = 0; Sample < RidgeSamples; ++Sample)
+        {
+            const float T = static_cast<float>(Sample) / static_cast<float>(RidgeSamples - 1);
+            const float X = FMath::Lerp(-11200.0f, 18400.0f, T);
+            const float RidgeNoise = 0.45f * FMath::Sin(T * UE_TWO_PI * 2.4f + RidgeIndex)
+                + 0.32f * FMath::Sin(T * UE_TWO_PI * 5.7f + 0.6f);
+            const float BaseZ = 420.0f + 260.0f * FMath::Sin(T * UE_TWO_PI * 1.2f + RidgeIndex);
+            const float MidZ = 2440.0f + 360.0f * RidgeIndex + RidgeNoise * 520.0f;
+            const float PeakZ = 4860.0f + RidgeNoise * 880.0f + 540.0f * Hash01(Sample * 1.7f, RidgeIndex);
+
+            RidgeVertices.Append({
+                FVector(X, RidgeY, BaseZ),
+                FVector(X, RidgeY, MidZ),
+                FVector(X, RidgeY, PeakZ)
+            });
+            RidgeNormals.Append({ FVector::ForwardVector, FVector::ForwardVector, FVector::ForwardVector });
+            RidgeUVs.Append({ FVector2D(T, 0.0f), FVector2D(T, 0.55f), FVector2D(T, 1.0f) });
+            RidgeColors.Append({
+                FLinearColor(0.10f, 0.13f, 0.13f, 1.0f),
+                FLinearColor(0.20f, 0.24f, 0.24f, 1.0f),
+                FLinearColor(0.38f, 0.45f, 0.46f, 1.0f)
+            });
+            RidgeTangents.Append({
+                FProcMeshTangent(FVector::ForwardVector, false),
+                FProcMeshTangent(FVector::ForwardVector, false),
+                FProcMeshTangent(FVector::ForwardVector, false)
+            });
+        }
+
+        for (int32 Sample = 0; Sample < RidgeSamples - 1; ++Sample)
+        {
+            const int32 A = BaseIndex + Sample * 3;
+            const int32 B = BaseIndex + (Sample + 1) * 3;
+            const int32 C = BaseIndex + Sample * 3 + 1;
+            const int32 D = BaseIndex + (Sample + 1) * 3 + 1;
+            const int32 E = BaseIndex + Sample * 3 + 2;
+            const int32 F = BaseIndex + (Sample + 1) * 3 + 2;
+            AddDoubleSidedQuad(RidgeTriangles, A, B, C, D);
+            AddDoubleSidedQuad(RidgeTriangles, C, D, E, F);
+        }
+    }
+
+    DistantRidgeMesh->CreateMeshSection_LinearColor(0, RidgeVertices, RidgeTriangles, RidgeNormals, RidgeUVs, RidgeColors, RidgeTangents, false);
+}
+
+void ACoasterRideActor::BuildRiverEffects()
+{
     const float RiverHalfWidth = 2050.0f;
     const float SegmentStep = 520.0f;
     const int32 SampleCount = FMath::Max(FMath::CeilToInt(TrackLengthCm / SegmentStep), 16);
-    const bool bHasImportedLandscape = HasImportedLandscape();
 
-    struct FRiverSample
-    {
-        FVector Center = FVector::ZeroVector;
-        FVector Forward = FVector::ForwardVector;
-        FVector Right = FVector::RightVector;
-        float Ratio = 0.0f;
-    };
+    TArray<FEnvironmentRiverSample> Samples;
+    BuildRiverSamples(Samples, SampleCount);
+    BuildRiverRibbon(Samples, RiverHalfWidth);
+    BuildFoamRibbon(Samples, RiverHalfWidth);
+    BuildRapids(Samples, RiverHalfWidth);
+}
 
-    TArray<FRiverSample> Samples;
-    Samples.Reserve(SampleCount + 1);
+void ACoasterRideActor::BuildRiverSamples(TArray<FEnvironmentRiverSample>& OutSamples, int32 SampleCount) const
+{
+    OutSamples.Reset();
+    OutSamples.Reserve(SampleCount + 1);
 
     for (int32 Index = 0; Index <= SampleCount; ++Index)
     {
@@ -686,92 +603,16 @@ void ACoasterRideActor::RebuildEnvironment()
 
         const FVector EnvRightA = FVector::CrossProduct(FVector::UpVector, EnvForwardA).GetSafeNormal();
         const float Bend = FMath::Sin(TrackRatio * UE_TWO_PI * 2.0f) * 90.0f;
-        FRiverSample& Sample = Samples.AddDefaulted_GetRef();
+        FEnvironmentRiverSample& Sample = OutSamples.AddDefaulted_GetRef();
         Sample.Center = FVector(LocationA.X, LocationA.Y + Bend, RiverZCm);
         Sample.Forward = EnvForwardA;
         Sample.Right = EnvRightA;
         Sample.Ratio = TrackRatio;
     }
+}
 
-    TArray<FVector> TerrainVertices;
-    TArray<int32> TerrainTriangles;
-    TArray<FVector> TerrainNormals;
-    TArray<FVector2D> TerrainUVs;
-    TArray<FLinearColor> TerrainColors;
-    TArray<FProcMeshTangent> TerrainTangents;
-    const int32 TerrainGridX = 156;
-    const int32 TerrainGridY = 128;
-    const float MinX = -4200.0f;
-    const float MaxX = 12200.0f;
-    const float MinY = -10500.0f;
-    const float MaxY = 8200.0f;
-    TerrainVertices.Reserve(TerrainGridX * TerrainGridY);
-    TerrainNormals.Reserve(TerrainGridX * TerrainGridY);
-    TerrainUVs.Reserve(TerrainGridX * TerrainGridY);
-    TerrainColors.Reserve(TerrainGridX * TerrainGridY);
-    TerrainTangents.Reserve(TerrainGridX * TerrainGridY);
-
-    for (int32 YIndex = 0; YIndex < TerrainGridY; ++YIndex)
-    {
-        const float V = static_cast<float>(YIndex) / static_cast<float>(TerrainGridY - 1);
-        const float Y = FMath::Lerp(MinY, MaxY, V);
-        for (int32 XIndex = 0; XIndex < TerrainGridX; ++XIndex)
-        {
-            const float U = static_cast<float>(XIndex) / static_cast<float>(TerrainGridX - 1);
-            const float X = FMath::Lerp(MinX, MaxX, U);
-            const float Height = YarlungTerrainHeight(X, Y);
-            TerrainVertices.Add(FVector(X, Y, Height));
-            TerrainNormals.Add(FVector::UpVector);
-            TerrainUVs.Add(FVector2D(U * 9.0f, V * 9.0f));
-            TerrainColors.Add(YarlungTerrainColor(X, Y, Height));
-            TerrainTangents.Add(FProcMeshTangent(FVector::ForwardVector, false));
-
-            const float DetailNoise = Hash01(static_cast<float>(XIndex), static_cast<float>(YIndex));
-            const float TrackDistance = YarlungCoaster::DistanceToTrack2D(X, Y);
-
-            if (Height > 2700.0f && TrackDistance > 2200.0f && (XIndex % 11) == 0 && (YIndex % 9) == 0)
-            {
-                const float SnowScale = 1.2f + DetailNoise * 1.8f;
-                SnowCaps->AddInstance(FTransform(
-                    FRotator(0.0f, FMath::Fmod(X * 0.11f + Y * 0.07f, 360.0f), 0.0f),
-                    FVector(X, Y, Height + 12.0f),
-                    FVector(SnowScale * 2.2f, SnowScale * 1.15f, SnowScale * 0.06f)));
-            }
-        }
-    }
-
-    for (int32 YIndex = 0; YIndex < TerrainGridY; ++YIndex)
-    {
-        for (int32 XIndex = 0; XIndex < TerrainGridX; ++XIndex)
-        {
-            const int32 Center = YIndex * TerrainGridX + XIndex;
-            const int32 Left = YIndex * TerrainGridX + FMath::Max(XIndex - 1, 0);
-            const int32 Right = YIndex * TerrainGridX + FMath::Min(XIndex + 1, TerrainGridX - 1);
-            const int32 Down = FMath::Max(YIndex - 1, 0) * TerrainGridX + XIndex;
-            const int32 Up = FMath::Min(YIndex + 1, TerrainGridY - 1) * TerrainGridX + XIndex;
-            const FVector Dx = TerrainVertices[Right] - TerrainVertices[Left];
-            const FVector Dy = TerrainVertices[Up] - TerrainVertices[Down];
-            TerrainNormals[Center] = FVector::CrossProduct(Dx, Dy).GetSafeNormal();
-        }
-    }
-
-    for (int32 YIndex = 0; YIndex < TerrainGridY - 1; ++YIndex)
-    {
-        for (int32 XIndex = 0; XIndex < TerrainGridX - 1; ++XIndex)
-        {
-            const int32 A = YIndex * TerrainGridX + XIndex;
-            const int32 B = (YIndex + 1) * TerrainGridX + XIndex;
-            const int32 C = YIndex * TerrainGridX + XIndex + 1;
-            const int32 D = (YIndex + 1) * TerrainGridX + XIndex + 1;
-            AddDoubleSidedQuad(TerrainTriangles, A, B, C, D);
-        }
-    }
-
-    if (!bHasImportedLandscape)
-    {
-        CanyonTerrainMesh->CreateMeshSection_LinearColor(0, TerrainVertices, TerrainTriangles, TerrainNormals, TerrainUVs, TerrainColors, TerrainTangents, false);
-    }
-
+void ACoasterRideActor::BuildRiverRibbon(const TArray<FEnvironmentRiverSample>& Samples, float RiverHalfWidth)
+{
     TArray<FVector> RiverVertices;
     TArray<int32> RiverTriangles;
     TArray<FVector> RiverNormals;
@@ -781,7 +622,7 @@ void ACoasterRideActor::RebuildEnvironment()
     const TArray<float> RiverAcross = { -1.0f, -0.52f, 0.0f, 0.52f, 1.0f };
     for (int32 Along = 0; Along < Samples.Num(); ++Along)
     {
-        const FRiverSample& Sample = Samples[Along];
+        const FEnvironmentRiverSample& Sample = Samples[Along];
         for (int32 Across = 0; Across < RiverAcross.Num(); ++Across)
         {
             const float Wave = 4.0f * FMath::Sin(Along * 0.85f + Across * 1.7f);
@@ -811,7 +652,10 @@ void ACoasterRideActor::RebuildEnvironment()
     }
 
     RiverRibbonMesh->CreateMeshSection_LinearColor(0, RiverVertices, RiverTriangles, RiverNormals, RiverUVs, RiverColors, RiverTangents, false);
+}
 
+void ACoasterRideActor::BuildFoamRibbon(const TArray<FEnvironmentRiverSample>& Samples, float RiverHalfWidth)
+{
     TArray<FVector> FoamVertices;
     TArray<int32> FoamTriangles;
     TArray<FVector> FoamNormals;
@@ -823,7 +667,7 @@ void ACoasterRideActor::RebuildEnvironment()
     {
         for (int32 Along = 0; Along < Samples.Num(); ++Along)
         {
-            const FRiverSample& Sample = Samples[Along];
+            const FEnvironmentRiverSample& Sample = Samples[Along];
             const float Lateral = (FoamLanes[Lane] * RiverHalfWidth) + 120.0f * FMath::Sin(Along * 0.9f + Lane);
             const float Width = 46.0f + 22.0f * FMath::Sin(Along * 0.51f + Lane * 1.4f);
             const FVector FoamCenter = Sample.Center + Sample.Right * Lateral + FVector(0.0f, 0.0f, 16.0f);
@@ -851,18 +695,20 @@ void ACoasterRideActor::RebuildEnvironment()
     }
 
     FoamRibbonMesh->CreateMeshSection_LinearColor(0, FoamVertices, FoamTriangles, FoamNormals, FoamUVs, FoamColors, FoamTangents, false);
+}
 
+void ACoasterRideActor::BuildRapids(const TArray<FEnvironmentRiverSample>& Samples, float RiverHalfWidth)
+{
     for (int32 Along = 0; Along < Samples.Num() - 1; ++Along)
     {
-        const FRiverSample& SampleA = Samples[Along];
-        const FRiverSample& SampleB = Samples[Along + 1];
+        const FEnvironmentRiverSample& SampleA = Samples[Along];
+        const FEnvironmentRiverSample& SampleB = Samples[Along + 1];
         if (Along % 4 == 0)
         {
             const FVector FoamStart = (SampleA.Center + SampleB.Center) * 0.5f - SampleA.Right * (RiverHalfWidth * 0.56f) + FVector(0.0f, 0.0f, 18.0f);
             const FVector FoamEnd = (SampleA.Center + SampleB.Center) * 0.5f + SampleA.Right * (RiverHalfWidth * 0.56f) + FVector(0.0f, 0.0f, 18.0f);
             Rapids->AddInstance(MakeSegmentTransform(FoamStart, FoamEnd, FVector(RiverHalfWidth * 0.54f, 4.0f, 2.0f)));
         }
-
     }
 }
 
@@ -902,7 +748,6 @@ void ACoasterRideActor::ApplyVisualMaterials()
     TintComponent(RiverSurface, FLinearColor(0.035f, 0.24f, 0.27f));
     TintComponent(Rapids, FLinearColor(0.44f, 0.56f, 0.50f));
     TintComponent(MistBands, FLinearColor(0.50f, 0.56f, 0.52f));
-    TintComponent(SnowCaps, FLinearColor(0.66f, 0.74f, 0.72f));
     TintComponent(RiverRibbonMesh, FLinearColor(0.035f, 0.24f, 0.27f));
     TintComponent(FoamRibbonMesh, FLinearColor(0.44f, 0.56f, 0.50f));
 }
@@ -982,21 +827,6 @@ void ACoasterRideActor::UpdateFirstPersonCamera()
 {
     RideCamera->SetRelativeLocation(FVector(-104.0f, 0.0f, 286.0f));
     RideCamera->SetRelativeRotation(FRotator(-4.0f, 0.0f, 0.0f));
-}
-
-bool ACoasterRideActor::HasImportedLandscape() const
-{
-    if (!bUseImportedLandscapeWhenPresent || !GetWorld())
-    {
-        return false;
-    }
-
-    for (TActorIterator<ALandscape> It(GetWorld()); It; ++It)
-    {
-        return true;
-    }
-
-    return false;
 }
 
 void ACoasterRideActor::SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const

@@ -134,6 +134,7 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
     if (LandscapeMaterial)
     {
         Landscape->LandscapeMaterial = LandscapeMaterial;
+        Landscape->UpdateAllComponentMaterialInstances(true);
         UE_LOG(LogTemp, Display, TEXT("Assigned Yarlung landscape material: %s"), *LandscapeMaterial->GetPathName());
     }
 
