@@ -43,14 +43,14 @@ ACoasterRideActor::ACoasterRideActor()
 
     TrainBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TrainBody"));
     TrainBody->SetupAttachment(TrainRoot);
-    TrainBody->SetRelativeScale3D(FVector(1.35f, 0.78f, 0.32f));
-    TrainBody->SetRelativeLocation(FVector(-45.0f, 0.0f, -78.0f));
+    TrainBody->SetRelativeScale3D(FVector(1.70f, 0.74f, 0.24f));
+    TrainBody->SetRelativeLocation(FVector(124.0f, 0.0f, -72.0f));
 
     RideCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("RideCamera"));
-    RideCamera->SetupAttachment(SceneRoot);
-    RideCamera->SetRelativeLocation(FVector(-520.0f, 120.0f, 260.0f));
-    RideCamera->SetRelativeRotation(FRotator(-10.0f, 0.0f, 0.0f));
-    RideCamera->SetFieldOfView(60.0f);
+    RideCamera->SetupAttachment(TrainRoot);
+    RideCamera->SetRelativeLocation(FVector(-150.0f, 0.0f, 116.0f));
+    RideCamera->SetRelativeRotation(FRotator(-9.0f, 0.0f, 0.0f));
+    RideCamera->SetFieldOfView(90.0f);
     RideCamera->bUsePawnControlRotation = false;
     RideCamera->PostProcessSettings.bOverride_MotionBlurAmount = true;
     RideCamera->PostProcessSettings.MotionBlurAmount = 0.12f;
@@ -194,7 +194,7 @@ void ACoasterRideActor::StartRideAt(float TrackRatio, float SpeedMps)
     FRotator Rotation;
     SampleFrame(CurrentDistanceCm, Location, Rotation, Forward, Right, Up);
     TrainRoot->SetRelativeLocationAndRotation(Location, Rotation);
-    UpdateCinematicCamera(Location, Forward);
+    UpdateFirstPersonCamera();
 }
 
 void ACoasterRideActor::RebuildSpline()
@@ -478,7 +478,7 @@ void ACoasterRideActor::AdvanceRide(float DeltaSeconds)
     FRotator NewRotation;
     SampleFrame(CurrentDistanceCm, NewLocation, NewRotation, NewForward, NewRight, NewUp);
     TrainRoot->SetRelativeLocationAndRotation(NewLocation, NewRotation);
-    UpdateCinematicCamera(NewLocation, NewForward);
+    UpdateFirstPersonCamera();
 
     const FVector VelocityCms = NewForward * CurrentSpeedCms;
     const FVector AccelWorldCms2 = (VelocityCms - LastVelocityCms) / DeltaSeconds;
@@ -494,28 +494,10 @@ void ACoasterRideActor::AdvanceRide(float DeltaSeconds)
     Telemetry.SectionName = SectionName;
 }
 
-void ACoasterRideActor::UpdateCinematicCamera(const FVector& TrainLocation, const FVector& TrainForward)
+void ACoasterRideActor::UpdateFirstPersonCamera()
 {
-    FVector Forward = TrainForward.GetSafeNormal();
-    if (Forward.IsNearlyZero())
-    {
-        Forward = FVector::ForwardVector;
-    }
-
-    FVector HorizontalForward(Forward.X, Forward.Y, 0.0f);
-    if (HorizontalForward.IsNearlyZero())
-    {
-        HorizontalForward = FVector::ForwardVector;
-    }
-    HorizontalForward.Normalize();
-
-    const FVector HorizontalRight = FVector::CrossProduct(FVector::UpVector, HorizontalForward).GetSafeNormal();
-    const FVector CameraLocation = TrainLocation - HorizontalForward * 3200.0f + HorizontalRight * 7200.0f + FVector(0.0f, 0.0f, 3600.0f);
-    const FVector LookTarget = TrainLocation + HorizontalForward * 1100.0f + FVector(0.0f, 0.0f, 260.0f);
-    const FVector LookDirection = (LookTarget - CameraLocation).GetSafeNormal();
-
-    RideCamera->SetRelativeLocation(CameraLocation);
-    RideCamera->SetRelativeRotation(FRotationMatrix::MakeFromX(LookDirection).Rotator());
+    RideCamera->SetRelativeLocation(FVector(-150.0f, 0.0f, 116.0f));
+    RideCamera->SetRelativeRotation(FRotator(-9.0f, 0.0f, 0.0f));
 }
 
 void ACoasterRideActor::SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const

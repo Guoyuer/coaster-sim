@@ -126,7 +126,7 @@ private:
     void RebuildEnvironment();
     void ApplyVisualMaterials();
     void AdvanceRide(float DeltaSeconds);
-    void UpdateCinematicCamera(const FVector& TrainLocation, const FVector& TrainForward);
+    void UpdateFirstPersonCamera();
     void SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const;
     FName GetSectionName(float TrackRatio) const;
 
