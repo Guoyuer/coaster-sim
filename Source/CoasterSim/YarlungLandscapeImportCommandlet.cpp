@@ -3,6 +3,7 @@
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "CoasterRideActor.h"
+#include "YarlungCoasterProfile.h"
 #include "Editor.h"
 #include "FileHelpers.h"
 #include "Landscape.h"
@@ -13,64 +14,6 @@
 #include "Misc/PackageName.h"
 #include "UObject/SavePackage.h"
 
-namespace
-{
-float Smooth01(float Value)
-{
-    const float T = FMath::Clamp(Value, 0.0f, 1.0f);
-    return T * T * (3.0f - 2.0f * T);
-}
-
-float DistanceToSegment2D(const FVector2D& Point, const FVector2D& A, const FVector2D& B, float& OutT)
-{
-    const FVector2D AB = B - A;
-    const float Denom = FMath::Max(AB.SizeSquared(), 1.0f);
-    OutT = FMath::Clamp(FVector2D::DotProduct(Point - A, AB) / Denom, 0.0f, 1.0f);
-    return (Point - (A + AB * OutT)).Size();
-}
-
-float ApplyCoasterClearanceCut(float X, float Y, float Height)
-{
-    const TArray<FVector> TrackPoints = {
-        FVector(0.0f, 0.0f, 1320.0f),
-        FVector(1800.0f, 0.0f, 1460.0f),
-        FVector(4200.0f, 280.0f, 2700.0f),
-        FVector(6800.0f, 620.0f, 4450.0f),
-        FVector(9300.0f, 260.0f, 2150.0f),
-        FVector(10400.0f, -1800.0f, 1420.0f),
-        FVector(7700.0f, -3650.0f, 2400.0f),
-        FVector(4100.0f, -3900.0f, 1800.0f),
-        FVector(600.0f, -2500.0f, 2750.0f),
-        FVector(-1800.0f, 300.0f, 1680.0f),
-        FVector(-850.0f, 1500.0f, 1360.0f)
-    };
-
-    const FVector2D Point(X, Y);
-    float BestDistance = TNumericLimits<float>::Max();
-    float ClearanceTarget = Height;
-    for (int32 Index = 0; Index < TrackPoints.Num(); ++Index)
-    {
-        const FVector& A3 = TrackPoints[Index];
-        const FVector& B3 = TrackPoints[(Index + 1) % TrackPoints.Num()];
-        float T = 0.0f;
-        const float Distance = DistanceToSegment2D(Point, FVector2D(A3.X, A3.Y), FVector2D(B3.X, B3.Y), T);
-        if (Distance < BestDistance)
-        {
-            BestDistance = Distance;
-            ClearanceTarget = FMath::Lerp(A3.Z, B3.Z, T) - 1580.0f;
-        }
-    }
-
-    if (BestDistance > 3300.0f)
-    {
-        return Height;
-    }
-
-    const float BlendToOriginal = Smooth01((BestDistance - 1450.0f) / 1850.0f);
-    const float CutHeight = FMath::Min(Height, ClearanceTarget);
-    return FMath::Lerp(CutHeight, Height, BlendToOriginal);
-}
-}
 #endif
 
 UYarlungLandscapeImportCommandlet::UYarlungLandscapeImportCommandlet()
@@ -129,7 +72,7 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
             const int32 DataIndex = YIndex * HeightmapSize + XIndex;
             const float EncodedT = static_cast<float>(HeightData[DataIndex]) / 65535.0f;
             const float HeightCm = FMath::Lerp(EncodedMinZ, EncodedMaxZ, EncodedT);
-            const float CutHeightCm = ApplyCoasterClearanceCut(X, Y, HeightCm);
+            const float CutHeightCm = YarlungCoaster::ApplyTrackClearanceCut(X, Y, HeightCm);
             const float CutT = FMath::Clamp((CutHeightCm - EncodedMinZ) / (EncodedMaxZ - EncodedMinZ), 0.0f, 1.0f);
             HeightData[DataIndex] = static_cast<uint16>(FMath::RoundToInt(CutT * 65535.0f));
         }

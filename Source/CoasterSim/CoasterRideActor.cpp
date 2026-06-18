@@ -1,5 +1,7 @@
 #include "CoasterRideActor.h"
 
+#include "YarlungCoasterProfile.h"
+
 #include "Camera/CameraComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
@@ -36,11 +38,7 @@ void AddDoubleSidedQuad(TArray<int32>& Triangles, int32 A, int32 B, int32 C, int
     Triangles.Append({ A, C, B, B, C, D, A, B, C, B, D, C });
 }
 
-float Smooth01(float Value)
-{
-    const float T = FMath::Clamp(Value, 0.0f, 1.0f);
-    return T * T * (3.0f - 2.0f * T);
-}
+using YarlungCoaster::Smooth01;
 
 float YarlungRiverCenterY(float X)
 {
@@ -48,8 +46,6 @@ float YarlungRiverCenterY(float X)
         + 1050.0f * FMath::Sin(X * 0.00048f + 0.7f)
         + 420.0f * FMath::Sin(X * 0.00115f - 0.6f);
 }
-
-float ApplyCoasterClearanceCut(float X, float Y, float Height);
 
 float YarlungTerrainHeight(float X, float Y)
 {
@@ -75,7 +71,7 @@ float YarlungTerrainHeight(float X, float Y)
         Height = FMath::Lerp(RiverZCm - 46.0f, RiverZCm + 34.0f, Channel);
     }
 
-    return ApplyCoasterClearanceCut(X, Y, Height);
+    return YarlungCoaster::ApplyTrackClearanceCut(X, Y, Height);
 }
 
 float YarlungForestAmount(float X, float Y, float Height)
@@ -126,84 +122,6 @@ float Hash01(float A, float B)
     return FMath::Frac(FMath::Sin(A * 12.9898f + B * 78.233f) * 43758.5453f);
 }
 
-float DistanceToSegment2D(const FVector2D& Point, const FVector2D& A, const FVector2D& B, float& OutT)
-{
-    const FVector2D AB = B - A;
-    const float Denom = FMath::Max(AB.SizeSquared(), 1.0f);
-    OutT = FMath::Clamp(FVector2D::DotProduct(Point - A, AB) / Denom, 0.0f, 1.0f);
-    return (Point - (A + AB * OutT)).Size();
-}
-
-float ApplyCoasterClearanceCut(float X, float Y, float Height)
-{
-    const TArray<FVector> TrackPoints = {
-        FVector(0.0f, 0.0f, 1320.0f),
-        FVector(1800.0f, 0.0f, 1460.0f),
-        FVector(4200.0f, 280.0f, 2700.0f),
-        FVector(6800.0f, 620.0f, 4450.0f),
-        FVector(9300.0f, 260.0f, 2150.0f),
-        FVector(10400.0f, -1800.0f, 1420.0f),
-        FVector(7700.0f, -3650.0f, 2400.0f),
-        FVector(4100.0f, -3900.0f, 1800.0f),
-        FVector(600.0f, -2500.0f, 2750.0f),
-        FVector(-1800.0f, 300.0f, 1680.0f),
-        FVector(-850.0f, 1500.0f, 1360.0f)
-    };
-
-    const FVector2D Point(X, Y);
-    float BestDistance = TNumericLimits<float>::Max();
-    float ClearanceTarget = Height;
-    for (int32 Index = 0; Index < TrackPoints.Num(); ++Index)
-    {
-        const FVector& A3 = TrackPoints[Index];
-        const FVector& B3 = TrackPoints[(Index + 1) % TrackPoints.Num()];
-        float T = 0.0f;
-        const float Distance = DistanceToSegment2D(Point, FVector2D(A3.X, A3.Y), FVector2D(B3.X, B3.Y), T);
-        if (Distance < BestDistance)
-        {
-            BestDistance = Distance;
-            ClearanceTarget = FMath::Lerp(A3.Z, B3.Z, T) - 1580.0f;
-        }
-    }
-
-    if (BestDistance > 3300.0f)
-    {
-        return Height;
-    }
-
-    const float BlendToOriginal = Smooth01((BestDistance - 1450.0f) / 1850.0f);
-    const float CutHeight = FMath::Min(Height, ClearanceTarget);
-    return FMath::Lerp(CutHeight, Height, BlendToOriginal);
-}
-
-float DistanceToCoasterTrack2D(float X, float Y)
-{
-    const TArray<FVector> TrackPoints = {
-        FVector(0.0f, 0.0f, 1320.0f),
-        FVector(1800.0f, 0.0f, 1460.0f),
-        FVector(4200.0f, 280.0f, 2700.0f),
-        FVector(6800.0f, 620.0f, 4450.0f),
-        FVector(9300.0f, 260.0f, 2150.0f),
-        FVector(10400.0f, -1800.0f, 1420.0f),
-        FVector(7700.0f, -3650.0f, 2400.0f),
-        FVector(4100.0f, -3900.0f, 1800.0f),
-        FVector(600.0f, -2500.0f, 2750.0f),
-        FVector(-1800.0f, 300.0f, 1680.0f),
-        FVector(-850.0f, 1500.0f, 1360.0f)
-    };
-
-    const FVector2D Point(X, Y);
-    float BestDistance = TNumericLimits<float>::Max();
-    for (int32 Index = 0; Index < TrackPoints.Num(); ++Index)
-    {
-        float T = 0.0f;
-        const FVector& A3 = TrackPoints[Index];
-        const FVector& B3 = TrackPoints[(Index + 1) % TrackPoints.Num()];
-        BestDistance = FMath::Min(BestDistance, DistanceToSegment2D(Point, FVector2D(A3.X, A3.Y), FVector2D(B3.X, B3.Y), T));
-    }
-
-    return BestDistance;
-}
 }
 
 ACoasterRideActor::ACoasterRideActor()
@@ -456,19 +374,7 @@ void ACoasterRideActor::EnsureDefaultTrack()
         return;
     }
 
-    ControlPoints = {
-        FVector(0.0f, 0.0f, 1320.0f),
-        FVector(1800.0f, 0.0f, 1460.0f),
-        FVector(4200.0f, 280.0f, 2700.0f),
-        FVector(6800.0f, 620.0f, 4450.0f),
-        FVector(9300.0f, 260.0f, 2150.0f),
-        FVector(10400.0f, -1800.0f, 1420.0f),
-        FVector(7700.0f, -3650.0f, 2400.0f),
-        FVector(4100.0f, -3900.0f, 1800.0f),
-        FVector(600.0f, -2500.0f, 2750.0f),
-        FVector(-1800.0f, 300.0f, 1680.0f),
-        FVector(-850.0f, 1500.0f, 1360.0f)
-    };
+    ControlPoints = YarlungCoaster::DefaultTrackControlPoints();
 }
 
 void ACoasterRideActor::StartRideAt(float TrackRatio, float SpeedMps)
@@ -786,7 +692,7 @@ void ACoasterRideActor::RebuildEnvironment()
             const float ForestAmount = YarlungForestAmount(X, Y, Height);
             const float Lateral = FMath::Abs(Y - YarlungRiverCenterY(X));
             const float DetailNoise = Hash01(static_cast<float>(XIndex), static_cast<float>(YIndex));
-            const float TrackDistance = DistanceToCoasterTrack2D(X, Y);
+            const float TrackDistance = YarlungCoaster::DistanceToTrack2D(X, Y);
             if (ForestAmount > 0.32f && TrackDistance > 2350.0f && (XIndex % 5) == 0 && (YIndex % 4) == 0 && DetailNoise > 0.22f)
             {
                 const float Yaw = FMath::Fmod(FMath::Abs(X * 0.37f + Y * 0.19f), 360.0f);

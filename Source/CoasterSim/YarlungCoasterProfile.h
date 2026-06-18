@@ -1,0 +1,86 @@
+#pragma once
+
+#include "CoreMinimal.h"
+
+namespace YarlungCoaster
+{
+constexpr float TrackClearanceOffsetCm = 1580.0f;
+constexpr float TrackClearanceOuterRadiusCm = 3300.0f;
+constexpr float TrackClearanceInnerRadiusCm = 1450.0f;
+
+inline float Smooth01(float Value)
+{
+    const float T = FMath::Clamp(Value, 0.0f, 1.0f);
+    return T * T * (3.0f - 2.0f * T);
+}
+
+inline const TArray<FVector>& DefaultTrackControlPoints()
+{
+    static const TArray<FVector> Points = {
+        FVector(0.0f, 0.0f, 1320.0f),
+        FVector(1800.0f, 0.0f, 1460.0f),
+        FVector(4200.0f, 280.0f, 2700.0f),
+        FVector(6800.0f, 620.0f, 4450.0f),
+        FVector(9300.0f, 260.0f, 2150.0f),
+        FVector(10400.0f, -1800.0f, 1420.0f),
+        FVector(7700.0f, -3650.0f, 2400.0f),
+        FVector(4100.0f, -3900.0f, 1800.0f),
+        FVector(600.0f, -2500.0f, 2750.0f),
+        FVector(-1800.0f, 300.0f, 1680.0f),
+        FVector(-850.0f, 1500.0f, 1360.0f)
+    };
+    return Points;
+}
+
+inline float DistanceToSegment2D(const FVector2D& Point, const FVector2D& A, const FVector2D& B, float& OutT)
+{
+    const FVector2D AB = B - A;
+    const float Denom = FMath::Max(AB.SizeSquared(), 1.0f);
+    OutT = FMath::Clamp(FVector2D::DotProduct(Point - A, AB) / Denom, 0.0f, 1.0f);
+    return (Point - (A + AB * OutT)).Size();
+}
+
+inline float DistanceToTrack2D(float X, float Y, float* OutTrackZ = nullptr)
+{
+    const TArray<FVector>& TrackPoints = DefaultTrackControlPoints();
+    const FVector2D Point(X, Y);
+    float BestDistance = TNumericLimits<float>::Max();
+    float BestTrackZ = 0.0f;
+
+    for (int32 Index = 0; Index < TrackPoints.Num(); ++Index)
+    {
+        const FVector& A3 = TrackPoints[Index];
+        const FVector& B3 = TrackPoints[(Index + 1) % TrackPoints.Num()];
+        float T = 0.0f;
+        const float Distance = DistanceToSegment2D(Point, FVector2D(A3.X, A3.Y), FVector2D(B3.X, B3.Y), T);
+        if (Distance < BestDistance)
+        {
+            BestDistance = Distance;
+            BestTrackZ = FMath::Lerp(A3.Z, B3.Z, T);
+        }
+    }
+
+    if (OutTrackZ)
+    {
+        *OutTrackZ = BestTrackZ;
+    }
+    return BestDistance;
+}
+
+inline float ApplyTrackClearanceCut(float X, float Y, float Height)
+{
+    float TrackZ = Height;
+    const float Distance = DistanceToTrack2D(X, Y, &TrackZ);
+    if (Distance > TrackClearanceOuterRadiusCm)
+    {
+        return Height;
+    }
+
+    const float ClearanceTarget = TrackZ - TrackClearanceOffsetCm;
+    const float BlendToOriginal = Smooth01(
+        (Distance - TrackClearanceInnerRadiusCm) /
+        (TrackClearanceOuterRadiusCm - TrackClearanceInnerRadiusCm));
+    const float CutHeight = FMath::Min(Height, ClearanceTarget);
+    return FMath::Lerp(CutHeight, Height, BlendToOriginal);
+}
+}
