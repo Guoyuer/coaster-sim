@@ -102,6 +102,10 @@ ACoasterRideActor::ACoasterRideActor()
     ForestPatches->SetupAttachment(SceneRoot);
     MistBands = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("MistBands"));
     MistBands->SetupAttachment(SceneRoot);
+    SandBars = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("SandBars"));
+    SandBars->SetupAttachment(SceneRoot);
+    SnowCaps = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("SnowCaps"));
+    SnowCaps->SetupAttachment(SceneRoot);
     CanyonTerrainMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("CanyonTerrainMesh"));
     CanyonTerrainMesh->SetupAttachment(SceneRoot);
     CanyonTerrainMesh->bUseAsyncCooking = true;
@@ -118,6 +122,8 @@ ACoasterRideActor::ACoasterRideActor()
     RiverRocks->SetCastShadow(false);
     ForestPatches->SetCastShadow(false);
     MistBands->SetCastShadow(false);
+    SandBars->SetCastShadow(false);
+    SnowCaps->SetCastShadow(false);
     CanyonTerrainMesh->SetCastShadow(false);
     RiverRibbonMesh->SetCastShadow(false);
     FoamRibbonMesh->SetCastShadow(false);
@@ -136,6 +142,8 @@ ACoasterRideActor::ACoasterRideActor()
         RiverRocks->SetStaticMesh(CubeMesh.Object);
         ForestPatches->SetStaticMesh(CubeMesh.Object);
         MistBands->SetStaticMesh(CubeMesh.Object);
+        SandBars->SetStaticMesh(CubeMesh.Object);
+        SnowCaps->SetStaticMesh(CubeMesh.Object);
     }
 
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
@@ -152,6 +160,8 @@ ACoasterRideActor::ACoasterRideActor()
         RiverRocks->SetMaterial(0, BasicMaterial.Object);
         ForestPatches->SetMaterial(0, BasicMaterial.Object);
         MistBands->SetMaterial(0, BasicMaterial.Object);
+        SandBars->SetMaterial(0, BasicMaterial.Object);
+        SnowCaps->SetMaterial(0, BasicMaterial.Object);
         CanyonTerrainMesh->SetMaterial(0, BasicMaterial.Object);
         RiverRibbonMesh->SetMaterial(0, BasicMaterial.Object);
         FoamRibbonMesh->SetMaterial(0, BasicMaterial.Object);
@@ -341,11 +351,13 @@ void ACoasterRideActor::RebuildEnvironment()
     RiverRocks->ClearInstances();
     ForestPatches->ClearInstances();
     MistBands->ClearInstances();
+    SandBars->ClearInstances();
+    SnowCaps->ClearInstances();
     CanyonTerrainMesh->ClearAllMeshSections();
     RiverRibbonMesh->ClearAllMeshSections();
     FoamRibbonMesh->ClearAllMeshSections();
 
-    const float RiverHalfWidth = 2800.0f;
+    const float RiverHalfWidth = 1500.0f;
     const float SegmentStep = 520.0f;
     const int32 SampleCount = FMath::Max(FMath::CeilToInt(TrackLengthCm / SegmentStep), 16);
 
@@ -394,14 +406,14 @@ void ACoasterRideActor::RebuildEnvironment()
     TArray<FLinearColor> TerrainColors;
     TArray<FProcMeshTangent> TerrainTangents;
     const TArray<float> TerrainOffsets = {
-        RiverHalfWidth + 11000.0f,
-        RiverHalfWidth + 15500.0f,
-        RiverHalfWidth + 21000.0f,
-        RiverHalfWidth + 28000.0f,
-        RiverHalfWidth + 36000.0f,
-        RiverHalfWidth + 46000.0f
+        RiverHalfWidth + 3600.0f,
+        RiverHalfWidth + 7600.0f,
+        RiverHalfWidth + 12600.0f,
+        RiverHalfWidth + 19000.0f,
+        RiverHalfWidth + 27000.0f,
+        RiverHalfWidth + 37000.0f
     };
-    const TArray<float> TerrainHeights = { 120.0f, 280.0f, 620.0f, 1100.0f, 1780.0f, 2600.0f };
+    const TArray<float> TerrainHeights = { 70.0f, 260.0f, 760.0f, 1480.0f, 2380.0f, 3400.0f };
 
     for (int32 Side = -1; Side <= 1; Side += 2)
     {
@@ -418,9 +430,9 @@ void ACoasterRideActor::RebuildEnvironment()
                 TerrainUVs.Add(FVector2D(Sample.Ratio * 12.0f, Across * 0.75f));
                 const float ColorT = static_cast<float>(Across) / static_cast<float>(TerrainOffsets.Num() - 1);
                 TerrainColors.Add(FLinearColor(
-                    FMath::Lerp(0.24f, 0.12f, ColorT),
-                    FMath::Lerp(0.22f, 0.14f, ColorT),
-                    FMath::Lerp(0.18f, 0.13f, ColorT),
+                    FMath::Lerp(0.32f, 0.16f, ColorT),
+                    FMath::Lerp(0.27f, 0.18f, ColorT),
+                    FMath::Lerp(0.18f, 0.14f, ColorT),
                     1.0f));
                 TerrainTangents.Add(FProcMeshTangent(Sample.Forward, false));
             }
@@ -439,7 +451,8 @@ void ACoasterRideActor::RebuildEnvironment()
         }
     }
 
-    CanyonTerrainMesh->CreateMeshSection_LinearColor(0, TerrainVertices, TerrainTriangles, TerrainNormals, TerrainUVs, TerrainColors, TerrainTangents, false);
+    // Continuous terrain wrapped around a closed coaster spline can cross the camera path.
+    // Use separated ridge bands instead so the canyon reads correctly from first person.
 
     TArray<FVector> RiverVertices;
     TArray<int32> RiverTriangles;
@@ -460,8 +473,8 @@ void ACoasterRideActor::RebuildEnvironment()
             const float CenterWeight = 1.0f - FMath::Abs(RiverAcross[Across]);
             RiverColors.Add(FLinearColor(
                 0.0f,
-                0.40f + CenterWeight * 0.14f,
-                0.52f + CenterWeight * 0.22f,
+                0.62f + CenterWeight * 0.16f,
+                0.88f + CenterWeight * 0.10f,
                 1.0f));
             RiverTangents.Add(FProcMeshTangent(Sample.Forward, false));
         }
@@ -502,8 +515,8 @@ void ACoasterRideActor::RebuildEnvironment()
             FoamNormals.Add(FVector::UpVector);
             FoamUVs.Add(FVector2D(Sample.Ratio * 24.0f, 0.0f));
             FoamUVs.Add(FVector2D(Sample.Ratio * 24.0f, 1.0f));
-            FoamColors.Add(FLinearColor(0.76f, 0.93f, 0.90f, 1.0f));
-            FoamColors.Add(FLinearColor(0.88f, 0.98f, 0.95f, 1.0f));
+            FoamColors.Add(FLinearColor(0.64f, 0.82f, 0.82f, 1.0f));
+            FoamColors.Add(FLinearColor(0.84f, 0.94f, 0.90f, 1.0f));
             FoamTangents.Add(FProcMeshTangent(Sample.Forward, false));
             FoamTangents.Add(FProcMeshTangent(Sample.Forward, false));
         }
@@ -525,7 +538,7 @@ void ACoasterRideActor::RebuildEnvironment()
     {
         const FRiverSample& SampleA = Samples[Along];
         const FRiverSample& SampleB = Samples[Along + 1];
-        RiverSurface->AddInstance(MakeSegmentTransform(SampleA.Center, SampleB.Center, FVector(SegmentStep, RiverHalfWidth * 4.2f, 6.0f)));
+        RiverSurface->AddInstance(MakeSegmentTransform(SampleA.Center, SampleB.Center, FVector(SegmentStep, RiverHalfWidth * 1.25f, 6.0f)));
 
         if (Along % 2 == 0)
         {
@@ -536,17 +549,61 @@ void ACoasterRideActor::RebuildEnvironment()
 
         for (int32 Side = -1; Side <= 1; Side += 2)
         {
-            const FVector BankA = SampleA.Center + SampleA.Right * (Side * (RiverHalfWidth + 140.0f)) + FVector(0.0f, 0.0f, 24.0f);
-            const FVector BankB = SampleB.Center + SampleB.Right * (Side * (RiverHalfWidth + 190.0f)) + FVector(0.0f, 0.0f, 30.0f);
-            RiverRocks->AddInstance(MakeSegmentTransform(BankA, BankB, FVector(SegmentStep, 320.0f, 34.0f)));
+            const FVector FloodplainA = SampleA.Center + SampleA.Right * (Side * (RiverHalfWidth + 1900.0f)) + FVector(0.0f, 0.0f, 9.0f);
+            const FVector FloodplainB = SampleB.Center + SampleB.Right * (Side * (RiverHalfWidth + 2050.0f)) + FVector(0.0f, 0.0f, 11.0f);
+            SandBars->AddInstance(MakeSegmentTransform(FloodplainA, FloodplainB, FVector(SegmentStep, 7200.0f, 5.0f)));
+
+            const FVector BankA = SampleA.Center + SampleA.Right * (Side * (RiverHalfWidth + 220.0f)) + FVector(0.0f, 0.0f, 18.0f);
+            const FVector BankB = SampleB.Center + SampleB.Right * (Side * (RiverHalfWidth + 280.0f)) + FVector(0.0f, 0.0f, 24.0f);
+            if (Along % 4 == 0)
+            {
+                RiverRocks->AddInstance(MakeSegmentTransform(BankA + FVector(0.0f, 0.0f, 8.0f), BankB + FVector(0.0f, 0.0f, 8.0f), FVector(SegmentStep, 120.0f, 14.0f)));
+            }
+
+            if (Along % 2 == 0)
+            {
+                for (int32 Layer = 0; Layer < 4; ++Layer)
+                {
+                    const float RidgeOffset = RiverHalfWidth + 14500.0f + Layer * 7200.0f;
+                    const float RidgeZ = RiverZCm + 220.0f + Layer * 610.0f + 95.0f * FMath::Sin(SampleA.Ratio * UE_TWO_PI * 3.0f + Layer);
+                    const float RidgeWidth = 780.0f + Layer * 280.0f;
+                    const float RidgeHeight = 110.0f + Layer * 110.0f;
+                    const FVector RidgeA = SampleA.Center + SampleA.Right * (Side * RidgeOffset) + FVector(0.0f, 0.0f, RidgeZ);
+                    const FVector RidgeB = SampleB.Center + SampleB.Right * (Side * (RidgeOffset + 240.0f)) + FVector(0.0f, 0.0f, RidgeZ + 45.0f);
+                    CanyonWalls->AddInstance(MakeSegmentTransform(RidgeA, RidgeB, FVector(SegmentStep * 1.2f, RidgeWidth, RidgeHeight)));
+
+                    if (Layer == 1)
+                    {
+                        ForestPatches->AddInstance(MakeSegmentTransform(
+                            RidgeA + FVector(0.0f, 0.0f, RidgeHeight * 0.55f),
+                            RidgeB + FVector(0.0f, 0.0f, RidgeHeight * 0.55f),
+                            FVector(SegmentStep * 0.75f, RidgeWidth * 0.36f, 18.0f)));
+                    }
+
+                    if (Layer == 3 && Along % 4 == 0)
+                    {
+                        SnowCaps->AddInstance(MakeSegmentTransform(
+                            RidgeA + FVector(0.0f, 0.0f, RidgeHeight * 0.95f),
+                            RidgeB + FVector(0.0f, 0.0f, RidgeHeight * 0.95f),
+                            FVector(SegmentStep * 0.85f, RidgeWidth * 0.32f, 22.0f)));
+                    }
+                }
+            }
+
+            if (Along % 4 == 0)
+            {
+                const FVector SnowA = SampleA.Center + SampleA.Right * (Side * (RiverHalfWidth + 30000.0f)) + FVector(0.0f, 0.0f, 3360.0f);
+                const FVector SnowB = SampleB.Center + SampleB.Right * (Side * (RiverHalfWidth + 31200.0f)) + FVector(0.0f, 0.0f, 3460.0f);
+                SnowCaps->AddInstance(MakeSegmentTransform(SnowA, SnowB, FVector(SegmentStep * 1.5f, 1450.0f, 34.0f)));
+            }
 
         }
 
-        if (Along % 3 == 0)
+        if (Along % 5 == 0)
         {
             const FVector RockCenter = (SampleA.Center + SampleB.Center) * 0.5f + SampleA.Right * (FMath::Sin(SampleA.Ratio * UE_TWO_PI * 9.0f) * RiverHalfWidth * 0.5f) + FVector(0.0f, 0.0f, 42.0f);
             const FVector RockEnd = RockCenter + SampleA.Forward * 120.0f + SampleA.Right * 40.0f;
-            RiverRocks->AddInstance(MakeSegmentTransform(RockCenter, RockEnd, FVector(140.0f, 70.0f, 44.0f)));
+            RiverRocks->AddInstance(MakeSegmentTransform(RockCenter, RockEnd, FVector(110.0f, 48.0f, 30.0f)));
         }
     }
 }
@@ -575,12 +632,14 @@ void ACoasterRideActor::ApplyVisualMaterials()
     TintComponent(RightRail, FLinearColor(0.55f, 0.57f, 0.56f));
     TintComponent(Ties, FLinearColor(0.22f, 0.18f, 0.13f));
     TintComponent(Supports, FLinearColor(0.38f, 0.42f, 0.44f));
-    TintComponent(CanyonWalls, FLinearColor(0.27f, 0.25f, 0.21f));
-    TintComponent(RiverSurface, FLinearColor(0.01f, 0.36f, 0.42f));
-    TintComponent(Rapids, FLinearColor(0.78f, 0.92f, 0.88f));
+    TintComponent(CanyonWalls, FLinearColor(0.38f, 0.32f, 0.24f));
+    TintComponent(RiverSurface, FLinearColor(0.00f, 0.62f, 0.82f));
+    TintComponent(Rapids, FLinearColor(0.70f, 0.88f, 0.84f));
     TintComponent(RiverRocks, FLinearColor(0.42f, 0.39f, 0.34f));
-    TintComponent(ForestPatches, FLinearColor(0.02f, 0.11f, 0.04f));
+    TintComponent(ForestPatches, FLinearColor(0.015f, 0.16f, 0.045f));
     TintComponent(MistBands, FLinearColor(0.78f, 0.88f, 0.84f));
+    TintComponent(SandBars, FLinearColor(0.58f, 0.50f, 0.36f));
+    TintComponent(SnowCaps, FLinearColor(0.86f, 0.92f, 0.90f));
 }
 
 void ACoasterRideActor::AdvanceRide(float DeltaSeconds)

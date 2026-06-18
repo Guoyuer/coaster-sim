@@ -106,6 +106,12 @@ protected:
     TObjectPtr<UInstancedStaticMeshComponent> MistBands;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UInstancedStaticMeshComponent> SandBars;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UInstancedStaticMeshComponent> SnowCaps;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UProceduralMeshComponent> CanyonTerrainMesh;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
