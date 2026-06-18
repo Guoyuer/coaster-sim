@@ -1,5 +1,6 @@
 param(
-    [switch]$Build
+    [switch]$Build,
+    [switch]$SkipMaterials
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,9 +18,11 @@ if ($Build) {
     }
 }
 
-& $EditorCmd $Project "-ExecutePythonScript=$MaterialScript" -unattended -nop4 -NullRHI -NoSplash
-if ($LASTEXITCODE -ne 0) {
-    throw "Coaster material generation failed with exit code $LASTEXITCODE"
+if (-not $SkipMaterials) {
+    & $EditorCmd $Project "-ExecutePythonScript=$MaterialScript" -unattended -nop4 -NullRHI -NoSplash
+    if ($LASTEXITCODE -ne 0) {
+        throw "Coaster material generation failed with exit code $LASTEXITCODE"
+    }
 }
 
 & $EditorCmd $Project -run=YarlungLandscapeImport -unattended -nop4 -NullRHI -NoSplash

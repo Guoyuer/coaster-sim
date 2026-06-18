@@ -2,7 +2,8 @@
 """Generate landscape-ready Yarlung Tsangpo canyon heightmap assets.
 
 The raw heightmap is little-endian uint16 `.r16`, which Unreal Landscape can
-import directly. PPM previews are intentionally dependency-free.
+import directly. PPM previews are dependency-free sanity checks for shape,
+river width, forest massing, snow, and rock zones.
 """
 
 from __future__ import annotations
@@ -83,16 +84,22 @@ def lerp(a: float, b: float, t: float) -> float:
 def rgb_for_preview(x: float, y: float, height: float) -> tuple[int, int, int]:
     rock, forest, snow, river = masks(x, y, height)
     if river > 8:
-        return 0, min(255, 105 + river // 2), min(255, 150 + river // 2)
+        return 12, min(255, 88 + river // 3), min(255, 102 + river // 3)
     if snow > 24:
-        v = min(255, 188 + snow // 4)
-        return v, min(255, v + 8), min(255, v + 2)
+        v = min(255, 158 + snow // 5)
+        return v, min(255, v + 7), min(255, v + 5)
     if forest > 18:
-        return 18, max(58, forest), 28
+        canopy = min(118, max(48, forest // 2 + 36))
+        return 20, canopy, 34
     if abs(y - river_center_y(x)) < 2350.0:
-        return 135, 114, 78
+        return 58, 62, 48
     shade = int(max(0.0, min(1.0, (height - 250.0) / 2900.0)) * 70.0)
-    return 94 + shade, 80 + shade, 58 + shade
+    grain = int(12.0 * math.sin(x * 0.013 + y * 0.017) + 8.0 * math.sin(x * 0.029 - y * 0.011))
+    return (
+        max(0, min(255, 55 + shade // 2 + grain)),
+        max(0, min(255, 59 + shade // 2 + grain)),
+        max(0, min(255, 50 + shade // 3 + grain // 2)),
+    )
 
 
 def write_ppm(path: Path, pixels: list[tuple[int, int, int]]) -> None:

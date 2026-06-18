@@ -1,6 +1,9 @@
 param(
     [switch]$Build,
+    [switch]$Fast,
     [int[]]$WaitSeconds = @(2, 6, 10, 15),
+    [int]$ResX = 1280,
+    [int]$ResY = 720,
     [string]$Name = "VisualCheck-latest"
 )
 
@@ -11,6 +14,10 @@ $Project = Join-Path $RepoRoot "CoasterSim.uproject"
 $Editor = "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe"
 $BuildBat = "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat"
 $OutputDir = Join-Path $RepoRoot "Saved"
+
+if ($Fast -and -not $PSBoundParameters.ContainsKey("WaitSeconds")) {
+    $WaitSeconds = @(10)
+}
 
 if ($Build) {
     & $BuildBat CoasterSimEditor Win64 Development "-Project=$Project" -WaitMutex -NoHotReloadFromIDE
@@ -25,8 +32,8 @@ $Process = Start-Process -FilePath $Editor -ArgumentList @(
     $Project,
     "-game",
     "-windowed",
-    "-ResX=1280",
-    "-ResY=720",
+    "-ResX=$ResX",
+    "-ResY=$ResY",
     "-NoSplash",
     "-NoLoadingScreen",
     "-NoLiveCoding",

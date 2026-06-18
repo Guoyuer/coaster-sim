@@ -8,11 +8,8 @@
 #include "FileHelpers.h"
 #include "Landscape.h"
 #include "LandscapeProxy.h"
-#include "Materials/MaterialInstanceConstant.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/FileHelper.h"
-#include "Misc/PackageName.h"
-#include "UObject/SavePackage.h"
 
 #endif
 
@@ -41,7 +38,6 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
         FPaths::ProjectContentDir(),
         TEXT("Generated/YarlungLandscape/YarlungTsangpo_505.r16")));
     const FString MapPackagePath = TEXT("/Game/Generated/YarlungLandscape/YarlungLandscape_Level");
-    const FString LandscapeMaterialPackagePath = TEXT("/Game/Generated/YarlungLandscape/MI_YarlungLandscape_Ground");
 
     TArray<uint8> RawBytes;
     if (!FFileHelper::LoadFileToArray(RawBytes, *HeightmapPath))
@@ -105,44 +101,6 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
     Landscape->bCastStaticShadow = true;
     Landscape->bCastDynamicShadow = true;
 
-    UMaterialInterface* BaseLandscapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
-    if (!BaseLandscapeMaterial)
-    {
-        BaseLandscapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
-    }
-    UMaterialInstanceConstant* LandscapeMaterial = LoadObject<UMaterialInstanceConstant>(nullptr, *LandscapeMaterialPackagePath);
-    if (!LandscapeMaterial && BaseLandscapeMaterial)
-    {
-        UPackage* MaterialPackage = CreatePackage(*LandscapeMaterialPackagePath);
-        LandscapeMaterial = NewObject<UMaterialInstanceConstant>(
-            MaterialPackage,
-            FName(TEXT("MI_YarlungLandscape_Ground")),
-            RF_Public | RF_Standalone);
-        FAssetRegistryModule::AssetCreated(LandscapeMaterial);
-    }
-
-    if (LandscapeMaterial && BaseLandscapeMaterial)
-    {
-        LandscapeMaterial->SetParentEditorOnly(BaseLandscapeMaterial);
-        LandscapeMaterial->SetVectorParameterValueEditorOnly(FMaterialParameterInfo(TEXT("Color")), FLinearColor(0.24f, 0.25f, 0.21f, 1.0f));
-        LandscapeMaterial->SetVectorParameterValueEditorOnly(FMaterialParameterInfo(TEXT("BaseColor")), FLinearColor(0.24f, 0.25f, 0.21f, 1.0f));
-        LandscapeMaterial->PostEditChange();
-        LandscapeMaterial->MarkPackageDirty();
-
-        UPackage* MaterialPackage = LandscapeMaterial->GetPackage();
-        FSavePackageArgs SaveArgs;
-        SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
-        SaveArgs.SaveFlags = SAVE_NoError;
-        const FString MaterialFilename = FPackageName::LongPackageNameToFilename(LandscapeMaterialPackagePath, FPackageName::GetAssetPackageExtension());
-        UPackage::SavePackage(MaterialPackage, LandscapeMaterial, *MaterialFilename, SaveArgs);
-
-        Landscape->LandscapeMaterial = LandscapeMaterial;
-    }
-    else if (BaseLandscapeMaterial)
-    {
-        Landscape->LandscapeMaterial = BaseLandscapeMaterial;
-    }
-
     TMap<FGuid, TArray<uint16>> HeightDataPerLayer;
     HeightDataPerLayer.Add(FGuid(), MoveTemp(HeightData));
 
@@ -163,6 +121,22 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
         ELandscapeImportAlphamapType::Additive,
         TArrayView<const FLandscapeLayer>());
     Landscape->RegisterAllComponents();
+
+    UMaterialInterface* LandscapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_YarlungLandscapeGround.M_YarlungLandscapeGround"));
+    if (!LandscapeMaterial)
+    {
+        LandscapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
+    }
+    if (!LandscapeMaterial)
+    {
+        LandscapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
+    }
+    if (LandscapeMaterial)
+    {
+        Landscape->LandscapeMaterial = LandscapeMaterial;
+        UE_LOG(LogTemp, Display, TEXT("Assigned Yarlung landscape material: %s"), *LandscapeMaterial->GetPathName());
+    }
+
     Landscape->PostEditChange();
 
     ACoasterRideActor* Ride = World->SpawnActor<ACoasterRideActor>(

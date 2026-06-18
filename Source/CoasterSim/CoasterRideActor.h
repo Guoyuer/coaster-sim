@@ -96,25 +96,13 @@ protected:
     TObjectPtr<UInstancedStaticMeshComponent> Supports;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UInstancedStaticMeshComponent> CanyonWalls;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UInstancedStaticMeshComponent> RiverSurface;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UInstancedStaticMeshComponent> Rapids;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UInstancedStaticMeshComponent> RiverRocks;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UInstancedStaticMeshComponent> ForestPatches;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UInstancedStaticMeshComponent> MistBands;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UInstancedStaticMeshComponent> SandBars;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UInstancedStaticMeshComponent> SnowCaps;
@@ -127,6 +115,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UProceduralMeshComponent> FoamRibbonMesh;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UProceduralMeshComponent> DistantRidgeMesh;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UProceduralMeshComponent> SkyDomeMesh;
