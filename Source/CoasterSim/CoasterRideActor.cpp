@@ -1,12 +1,16 @@
 #include "CoasterRideActor.h"
 
 #include "Camera/CameraComponent.h"
+#include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/SplineComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "EngineUtils.h"
+#include "Landscape.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
@@ -150,7 +154,18 @@ ACoasterRideActor::ACoasterRideActor()
 
     SkyLight = CreateDefaultSubobject<USkyLightComponent>(TEXT("SkyLight"));
     SkyLight->SetupAttachment(SceneRoot);
-    SkyLight->SetIntensity(0.38f);
+    SkyLight->SetIntensity(0.78f);
+
+    SunLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("SunLight"));
+    SunLight->SetupAttachment(SceneRoot);
+    SunLight->SetRelativeRotation(FRotator(-38.0f, -26.0f, 0.0f));
+    SunLight->SetIntensity(7.4f);
+    SunLight->SetLightColor(FLinearColor(1.0f, 0.93f, 0.82f));
+    SunLight->SetAtmosphereSunLight(true);
+    SunLight->SetAtmosphereSunLightIndex(0);
+
+    SkyAtmosphere = CreateDefaultSubobject<USkyAtmosphereComponent>(TEXT("SkyAtmosphere"));
+    SkyAtmosphere->SetupAttachment(SceneRoot);
 
     ValleyFog = CreateDefaultSubobject<UExponentialHeightFogComponent>(TEXT("ValleyFog"));
     ValleyFog->SetupAttachment(SceneRoot);
@@ -449,6 +464,7 @@ void ACoasterRideActor::RebuildEnvironment()
     const float RiverHalfWidth = 1500.0f;
     const float SegmentStep = 520.0f;
     const int32 SampleCount = FMath::Max(FMath::CeilToInt(TrackLengthCm / SegmentStep), 16);
+    const bool bHasImportedLandscape = HasImportedLandscape();
 
     struct FRiverSample
     {
@@ -571,7 +587,10 @@ void ACoasterRideActor::RebuildEnvironment()
         }
     }
 
-    CanyonTerrainMesh->CreateMeshSection_LinearColor(0, TerrainVertices, TerrainTriangles, TerrainNormals, TerrainUVs, TerrainColors, TerrainTangents, false);
+    if (!bHasImportedLandscape)
+    {
+        CanyonTerrainMesh->CreateMeshSection_LinearColor(0, TerrainVertices, TerrainTriangles, TerrainNormals, TerrainUVs, TerrainColors, TerrainTangents, false);
+    }
 
     TArray<FVector> RiverVertices;
     TArray<int32> RiverTriangles;
@@ -794,6 +813,21 @@ void ACoasterRideActor::UpdateFirstPersonCamera()
 {
     RideCamera->SetRelativeLocation(FVector(-24.0f, 0.0f, 205.0f));
     RideCamera->SetRelativeRotation(FRotator(-15.0f, 0.0f, 0.0f));
+}
+
+bool ACoasterRideActor::HasImportedLandscape() const
+{
+    if (!bUseImportedLandscapeWhenPresent || !GetWorld())
+    {
+        return false;
+    }
+
+    for (TActorIterator<ALandscape> It(GetWorld()); It; ++It)
+    {
+        return true;
+    }
+
+    return false;
 }
 
 void ACoasterRideActor::SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const

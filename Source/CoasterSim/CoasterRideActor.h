@@ -5,9 +5,11 @@
 #include "CoasterRideActor.generated.h"
 
 class UCameraComponent;
+class UDirectionalLightComponent;
 class UExponentialHeightFogComponent;
 class UInstancedStaticMeshComponent;
 class UProceduralMeshComponent;
+class USkyAtmosphereComponent;
 class USkyLightComponent;
 class USplineComponent;
 
@@ -71,6 +73,12 @@ protected:
 
     UPROPERTY(VisibleAnywhere, Category = "Lighting")
     TObjectPtr<USkyLightComponent> SkyLight;
+
+    UPROPERTY(VisibleAnywhere, Category = "Lighting")
+    TObjectPtr<UDirectionalLightComponent> SunLight;
+
+    UPROPERTY(VisibleAnywhere, Category = "Lighting")
+    TObjectPtr<USkyAtmosphereComponent> SkyAtmosphere;
 
     UPROPERTY(VisibleAnywhere, Category = "Lighting")
     TObjectPtr<UExponentialHeightFogComponent> ValleyFog;
@@ -143,6 +151,7 @@ private:
     void ApplyVisualMaterials();
     void AdvanceRide(float DeltaSeconds);
     void UpdateFirstPersonCamera();
+    bool HasImportedLandscape() const;
     void SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const;
     FName GetSectionName(float TrackRatio) const;
 
@@ -151,4 +160,7 @@ private:
     float CurrentDistanceCm = 0.0f;
     float CurrentSpeedCms = 0.0f;
     float TrackLengthCm = 1.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Environment")
+    bool bUseImportedLandscapeWhenPresent = true;
 };

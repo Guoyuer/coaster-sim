@@ -12,6 +12,7 @@ public class CoasterSim : ModuleRules
             "CoreUObject",
             "Engine",
             "InputCore",
+            "Landscape",
             "ProceduralMeshComponent",
             "UMG"
         });
@@ -21,5 +22,14 @@ public class CoasterSim : ModuleRules
             "Slate",
             "SlateCore"
         });
+
+        if (Target.bBuildEditor)
+        {
+            PrivateDependencyModuleNames.AddRange(new[]
+            {
+                "AssetRegistry",
+                "UnrealEd"
+            });
+        }
     }
 }
