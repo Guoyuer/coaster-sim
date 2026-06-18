@@ -5,7 +5,9 @@
 #include "CoasterRideActor.generated.h"
 
 class UCameraComponent;
+class UExponentialHeightFogComponent;
 class UInstancedStaticMeshComponent;
+class USkyLightComponent;
 class USplineComponent;
 
 USTRUCT(BlueprintType)
@@ -48,6 +50,7 @@ public:
     virtual void Tick(float DeltaSeconds) override;
 
     const FCoasterTelemetry& GetTelemetry() const { return Telemetry; }
+    void StartRideAt(float TrackRatio, float SpeedMps);
 
 protected:
     UPROPERTY(VisibleAnywhere, Category = "Components")
@@ -65,6 +68,12 @@ protected:
     UPROPERTY(VisibleAnywhere, Category = "Components")
     TObjectPtr<UCameraComponent> RideCamera;
 
+    UPROPERTY(VisibleAnywhere, Category = "Lighting")
+    TObjectPtr<USkyLightComponent> SkyLight;
+
+    UPROPERTY(VisibleAnywhere, Category = "Lighting")
+    TObjectPtr<UExponentialHeightFogComponent> ValleyFog;
+
     UPROPERTY(VisibleAnywhere, Category = "Track Visuals")
     TObjectPtr<UInstancedStaticMeshComponent> LeftRail;
 
@@ -76,6 +85,24 @@ protected:
 
     UPROPERTY(VisibleAnywhere, Category = "Track Visuals")
     TObjectPtr<UInstancedStaticMeshComponent> Supports;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UInstancedStaticMeshComponent> CanyonWalls;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UInstancedStaticMeshComponent> RiverSurface;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UInstancedStaticMeshComponent> Rapids;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UInstancedStaticMeshComponent> RiverRocks;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UInstancedStaticMeshComponent> ForestPatches;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UInstancedStaticMeshComponent> MistBands;
 
     UPROPERTY(EditAnywhere, Category = "Track")
     TArray<FVector> ControlPoints;
@@ -96,7 +123,10 @@ private:
     void EnsureDefaultTrack();
     void RebuildSpline();
     void RebuildVisuals();
+    void RebuildEnvironment();
+    void ApplyVisualMaterials();
     void AdvanceRide(float DeltaSeconds);
+    void UpdateCinematicCamera(const FVector& TrainLocation, const FVector& TrainForward);
     void SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const;
     FName GetSectionName(float TrackRatio) const;
 

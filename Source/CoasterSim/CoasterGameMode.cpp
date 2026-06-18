@@ -29,6 +29,7 @@ void ACoasterGameMode::BeginPlay()
 
     if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
     {
+        Ride->StartRideAt(0.34f, 18.0f);
         PlayerController->SetViewTarget(Ride);
         PlayerController->bShowMouseCursor = false;
     }

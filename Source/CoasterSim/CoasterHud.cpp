@@ -33,8 +33,8 @@ void ACoasterHud::DrawHUD()
         Telemetry.LateralG,
         Telemetry.LongitudinalG);
 
-    FCanvasTextItem TextItem(FVector2D(24.0f, 24.0f), FText::FromString(Lines), GEngine->GetMediumFont(), FLinearColor::White);
+    FCanvasTextItem TextItem(FVector2D(28.0f, 28.0f), FText::FromString(Lines), GEngine->GetMediumFont(), FLinearColor(0.9f, 0.94f, 0.96f, 0.78f));
     TextItem.EnableShadow(FLinearColor::Black);
-    TextItem.Scale = FVector2D(1.05f, 1.05f);
+    TextItem.Scale = FVector2D(0.82f, 0.82f);
     Canvas->DrawItem(TextItem);
 }
