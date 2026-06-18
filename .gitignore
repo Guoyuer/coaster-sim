@@ -9,6 +9,7 @@ Intermediate/
 Saved/
 .vs/
 *.sln
+*.slnx
 *.VC.db
 *.opensdf
 *.opendb
