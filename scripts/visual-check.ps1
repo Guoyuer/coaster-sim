@@ -1,6 +1,6 @@
 param(
     [switch]$Build,
-    [int]$WaitSeconds = 3,
+    [int[]]$WaitSeconds = @(2, 6, 10, 15),
     [string]$Name = "VisualCheck-latest"
 )
 
@@ -10,7 +10,7 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Project = Join-Path $RepoRoot "CoasterSim.uproject"
 $Editor = "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe"
 $BuildBat = "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat"
-$Output = Join-Path $RepoRoot "Saved\$Name.png"
+$OutputDir = Join-Path $RepoRoot "Saved"
 
 if ($Build) {
     & $BuildBat CoasterSimEditor Win64 Development "-Project=$Project" -WaitMutex -NoHotReloadFromIDE
@@ -49,7 +49,10 @@ if (-not $GameWindow) {
     throw "CoasterSim window was not found"
 }
 
-Start-Sleep -Seconds $WaitSeconds
+$CaptureTimes = @($WaitSeconds | Sort-Object -Unique)
+$SingleCapture = $CaptureTimes.Count -eq 1
+$Outputs = @()
+$ElapsedSeconds = 0
 
 if (-not ("WinCapVisualCheck" -as [type])) {
     Add-Type -TypeDefinition @'
@@ -79,7 +82,25 @@ public class WinCapVisualCheck {
 '@ -ReferencedAssemblies System.Drawing
 }
 
-[WinCapVisualCheck]::Capture($GameWindow.MainWindowHandle, $Output)
+foreach ($CaptureSecond in $CaptureTimes) {
+    $DeltaSeconds = [Math]::Max($CaptureSecond - $ElapsedSeconds, 0)
+    if ($DeltaSeconds -gt 0) {
+        Start-Sleep -Seconds $DeltaSeconds
+    }
+
+    if ($SingleCapture) {
+        $Output = Join-Path $OutputDir "$Name.png"
+    } else {
+        $Output = Join-Path $OutputDir ("{0}-t{1}s.png" -f $Name, $CaptureSecond)
+    }
+
+    [WinCapVisualCheck]::Capture($GameWindow.MainWindowHandle, $Output)
+    $Outputs += $Output
+    $ElapsedSeconds = $CaptureSecond
+}
+
 Get-Process UnrealEditor -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
-Write-Host "Screenshot=$Output"
+foreach ($Output in $Outputs) {
+    Write-Host "Screenshot=$Output"
+}

@@ -128,6 +128,12 @@ protected:
     UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UProceduralMeshComponent> FoamRibbonMesh;
 
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UProceduralMeshComponent> SkyDomeMesh;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UProceduralMeshComponent> CloudLayerMesh;
+
     UPROPERTY(EditAnywhere, Category = "Track")
     TArray<FVector> ControlPoints;
 
