@@ -1,0 +1,85 @@
+param(
+    [switch]$Build,
+    [int]$WaitSeconds = 3,
+    [string]$Name = "VisualCheck-latest"
+)
+
+$ErrorActionPreference = "Stop"
+
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+$Project = Join-Path $RepoRoot "CoasterSim.uproject"
+$Editor = "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe"
+$BuildBat = "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat"
+$Output = Join-Path $RepoRoot "Saved\$Name.png"
+
+if ($Build) {
+    & $BuildBat CoasterSimEditor Win64 Development "-Project=$Project" -WaitMutex -NoHotReloadFromIDE
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unreal build failed with exit code $LASTEXITCODE"
+    }
+}
+
+Get-Process UnrealEditor -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+$Process = Start-Process -FilePath $Editor -ArgumentList @(
+    $Project,
+    "-game",
+    "-windowed",
+    "-ResX=1280",
+    "-ResY=720",
+    "-NoSplash",
+    "-NoLoadingScreen",
+    "-NoLiveCoding",
+    "-ExecCmds=DisableAllScreenMessages"
+) -WorkingDirectory $RepoRoot -PassThru
+
+$GameWindow = $null
+for ($Index = 0; $Index -lt 90; ++$Index) {
+    Start-Sleep -Milliseconds 500
+    $GameWindow = Get-Process UnrealEditor -ErrorAction SilentlyContinue |
+        Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -like "*CoasterSim*" } |
+        Select-Object -First 1
+    if ($GameWindow) {
+        break
+    }
+}
+
+if (-not $GameWindow) {
+    Get-Process UnrealEditor -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    throw "CoasterSim window was not found"
+}
+
+Start-Sleep -Seconds $WaitSeconds
+
+if (-not ("WinCapVisualCheck" -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Drawing;
+
+public class WinCapVisualCheck {
+  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, int nFlags);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out RECT lpRect);
+  public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+
+  public static void Capture(IntPtr hwnd, string path) {
+    RECT rc; GetWindowRect(hwnd, out rc);
+    int width = Math.Max(rc.Right - rc.Left, 1);
+    int height = Math.Max(rc.Bottom - rc.Top, 1);
+    using (Bitmap bitmap = new Bitmap(width, height)) {
+      using (Graphics graphics = Graphics.FromImage(bitmap)) {
+        IntPtr hdc = graphics.GetHdc();
+        PrintWindow(hwnd, hdc, 2);
+        graphics.ReleaseHdc(hdc);
+      }
+      bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+    }
+  }
+}
+'@ -ReferencedAssemblies System.Drawing
+}
+
+[WinCapVisualCheck]::Capture($GameWindow.MainWindowHandle, $Output)
+Get-Process UnrealEditor -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+
+Write-Host "Screenshot=$Output"
