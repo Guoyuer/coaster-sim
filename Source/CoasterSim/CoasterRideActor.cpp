@@ -43,6 +43,40 @@ float Hash01(float A, float B)
     return FMath::Frac(FMath::Sin(A * 12.9898f + B * 78.233f) * 43758.5453f);
 }
 
+float YarlungRiverCenterY(float X)
+{
+    return -1150.0f
+        + 1050.0f * FMath::Sin(X * 0.00048f + 0.7f)
+        + 420.0f * FMath::Sin(X * 0.00115f - 0.6f);
+}
+
+float YarlungLandscapeHeight(float X, float Y)
+{
+    const float RiverY = YarlungRiverCenterY(X);
+    const float Lateral = FMath::Abs(Y - RiverY);
+    const float WideValley = Smooth01((Lateral - 1150.0f) / 9400.0f);
+    const float OuterMountain = Smooth01((Lateral - 5800.0f) / 7600.0f);
+    const float CliffBand = Smooth01((Lateral - 3100.0f) / 4200.0f);
+    const float LongRidge = 155.0f * FMath::Sin(X * 0.00075f + Y * 0.00018f);
+    const float FoldNoise = 82.0f * FMath::Sin(X * 0.0018f - Y * 0.00072f)
+        + 46.0f * FMath::Sin(X * 0.0034f + Y * 0.0011f);
+    const float Terraces = 58.0f * FMath::Sin((Lateral - 1200.0f) * 0.0018f + X * 0.00042f);
+
+    float Height = RiverZCm - 22.0f
+        + WideValley * 520.0f
+        + CliffBand * 1420.0f
+        + OuterMountain * 1900.0f
+        + LongRidge + FoldNoise + Terraces;
+
+    if (Lateral < 980.0f)
+    {
+        const float Channel = Smooth01(Lateral / 980.0f);
+        Height = FMath::Lerp(RiverZCm - 46.0f, RiverZCm + 34.0f, Channel);
+    }
+
+    return YarlungCoaster::ApplyTrackClearanceCut(X, Y, Height);
+}
+
 }
 
 ACoasterRideActor::ACoasterRideActor()
@@ -71,13 +105,13 @@ ACoasterRideActor::ACoasterRideActor()
     RideCamera->SetFieldOfView(92.0f);
     RideCamera->bUsePawnControlRotation = false;
     RideCamera->PostProcessSettings.bOverride_MotionBlurAmount = true;
-    RideCamera->PostProcessSettings.MotionBlurAmount = 0.065f;
+    RideCamera->PostProcessSettings.MotionBlurAmount = 0.025f;
     RideCamera->PostProcessSettings.bOverride_VignetteIntensity = true;
     RideCamera->PostProcessSettings.VignetteIntensity = 0.18f;
     RideCamera->PostProcessSettings.bOverride_ColorSaturation = true;
-    RideCamera->PostProcessSettings.ColorSaturation = FVector4(0.74f, 0.86f, 0.84f, 1.0f);
+    RideCamera->PostProcessSettings.ColorSaturation = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
     RideCamera->PostProcessSettings.bOverride_ColorContrast = true;
-    RideCamera->PostProcessSettings.ColorContrast = FVector4(1.08f, 1.07f, 1.04f, 1.0f);
+    RideCamera->PostProcessSettings.ColorContrast = FVector4(1.02f, 1.02f, 1.02f, 1.0f);
     RideCamera->PostProcessSettings.bOverride_ColorGamma = true;
     RideCamera->PostProcessSettings.ColorGamma = FVector4(0.96f, 0.98f, 1.02f, 1.0f);
     RideCamera->PostProcessSettings.bOverride_ColorGain = true;
@@ -89,13 +123,13 @@ ACoasterRideActor::ACoasterRideActor()
     RideCamera->PostProcessSettings.bOverride_AutoExposureMaxBrightness = true;
     RideCamera->PostProcessSettings.AutoExposureMaxBrightness = 1.0f;
     RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-    RideCamera->PostProcessSettings.AutoExposureBias = 0.22f;
+    RideCamera->PostProcessSettings.AutoExposureBias = 0.50f;
     RideCamera->PostProcessSettings.bOverride_FilmSlope = true;
     RideCamera->PostProcessSettings.FilmSlope = 0.78f;
     RideCamera->PostProcessSettings.bOverride_FilmToe = true;
-    RideCamera->PostProcessSettings.FilmToe = 0.36f;
+    RideCamera->PostProcessSettings.FilmToe = 0.28f;
     RideCamera->PostProcessSettings.bOverride_FilmShoulder = true;
-    RideCamera->PostProcessSettings.FilmShoulder = 0.34f;
+    RideCamera->PostProcessSettings.FilmShoulder = 0.28f;
     RideCamera->PostProcessSettings.bOverride_FilmGrainIntensity = true;
     RideCamera->PostProcessSettings.FilmGrainIntensity = 0.035f;
     RideCamera->PostProcessSettings.bOverride_SceneFringeIntensity = true;
@@ -109,35 +143,35 @@ ACoasterRideActor::ACoasterRideActor()
 
     SkyLight = CreateDefaultSubobject<USkyLightComponent>(TEXT("SkyLight"));
     SkyLight->SetupAttachment(SceneRoot);
-    SkyLight->SetIntensity(2.2f);
+    SkyLight->SetIntensity(4.2f);
 
     SunLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("SunLight"));
     SunLight->SetupAttachment(SceneRoot);
-    SunLight->SetRelativeRotation(FRotator(-46.0f, -24.0f, 0.0f));
-    SunLight->SetIntensity(15.0f);
-    SunLight->SetTemperature(6100.0f);
-    SunLight->SetLightColor(FLinearColor(1.0f, 1.0f, 0.96f));
+    SunLight->SetRelativeRotation(FRotator(-42.0f, -18.0f, 0.0f));
+    SunLight->SetIntensity(32.0f);
+    SunLight->SetTemperature(5600.0f);
+    SunLight->SetLightColor(FLinearColor(1.0f, 0.98f, 0.90f));
     SunLight->SetAtmosphereSunLight(true);
     SunLight->SetAtmosphereSunLightIndex(0);
 
     SkyAtmosphere = CreateDefaultSubobject<USkyAtmosphereComponent>(TEXT("SkyAtmosphere"));
     SkyAtmosphere->SetupAttachment(SceneRoot);
-    SkyAtmosphere->SetRayleighScatteringScale(1.45f);
-    SkyAtmosphere->SetMieScatteringScale(0.012f);
-    SkyAtmosphere->SetAerialPerspectiveStartDepth(3400.0f);
+    SkyAtmosphere->SetRayleighScatteringScale(1.85f);
+    SkyAtmosphere->SetMieScatteringScale(0.006f);
+    SkyAtmosphere->SetAerialPerspectiveStartDepth(5200.0f);
 
     ValleyFog = CreateDefaultSubobject<UExponentialHeightFogComponent>(TEXT("ValleyFog"));
     ValleyFog->SetupAttachment(SceneRoot);
     ValleyFog->SetRelativeLocation(FVector(0.0f, 0.0f, RiverZCm + 70.0f));
-    ValleyFog->SetFogDensity(0.00022f);
-    ValleyFog->SetFogHeightFalloff(0.34f);
-    ValleyFog->SetFogMaxOpacity(0.24f);
-    ValleyFog->SetStartDistance(1800.0f);
-    ValleyFog->SetFogInscatteringColor(FLinearColor(0.58f, 0.68f, 0.76f));
+    ValleyFog->SetFogDensity(0.000020f);
+    ValleyFog->SetFogHeightFalloff(0.40f);
+    ValleyFog->SetFogMaxOpacity(0.035f);
+    ValleyFog->SetStartDistance(12000.0f);
+    ValleyFog->SetFogInscatteringColor(FLinearColor(0.78f, 0.88f, 1.0f));
     ValleyFog->SetVolumetricFog(true);
     ValleyFog->SetVolumetricFogScatteringDistribution(0.28f);
-    ValleyFog->SetVolumetricFogExtinctionScale(0.18f);
-    ValleyFog->SetVolumetricFogDistance(16000.0f);
+    ValleyFog->SetVolumetricFogExtinctionScale(0.02f);
+    ValleyFog->SetVolumetricFogDistance(22000.0f);
 
     LeftRail = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("LeftRail"));
     LeftRail->SetupAttachment(SceneRoot);
@@ -153,6 +187,8 @@ ACoasterRideActor::ACoasterRideActor()
     Rapids->SetupAttachment(SceneRoot);
     MistBands = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("MistBands"));
     MistBands->SetupAttachment(SceneRoot);
+    BoulderOutcrops = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("BoulderOutcrops"));
+    BoulderOutcrops->SetupAttachment(SceneRoot);
     RiverRibbonMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("RiverRibbonMesh"));
     RiverRibbonMesh->SetupAttachment(SceneRoot);
     RiverRibbonMesh->bUseAsyncCooking = true;
@@ -168,10 +204,10 @@ ACoasterRideActor::ACoasterRideActor()
     CloudLayerMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("CloudLayerMesh"));
     CloudLayerMesh->SetupAttachment(SceneRoot);
     CloudLayerMesh->bUseAsyncCooking = true;
-
     RiverSurface->SetCastShadow(false);
     Rapids->SetCastShadow(false);
     MistBands->SetCastShadow(false);
+    BoulderOutcrops->SetCastShadow(true);
     RiverRibbonMesh->SetCastShadow(false);
     FoamRibbonMesh->SetCastShadow(false);
     DistantRidgeMesh->SetCastShadow(false);
@@ -191,6 +227,12 @@ ACoasterRideActor::ACoasterRideActor()
         MistBands->SetStaticMesh(CubeMesh.Object);
     }
 
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> BoulderMesh(TEXT("/Game/Generated/Models/Boulder01/boulder_01_1k.boulder_01_1k"));
+    if (BoulderMesh.Succeeded())
+    {
+        BoulderOutcrops->SetStaticMesh(BoulderMesh.Object);
+    }
+
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
     if (BasicMaterial.Succeeded())
     {
@@ -202,6 +244,7 @@ ACoasterRideActor::ACoasterRideActor()
         RiverSurface->SetMaterial(0, BasicMaterial.Object);
         Rapids->SetMaterial(0, BasicMaterial.Object);
         MistBands->SetMaterial(0, BasicMaterial.Object);
+        BoulderOutcrops->SetMaterial(0, BasicMaterial.Object);
         RiverRibbonMesh->SetMaterial(0, BasicMaterial.Object);
         FoamRibbonMesh->SetMaterial(0, BasicMaterial.Object);
         DistantRidgeMesh->SetMaterial(0, BasicMaterial.Object);
@@ -382,6 +425,7 @@ void ACoasterRideActor::RebuildEnvironment()
     BuildSkyDome();
     BuildCloudLayer();
     BuildDistantRidges();
+    BuildBoulderOutcrops();
     BuildRiverEffects();
 }
 
@@ -390,6 +434,7 @@ void ACoasterRideActor::ClearEnvironmentVisuals()
     RiverSurface->ClearInstances();
     Rapids->ClearInstances();
     MistBands->ClearInstances();
+    BoulderOutcrops->ClearInstances();
     RiverRibbonMesh->ClearAllMeshSections();
     FoamRibbonMesh->ClearAllMeshSections();
     DistantRidgeMesh->ClearAllMeshSections();
@@ -416,8 +461,8 @@ void ACoasterRideActor::BuildSkyDome()
         const float Theta = V * UE_HALF_PI;
         const float RadiusAtRing = FMath::Cos(Theta) * SkyRadius;
         const float Z = FMath::Sin(Theta) * SkyRadius - 2200.0f;
-        const FLinearColor HorizonColor(0.54f, 0.69f, 0.88f, 1.0f);
-        const FLinearColor ZenithColor(0.08f, 0.30f, 0.70f, 1.0f);
+        const FLinearColor HorizonColor(0.38f, 0.70f, 1.0f, 1.0f);
+        const FLinearColor ZenithColor(0.015f, 0.29f, 0.92f, 1.0f);
         const FLinearColor RingColor = FMath::Lerp(HorizonColor, ZenithColor, Smooth01(V));
 
         for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
@@ -476,7 +521,7 @@ void ACoasterRideActor::BuildCloudLayer()
         CloudVertices.Add(Center);
         CloudNormals.Add(FVector::DownVector);
         CloudUVs.Add(FVector2D(0.5f, 0.5f));
-        CloudColors.Add(FLinearColor(0.78f, 0.82f, 0.84f, 1.0f));
+        CloudColors.Add(FLinearColor(0.92f, 0.95f, 0.98f, 1.0f));
         CloudTangents.Add(FProcMeshTangent(AxisX, false));
 
         for (int32 Segment = 0; Segment < CloudSegments; ++Segment)
@@ -489,8 +534,8 @@ void ACoasterRideActor::BuildCloudLayer()
             CloudVertices.Add(Edge);
             CloudNormals.Add(FVector::DownVector);
             CloudUVs.Add(FVector2D(FMath::Cos(Angle) * 0.5f + 0.5f, FMath::Sin(Angle) * 0.5f + 0.5f));
-            const float Bright = 0.70f + 0.09f * Hash01(Segment * 0.7f, Patch * 1.9f);
-            CloudColors.Add(FLinearColor(Bright, Bright + 0.04f, Bright + 0.06f, 1.0f));
+            const float Bright = 0.86f + 0.08f * Hash01(Segment * 0.7f, Patch * 1.9f);
+            CloudColors.Add(FLinearColor(Bright, FMath::Min(Bright + 0.03f, 1.0f), FMath::Min(Bright + 0.05f, 1.0f), 1.0f));
             CloudTangents.Add(FProcMeshTangent(AxisX, false));
         }
 
@@ -563,6 +608,39 @@ void ACoasterRideActor::BuildDistantRidges()
     }
 
     DistantRidgeMesh->CreateMeshSection_LinearColor(0, RidgeVertices, RidgeTriangles, RidgeNormals, RidgeUVs, RidgeColors, RidgeTangents, false);
+}
+
+void ACoasterRideActor::BuildBoulderOutcrops()
+{
+    if (!BoulderOutcrops || !BoulderOutcrops->GetStaticMesh())
+    {
+        return;
+    }
+
+    constexpr int32 BoulderCount = 118;
+    constexpr float MinX = -3200.0f;
+    constexpr float MaxX = 11600.0f;
+
+    for (int32 Index = 0; Index < BoulderCount; ++Index)
+    {
+        const float T = static_cast<float>(Index) / static_cast<float>(BoulderCount - 1);
+        const float X = FMath::Lerp(MinX, MaxX, T) + (Hash01(Index * 2.9f, 5.1f) - 0.5f) * 520.0f;
+        const float Side = (Index % 2 == 0) ? -1.0f : 1.0f;
+        const float Lateral = Side * FMath::Lerp(780.0f, 2650.0f, Hash01(Index * 4.7f, 1.4f));
+        const float Y = YarlungRiverCenterY(X) + Lateral;
+        const float Height = YarlungLandscapeHeight(X, Y);
+        if (Height < 120.0f || Height > 2550.0f)
+        {
+            continue;
+        }
+
+        const float Yaw = Hash01(Index * 7.2f, 8.4f) * 360.0f;
+        const float Pitch = FMath::Lerp(-8.0f, 8.0f, Hash01(Index * 3.5f, 2.2f));
+        const float Roll = FMath::Lerp(-6.0f, 6.0f, Hash01(Index * 5.8f, 9.6f));
+        const float Scale = FMath::Lerp(0.42f, 1.08f, Hash01(Index * 1.8f, 3.1f));
+        const FVector Location(X, Y, Height + 18.0f);
+        BoulderOutcrops->AddInstance(FTransform(FRotator(Pitch, Yaw, Roll), Location, FVector(Scale)));
+    }
 }
 
 void ACoasterRideActor::BuildRiverEffects()
@@ -709,6 +787,14 @@ void ACoasterRideActor::BuildRapids(const TArray<FEnvironmentRiverSample>& Sampl
             const FVector FoamEnd = (SampleA.Center + SampleB.Center) * 0.5f + SampleA.Right * (RiverHalfWidth * 0.56f) + FVector(0.0f, 0.0f, 18.0f);
             Rapids->AddInstance(MakeSegmentTransform(FoamStart, FoamEnd, FVector(RiverHalfWidth * 0.54f, 4.0f, 2.0f)));
         }
+
+        if (Along % 5 == 2)
+        {
+            const FVector MistCenter = (SampleA.Center + SampleB.Center) * 0.5f + FVector(0.0f, 0.0f, 165.0f + 38.0f * FMath::Sin(Along * 0.71f));
+            const FVector MistStart = MistCenter - SampleA.Right * (RiverHalfWidth * 0.72f);
+            const FVector MistEnd = MistCenter + SampleA.Right * (RiverHalfWidth * 0.72f);
+            MistBands->AddInstance(MakeSegmentTransform(MistStart, MistEnd, FVector(RiverHalfWidth * 0.72f, 32.0f, 7.0f)));
+        }
     }
 }
 
@@ -748,6 +834,7 @@ void ACoasterRideActor::ApplyVisualMaterials()
     TintComponent(RiverSurface, FLinearColor(0.035f, 0.24f, 0.27f));
     TintComponent(Rapids, FLinearColor(0.44f, 0.56f, 0.50f));
     TintComponent(MistBands, FLinearColor(0.50f, 0.56f, 0.52f));
+    TintComponent(BoulderOutcrops, FLinearColor(0.20f, 0.23f, 0.20f));
     TintComponent(RiverRibbonMesh, FLinearColor(0.035f, 0.24f, 0.27f));
     TintComponent(FoamRibbonMesh, FLinearColor(0.44f, 0.56f, 0.50f));
 }

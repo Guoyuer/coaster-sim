@@ -113,6 +113,9 @@ protected:
     TObjectPtr<UInstancedStaticMeshComponent> MistBands;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UInstancedStaticMeshComponent> BoulderOutcrops;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UProceduralMeshComponent> RiverRibbonMesh;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
@@ -151,6 +154,7 @@ private:
     void BuildSkyDome();
     void BuildCloudLayer();
     void BuildDistantRidges();
+    void BuildBoulderOutcrops();
     void BuildRiverEffects();
     void BuildRiverSamples(TArray<FEnvironmentRiverSample>& OutSamples, int32 SampleCount) const;
     void BuildRiverRibbon(const TArray<FEnvironmentRiverSample>& Samples, float RiverHalfWidth);
