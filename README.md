@@ -22,7 +22,7 @@ measurable visual targets, and iterative validation.
 ## Engine
 
 The project is now a native Unreal Engine 5 C++ project. The `.uproject` is
-associated with UE 5.6 by default, but the specs should remain valid for a
+associated with UE 5.8 by default, but the specs should remain valid for a
 nearby UE5 version if the project file is reassociated locally.
 
 ## Specs
