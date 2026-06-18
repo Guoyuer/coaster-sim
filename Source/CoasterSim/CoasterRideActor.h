@@ -7,6 +7,7 @@
 class UCameraComponent;
 class UExponentialHeightFogComponent;
 class UInstancedStaticMeshComponent;
+class UProceduralMeshComponent;
 class USkyLightComponent;
 class USplineComponent;
 
@@ -103,6 +104,15 @@ protected:
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UInstancedStaticMeshComponent> MistBands;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UProceduralMeshComponent> CanyonTerrainMesh;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UProceduralMeshComponent> RiverRibbonMesh;
+
+    UPROPERTY(VisibleAnywhere, Category = "Environment")
+    TObjectPtr<UProceduralMeshComponent> FoamRibbonMesh;
 
     UPROPERTY(EditAnywhere, Category = "Track")
     TArray<FVector> ControlPoints;

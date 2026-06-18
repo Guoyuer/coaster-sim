@@ -12,6 +12,7 @@ public class CoasterSim : ModuleRules
             "CoreUObject",
             "Engine",
             "InputCore",
+            "ProceduralMeshComponent",
             "UMG"
         });
 
