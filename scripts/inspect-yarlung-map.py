@@ -4,6 +4,7 @@ from pathlib import Path
 
 MAP_PATH = "/Game/Generated/YarlungLandscape/YarlungLandscape_Level"
 LANDSCAPE_MATERIAL_PATH = "/Game/Generated/Materials/M_YarlungLandscapeGround.M_YarlungLandscapeGround"
+CLIFF_MATERIAL_PATH = "/Game/Generated/Materials/M_YarlungCliffRock.M_YarlungCliffRock"
 FORBIDDEN_RIDE_COMPONENTS = {
     "CanyonTerrainMesh",
     "SnowCaps",
@@ -38,9 +39,11 @@ def main():
         raise RuntimeError(f"Unable to load map: {MAP_PATH}")
 
     material = unreal.EditorAssetLibrary.load_asset(LANDSCAPE_MATERIAL_PATH)
+    cliff_material = unreal.EditorAssetLibrary.load_asset(CLIFF_MATERIAL_PATH)
     emit(f"[YARLUNG-INSPECT] material={object_path(material)}")
     if material:
         emit(f"[YARLUNG-INSPECT] material_class={material.get_class().get_name()}")
+    emit(f"[YARLUNG-INSPECT] cliff_material={object_path(cliff_material)}")
 
     world = unreal.EditorLevelLibrary.get_editor_world()
     actors = unreal.EditorLevelLibrary.get_all_level_actors()
@@ -103,6 +106,19 @@ def main():
             material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
             emit(
                 f"[YARLUNG-INSPECT] river_component={component.get_name()} "
+                f"class={component.get_class().get_name()} hidden={component.get_editor_property('hidden_in_game')} "
+                f"materials={material_names}"
+            )
+
+    cliff_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungCliffActor")]
+    if len(cliff_actors) != 1:
+        raise RuntimeError(f"Expected exactly one YarlungCliffActor, found {len(cliff_actors)}")
+    for actor in cliff_actors:
+        emit(f"[YARLUNG-INSPECT] cliff={actor.get_actor_label()} class={actor.get_class().get_name()}")
+        for component in actor.get_components_by_class(unreal.MeshComponent):
+            material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
+            emit(
+                f"[YARLUNG-INSPECT] cliff_component={component.get_name()} "
                 f"class={component.get_class().get_name()} hidden={component.get_editor_property('hidden_in_game')} "
                 f"materials={material_names}"
             )
