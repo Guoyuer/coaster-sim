@@ -137,6 +137,21 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Ride", meta = (ClampMin = "0.0"))
     float BrakeTargetSpeedMps = 8.0f;
 
+    UPROPERTY(EditAnywhere, Category = "Ride", meta = (ClampMin = "0.0"))
+    float PoweredCruiseTargetSpeedMps = 28.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Ride", meta = (ClampMin = "0.0"))
+    float PoweredTurnaroundTargetSpeedMps = 12.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Ride", meta = (ClampMin = "0.0"))
+    float PoweredDriveMaxAccelMps2 = 4.2f;
+
+    UPROPERTY(EditAnywhere, Category = "Ride", meta = (ClampMin = "0.0"))
+    float PoweredBrakeMaxAccelMps2 = 4.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Ride", meta = (ClampMin = "0.0"))
+    float NumericalStallFloorMps = 0.2f;
+
 private:
     void EnsureDefaultTrack();
     void RebuildSpline();

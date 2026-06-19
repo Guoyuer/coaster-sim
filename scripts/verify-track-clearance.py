@@ -164,7 +164,15 @@ def curvature_accel_mps2(
     return vec_scale(curvature_vector, speed_mps * speed_mps)
 
 
-def ride_accel_components(section: str, speed_mps: float, forward: tuple[float, float, float]) -> tuple[float, float, float, float, float]:
+def ride_accel_components(
+    section: str,
+    speed_mps: float,
+    forward: tuple[float, float, float],
+    powered_cruise_target_mps: float,
+    powered_turnaround_target_mps: float,
+    powered_drive_max_mps2: float,
+    powered_brake_max_mps2: float,
+) -> tuple[float, float, float, float, float]:
     drive = 0.0
     brake = 0.0
     if section == "Lift":
@@ -175,6 +183,13 @@ def ride_accel_components(section: str, speed_mps: float, forward: tuple[float, 
         brake = min((speed_mps - 8.0) * 1.1, 8.5) if speed_mps > 8.0 else 0.0
     elif section == "Station":
         drive = clamp((4.0 - speed_mps) * 1.0, -2.0, 1.8)
+    elif section == "Turnaround":
+        if speed_mps < powered_turnaround_target_mps:
+            drive = clamp((powered_turnaround_target_mps - speed_mps) * 1.4, 0.0, powered_drive_max_mps2)
+        else:
+            brake = min((speed_mps - powered_turnaround_target_mps) * 1.1, powered_brake_max_mps2)
+    elif section in {"Outbound", "Return", "Coast"}:
+        drive = clamp((powered_cruise_target_mps - speed_mps) * 1.1, 0.0, powered_drive_max_mps2)
 
     gravity = dot((0.0, 0.0, -GRAVITY_MPS2), forward)
     drag = 0.0015 * speed_mps * speed_mps
@@ -272,7 +287,8 @@ def main() -> None:
     parser.add_argument("--samples-per-segment", type=int, default=8)
     parser.add_argument("--clearance-floor-m", type=float, default=2.0)
     parser.add_argument("--initial-speed-mps", type=float, default=4.0)
-    parser.add_argument("--min-speed-mps", type=float, default=1.8)
+    parser.add_argument("--stall-floor-mps", type=float, default=0.2)
+    parser.add_argument("--min-powered-speed-mps", type=float, default=8.0)
     parser.add_argument("--max-speed-mps", type=float, default=56.0)
     parser.add_argument("--max-lat-g", type=float, default=2.5)
     parser.add_argument("--min-vert-g", type=float, default=-1.5)
@@ -281,6 +297,10 @@ def main() -> None:
     parser.add_argument("--max-grade-pct", type=float, default=65.0)
     parser.add_argument("--airtime-target-g", type=float, default=-0.3)
     parser.add_argument("--min-airtime-samples", type=int, default=2)
+    parser.add_argument("--powered-cruise-target-mps", type=float, default=28.0)
+    parser.add_argument("--powered-turnaround-target-mps", type=float, default=12.0)
+    parser.add_argument("--powered-drive-max-mps2", type=float, default=4.2)
+    parser.add_argument("--powered-brake-max-mps2", type=float, default=4.0)
     args = parser.parse_args()
 
     root = Path.cwd()
@@ -304,7 +324,9 @@ def main() -> None:
     min_speed = 1.0e9
     max_speed = 0.0
     airtime_samples = 0
-    speed_mps = clamp(args.initial_speed_mps, args.min_speed_mps, args.max_speed_mps)
+    low_speed_samples = 0
+    stall_samples = 0
+    speed_mps = clamp(args.initial_speed_mps, args.stall_floor_mps, args.max_speed_mps)
 
     for index, sample in enumerate(samples):
         previous = samples[index - 1]
@@ -321,7 +343,15 @@ def main() -> None:
         seat_force = vec_add(curve_accel, (0.0, 0.0, GRAVITY_MPS2))
         lat_g = dot(seat_force, right) / GRAVITY_MPS2
         vert_g = dot(seat_force, up) / GRAVITY_MPS2
-        net_accel, long_accel, _drive, _drag, _brake = ride_accel_components(sample.section, speed_mps, forward)
+        net_accel, long_accel, _drive, _drag, _brake = ride_accel_components(
+            sample.section,
+            speed_mps,
+            forward,
+            args.powered_cruise_target_mps,
+            args.powered_turnaround_target_mps,
+            args.powered_drive_max_mps2,
+            args.powered_brake_max_mps2,
+        )
         long_g = long_accel / GRAVITY_MPS2
         violation_reasons = []
         if clearance_m < args.clearance_floor_m:
@@ -336,6 +366,9 @@ def main() -> None:
             violation_reasons.append("long_g")
         if sample.section == "Outbound" and vert_g <= args.airtime_target_g:
             airtime_samples += 1
+        if sample.section in {"Outbound", "Turnaround", "Return", "Launch"} and speed_mps < args.min_powered_speed_mps:
+            violation_reasons.append("low_speed")
+            low_speed_samples += 1
 
         min_clearance = min(min_clearance, clearance_m)
         min_radius = min(min_radius, radius_m)
@@ -371,8 +404,14 @@ def main() -> None:
         )
 
         ds = segment_distance_m(sample, next_sample)
-        speed_mps = math.sqrt(max(args.min_speed_mps * args.min_speed_mps, speed_mps * speed_mps + 2.0 * net_accel * ds))
-        speed_mps = clamp(speed_mps, args.min_speed_mps, args.max_speed_mps)
+        next_speed_sq = speed_mps * speed_mps + 2.0 * net_accel * ds
+        if next_speed_sq <= args.stall_floor_mps * args.stall_floor_mps:
+            if sample.section not in {"Brake", "Station"}:
+                stall_samples += 1
+            speed_mps = args.stall_floor_mps
+        else:
+            speed_mps = math.sqrt(next_speed_sq)
+        speed_mps = min(speed_mps, args.max_speed_mps)
 
     write_csv(Path(args.out_csv), rows)
     write_plot(
@@ -389,6 +428,7 @@ def main() -> None:
         f"speed_range={min_speed:.1f}-{max_speed:.1f}mps "
         f"est_max_lat_g={max_lat_g:.2f} est_vert_g={min_vert_g:.2f}/{max_vert_g:.2f} est_max_long_g={max_long_g:.2f} "
         f"airtime_samples={airtime_samples}@<={args.airtime_target_g:.2f}G "
+        f"low_speed_samples={low_speed_samples}@<{args.min_powered_speed_mps:.1f}mps stall_samples={stall_samples} "
         f"violations={violations} csv={args.out_csv} plot={args.out_png}"
     )
     if airtime_samples < args.min_airtime_samples:
@@ -397,6 +437,9 @@ def main() -> None:
             f"required={args.min_airtime_samples}",
             file=sys.stderr,
         )
+        violations += 1
+    if stall_samples:
+        print(f"stall gate failed: samples={stall_samples}", file=sys.stderr)
         violations += 1
     if violations:
         sys.exit(1)

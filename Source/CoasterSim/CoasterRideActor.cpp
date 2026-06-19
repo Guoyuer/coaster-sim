@@ -301,7 +301,7 @@ void ACoasterRideActor::StartRideAt(float TrackRatio, float SpeedMps)
 
     const float ClampedRatio = FMath::Clamp(TrackRatio, 0.0f, 0.999f);
     CurrentDistanceCm = TrackLengthCm * ClampedRatio;
-    CurrentSpeedCms = FMath::Max(SpeedMps, 1.8f) * CmPerMeter;
+    CurrentSpeedCms = FMath::Max(SpeedMps, NumericalStallFloorMps) * CmPerMeter;
     LastVelocityCms = FVector::ZeroVector;
 
     FVector Location;
@@ -329,7 +329,7 @@ void ACoasterRideActor::StartRideFromCommandLine(float DefaultTrackRatio, float 
         RebuildSpline();
         const float ClampedRatio = FMath::Clamp(TrackRatio, 0.0f, 0.999f);
         const float StartDistanceCm = TrackLengthCm * ClampedRatio;
-        const float AdvanceCm = FMath::Max(SpeedMps, 1.8f) * CmPerMeter * StartSeconds;
+        const float AdvanceCm = FMath::Max(SpeedMps, NumericalStallFloorMps) * CmPerMeter * StartSeconds;
         float AdvancedRatio = FMath::Fmod((StartDistanceCm + AdvanceCm) / TrackLengthCm, 1.0f);
         if (AdvancedRatio < 0.0f)
         {
@@ -722,9 +722,34 @@ void ACoasterRideActor::AdvanceRide(float DeltaSeconds)
         const float Target = 4.0f * CmPerMeter;
         DriveAccel = FMath::Clamp((Target - CurrentSpeedCms) * 1.0f, -200.0f, 180.0f);
     }
+    else if (SectionName == TEXT("Turnaround"))
+    {
+        const float Target = PoweredTurnaroundTargetSpeedMps * CmPerMeter;
+        if (CurrentSpeedCms < Target)
+        {
+            DriveAccel = FMath::Clamp(
+                (Target - CurrentSpeedCms) * 1.4f,
+                0.0f,
+                PoweredDriveMaxAccelMps2 * CmPerMeter);
+        }
+        else
+        {
+            BrakeAccel = FMath::Min(
+                (CurrentSpeedCms - Target) * 1.1f,
+                PoweredBrakeMaxAccelMps2 * CmPerMeter);
+        }
+    }
+    else
+    {
+        const float Target = PoweredCruiseTargetSpeedMps * CmPerMeter;
+        DriveAccel = FMath::Clamp(
+            (Target - CurrentSpeedCms) * 1.1f,
+            0.0f,
+            PoweredDriveMaxAccelMps2 * CmPerMeter);
+    }
 
     const float NetAccel = DriveAccel + GravityAccel - DragAccel - RollingAccel - BrakeAccel;
-    CurrentSpeedCms = FMath::Clamp(CurrentSpeedCms + NetAccel * DeltaSeconds, 180.0f, 5600.0f);
+    CurrentSpeedCms = FMath::Clamp(CurrentSpeedCms + NetAccel * DeltaSeconds, NumericalStallFloorMps * CmPerMeter, 5600.0f);
     CurrentDistanceCm = FMath::Fmod(CurrentDistanceCm + CurrentSpeedCms * DeltaSeconds, TrackLengthCm);
 
     FVector NewLocation;
