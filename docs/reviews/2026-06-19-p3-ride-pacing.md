@@ -101,3 +101,33 @@ Fresh run: `samples=1584 ... speed_range=1.8-49.7mps ... airtime_samples=6 viola
 
 - Status: Open — airtime existence closed; **ride physical feasibility FAIL** (clamp-masked stall). P3 not Done.
 - Follow-up evidence: pending (speed profile with no min-clamp pinning on unpowered sections; back-half comfort recomputed at real speed; train reaches turnaround under gravity or honest launch).
+
+---
+
+# Re-review #2 (powered coaster: commit `f7574b4` "Close P3 powered coaster physics")
+
+- Re-review date: 2026-06-19
+- Trigger: per the user's design decision (powered coaster, strategy A: governor cruise + gravity thrills), Codex implemented bounded propulsion in BOTH the verifier and the runtime and marked the index row PASS. Independently re-verified (fresh verifier run + CSV inspection + diff read of `verify-track-clearance.py`, `CoasterRideActor.cpp/.h`).
+- Re-review #2 verdict: **PASS (reviewer-confirmed) on the P3 ride-physics / airtime / powered-feasibility axis.** The clamp-masked-stall blocker from Re-review #1 is genuinely closed with real evidence and runtime parity. Remaining Open item is unchanged and orthogonal: **scenery is still unverified** (the #1 non-length priority) — P3 ride may be Done; "scenery Done" and overall acceptance may NOT.
+
+## Why it passes (each Re-review #1 blocker, independently checked)
+
+1. **Propulsion is a real bounded force, not a clamp-in-disguise.** `drive = clamp((cruise−v)·1.1, 0, 4.2 m/s²)` (proportional, capped at 0.43 g), fed into `net = drive + gravity − drag − rolling − brake`, then `v² += 2·net·ds`. Genuine integration. Verifier diff confirmed.
+2. **The 1.8 m/s crawl floor is removed in BOTH verifier and runtime.** Verifier: floor lowered to a 0.2 m/s numerical guard with explicit `stall_samples` tracking. Runtime (`AdvanceRide`): `FMath::Clamp(..., 180.0f, 5600.0f)` → `FMath::Clamp(..., 0.2 m/s, 56 m/s)`; `StartRideAt`/`StartRideFromCommandLine` 1.8 → `NumericalStallFloorMps`. **Runtime parity is real** — same Turnaround/cruise bounded-drive branches, same constants exposed as UPROPERTY defaults (28/12/4.2/4.0/0.2). Not a verifier-only fiction.
+3. **No mainline crawl.** Fresh run: `speed_range=0.2-49.7, low_speed_samples=0@<8.0mps, stall_samples=0`. CSV: mainline (Outbound/Turnaround/Return/Launch) min speed **9.99 m/s**, max 49.7; samples <8 m/s occur only in Station(64)/Lift(1)/Brake(60); 0.2 m/s only in Brake (stopping). The ~22-min crawl is gone.
+4. **Back-half G is now computed at real speed.** Max lateral rose 0.72 → **1.01 g** precisely because the return curves now run at honest driven speed — the numbers are no longer crawl-trivial ~1.0.
+5. **Turnaround fragility resolved.** The 19.7 m min-radius point is now evaluated at its real driven speed 10.1 m/s with 41° banking → lat 1.01 g (the ride-wide max), comfortably within the 2.5 gate. It no longer "passes only because the train crawls."
+6. **Longitudinal G within comfort.** Max |long_g| = 1.06 (Brake zone); cruise drive caps at 0.43 g. ≤2.5 envelope respected — "unlimited endurance" did not become unlimited instantaneous force.
+7. **Airtime preserved.** Camelback #1 still delivers −0.89 g at 40.9 m/s; airtime gate (≥2 Outbound samples ≤−0.30 g) met with 6.
+8. **The new gates are real hard gates.** `low_speed` adds a per-sample violation (→ `sys.exit(1)`); `stall_samples` adds a violation at end. Both are the acceptance gates requested in Re-review #1.
+
+## Remaining notes (non-blocking)
+
+1. **Scenery still unverified (Open, unchanged).** The washed-out overlay still cannot confirm the track hugs the real river — the #1 non-length priority. P3 ride is Done; scenery is not. Carry to P4 (legible river-mask/raw-hillshade overlay + human confirm).
+2. **Camelbacks #2/#3 are floaters, not ejector.** At real speed they now read +0.77 g (31.8 m/s) and +0.42 g (25 m/s) — genuine lighter airtime, but not the ejector of #1. The "3 camelbacks" phrasing is slightly generous; acceptable, optional tune.
+3. **Reviewer did not rebuild UE.** Runtime change is correct by inspection and consistent with the verifier; the HUD smoke (Outbound ~20.8 m/s, i.e. real cruise-range, not 1.8 crawl) corroborates parity. Build/run not independently re-executed by the reviewer.
+
+## Agent Disposition (re-review #2)
+
+- Status: **Closed on P3 ride-physics axis (reviewer-confirmed PASS).** P3 ride-experience may be marked Done. Scenery remains Open (not P3's axis).
+- Next: P4 (corridor photoreal + environment extraction) and the scenery overlay/human-confirm; the terrain staircase remains a P4/C render concern, orthogonal to the now-closed ride work.
