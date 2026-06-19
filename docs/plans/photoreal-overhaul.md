@@ -108,9 +108,18 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 ### 阶段 A — 地形单一真相源 + 真实 DEM（地基）
 - **A1 删假环境几何**：从 `CoasterRideActor.cpp`/`.h` 删除 `BuildSkyDome`/`BuildCloudLayer`/`BuildDistantRidges` 及对应组件 (`SkyDomeMesh`/`CloudLayerMesh`/`DistantRidgeMesh`) 和 `VertexColorMaterial` 绑定。河流(`BuildRiver*`)先留占位，D 阶段换真实水体。保留仿真与轨道/车几何。
   - 验收：编译通过；FP 截图不再有方块云/顶点色天穹/平面远山；天空交给 `SkyAtmosphere`（可能暂时偏暗，B 修）。
-- **A2 真实 DEM 地形（如画轮廓的来源）**：用免费公开 DEM（SRTM 30m / ALOS AW3D30 30m / Copernicus GLO-30）取南迦巴瓦—雅鲁藏布大峡谷区域，转成 16-bit 高度图喂给 `generate-yarlung-landscape-assets.py` / commandlet（替换程序化 `.r16`）。对齐世界尺度与现有轨道走廊（轨道控制点 X∈[-1800,10400], Y∈[-3900,1500]，`YarlungCoasterProfile.h:17`），保留 `ApplyTrackClearanceCut`。
-  - 远景"画意"主要来自真实山体轮廓——这一步价值最高。
-  - 验收：英雄段 FP 帧里对岸崖壁/远山轮廓接近参照照片的真实山形，不再是平滑解析坡。
+- **A2 真实 DEM 地形（如画轮廓的来源）— 真实尺度，不压缩**（2026-06-18 决策）：
+  - **尺度方案=真实尺度子区域**：裁取约 **5–10 km** 的一段壮观真实峡谷，按**接近 1:1** 导成**公里级 UE Landscape**（UE 跑公里级地形正常）。**禁止**把整条峡谷压进现有 164×187m 的玩具尺度——那会让崖壁只剩 ~43m、远山变成贴轨小丘，第一人称读成桌面沙盘，丢掉"如画"壮阔感（压缩倍率水平~212×/垂直~114×，已验证不可接受）。
+  - **垂直保持真实尺度**：崖壁几百米量级，抬头能看到压过来的峡谷墙与真正"远"的雪山。
+  - **过山车作为峡谷里的小型设施**：占地约 150m 的轨道是这个公里级峡谷中的一段（符合现实）。**轨道样条坐标需随新世界尺度重新定位/缩放**（`YarlungCoasterProfile.h:17` 的控制点），并让样条穿过取景好的临江高弯。这是 A2 的核心工作。
+  - **选定子区域（2026-06-18 用户拍板）=大拐弯最深峡谷段**，南迦巴瓦与加拉白垒之间（世界最深，最大深度 6009m）。险峻+如画。
+    - **裁剪 bbox（约 8.3×6.8 km）**：`lat 29.745–29.820°N, lon 94.945–95.015°E`。框内含：谷底最深点 `29.7697°N, 94.9899°E`（Copernicus GLO-30 实采约 **2652m**，接近画面中心）、加拉白垒峰 `29.8133°N, 94.9672°E`（实采约 **7048m**，北缘，做远景雪山背景）、两者之间最陡崖壁。当前 bbox 实采范围约 **2613m→7144m ≈ 4530m**。参考：南迦巴瓦峰 `29.6258°N, 95.0572°E`（7782m）。
+    - **DEM 源 = Copernicus GLO-30（30m）优先**（高海拔陡坡质量最好、空洞最少）；ALOS AW3D30 备选；**不要用 SRTM 做主力**（喜马拉雅陡坡有空洞/噪点）。
+    - **分辨率维持 1009×1009×16-bit，不用加**（DEM 原生 30m，8km 框原生才~267 采样点，1009 已过采样；近景细节交给阶段 C 材质/法线/Nanite，不靠高度图）。**不需要改** commandlet 的 `HeightmapSize`。
+    - **垂直 1:1 真实尺度（关键）**：把 `YarlungLandscapeImportCommandlet.cpp` 的 `EncodedMinZ/EncodedMaxZ` 从 `-360cm/3900cm` 改成框内**真实海拔范围**（当前编码窗口 **2600m–7300m**，注意单位 cm），让崖壁是几百上千米而非 43m。`XYScale` 由 bbox 自动算出（当前 X≈6.70m/quad、Y≈8.27m/quad，可接受）。保留 `ApplyTrackClearanceCut`。
+    - **保险步骤**：正式导入前先出一张该 bbox 的 hillshade（晕渲）预览图肉眼确认河道走向与雪峰位置，避免下错瓦片/朝向不对白跑一轮。
+  - 远景"画意"主要来自真实山体轮廓+真实尺度——这一步价值最高。
+  - 验收：英雄段 FP 帧里对岸崖壁/远山轮廓接近参照照片的真实山形与**尺度感**（壮阔，不是小土坡），不再是平滑解析坡。
 - **A3 scatter 改查真实地形，并迁出 ride actor**：用 Landscape 真表面点+法线放置巨石/植被，替换对解析 `YarlungLandscapeHeight()` 的依赖。首选在 `YarlungLandscapeImportCommandlet.cpp` 或专门的 generated scenery/PCG 管线中生成关卡内容；若必须用运行时 `LineTraceSingleByChannel`（高空向下打 `ECC_WorldStatic`），也要封装到独立 scenery actor，不要继续写进 `ACoasterRideActor::RebuildEnvironment`。注意 Landscape 碰撞就绪时序（commandlet 离屏环境与 PIE/运行时都要验证）。最终删除影子地形函数。
   - 验收：植被/巨石与地表无缝贴合，无浮空/半埋；`Yarlung scatter instances` 计数 > 0。
 

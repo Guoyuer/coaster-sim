@@ -11,24 +11,48 @@
     1009
   ],
   "format": "little-endian uint16 raw",
+  "source": "copernicus",
+  "dem": {
+    "source": "Copernicus DEM GLO-30 public COG tiles on AWS Open Data",
+    "source_url": "https://registry.opendata.aws/copernicus-dem/",
+    "tile_url_template": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_{lat_prefix}{lat:02d}_00_{lon_prefix}{lon:03d}_00_DEM/Copernicus_DSM_COG_10_{lat_prefix}{lat:02d}_00_{lon_prefix}{lon:03d}_00_DEM.tif",
+    "bbox_wgs84": {
+      "west_lon": 94.945,
+      "east_lon": 95.015,
+      "south_lat": 29.745,
+      "north_lat": 29.82
+    },
+    "cache_dir": "SourceAssets\\DEM\\CopernicusGLO30",
+    "raw_height_range_cm": {
+      "min": 261350.09,
+      "max": 714367.22
+    },
+    "encoded_height_range_cm": {
+      "min": 260000.0,
+      "max": 730000.0
+    },
+    "note": "Heights are kept in real-world centimeters and clipped only at encode time."
+  },
   "world_bounds_cm": {
-    "min_x": -4200.0,
-    "max_x": 12200.0,
-    "min_y": -10500.0,
-    "max_y": 8200.0
+    "min_x": -337778.4313411617,
+    "max_x": 337778.4313411617,
+    "min_y": -416981.55087574443,
+    "max_y": 416981.55087574443
   },
   "height_range_cm": {
-    "encoded_min": -360.0,
-    "encoded_max": 3900.0,
-    "min_cm": -325.5481721789654,
-    "max_cm": 3400.5129609716564
+    "encoded_min": 260000.0,
+    "encoded_max": 730000.0,
+    "min_cm": 261350.08773437497,
+    "max_cm": 714367.2242677792
   },
   "unreal_import": {
     "landscape_section_size": 63,
     "sections_per_component": 1,
     "component_count": "16 x 16",
-    "xy_scale_cm": 16.27,
-    "z_scale_note": "Set Z scale so the encoded 3950 cm range maps to the desired mountain relief.",
+    "xy_scale_x_cm": 670.195,
+    "xy_scale_y_cm": 827.344,
+    "z_scale": 917.969,
+    "z_scale_note": "Encoded 16-bit heights map to the real-scale 2600m-7300m elevation window.",
     "material_layers": [
       "River",
       "AlluvialSand",

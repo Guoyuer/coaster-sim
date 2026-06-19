@@ -13,17 +13,32 @@ import argparse
 import json
 import math
 import struct
+import urllib.request
 from pathlib import Path
+
+from PIL import Image
 
 
 SIZE = 1009
-MIN_X = -4200.0
-MAX_X = 12200.0
-MIN_Y = -10500.0
-MAX_Y = 8200.0
-RIVER_Z = 18.0
-HEIGHT_MIN = -360.0
-HEIGHT_MAX = 3900.0
+MIN_X = -337778.4313411617
+MAX_X = 337778.4313411617
+MIN_Y = -416981.55087574443
+MAX_Y = 416981.55087574443
+RIVER_Z = 265200.0
+RIVER_ANCHOR_X = 95543.0
+RIVER_ANCHOR_Y = -142330.0
+HEIGHT_MIN = 260000.0
+HEIGHT_MAX = 730000.0
+DEM_WEST_LON = 94.945
+DEM_EAST_LON = 95.015
+DEM_SOUTH_LAT = 29.745
+DEM_NORTH_LAT = 29.820
+DEM_CACHE_DIR = Path("SourceAssets/DEM/CopernicusGLO30")
+DEM_TILE_URL = (
+    "https://copernicus-dem-30m.s3.amazonaws.com/"
+    "Copernicus_DSM_COG_10_{lat_prefix}{lat:02d}_00_{lon_prefix}{lon:03d}_00_DEM/"
+    "Copernicus_DSM_COG_10_{lat_prefix}{lat:02d}_00_{lon_prefix}{lon:03d}_00_DEM.tif"
+)
 
 
 def smooth01(value: float) -> float:
@@ -51,7 +66,12 @@ def value_noise(x: float, y: float, cell_size: float, salt: int = 0) -> float:
 
 
 def river_center_y(x: float) -> float:
-    return -1150.0 + 1050.0 * math.sin(x * 0.00048 + 0.7) + 420.0 * math.sin(x * 0.00115 - 0.6)
+    offset_x = x - RIVER_ANCHOR_X
+    return (
+        RIVER_ANCHOR_Y
+        + 9000.0 * math.sin(offset_x * 0.00009 + 0.25)
+        + 4200.0 * math.sin(offset_x * 0.00021 - 0.6)
+    )
 
 
 def terrain_height(x: float, y: float) -> float:
@@ -77,23 +97,139 @@ def terrain_height(x: float, y: float) -> float:
     if lateral < 980.0:
         channel = smooth01(lateral / 980.0)
         height = (RIVER_Z - 46.0) * (1.0 - channel) + (RIVER_Z + 34.0) * channel
-    return height
+    normalized = smooth01((height + 360.0) / 4260.0)
+    return lerp(HEIGHT_MIN, HEIGHT_MAX, normalized)
+
+
+def height01(height: float) -> float:
+    return smooth01((height - HEIGHT_MIN) / (HEIGHT_MAX - HEIGHT_MIN))
+
+
+def copernicus_tile_name(lon: int, lat: int) -> str:
+    lat_prefix = "N" if lat >= 0 else "S"
+    lon_prefix = "E" if lon >= 0 else "W"
+    return f"Copernicus_DSM_COG_10_{lat_prefix}{abs(lat):02d}_00_{lon_prefix}{abs(lon):03d}_00_DEM.tif"
+
+
+class CopernicusDem:
+    def __init__(self, cache_dir: Path) -> None:
+        self.cache_dir = cache_dir
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.tiles: dict[tuple[int, int], Image.Image] = {}
+
+    def tile_path(self, lon: int, lat: int) -> Path:
+        return self.cache_dir / copernicus_tile_name(lon, lat)
+
+    def fetch_tile(self, lon: int, lat: int) -> Image.Image:
+        key = (lon, lat)
+        if key in self.tiles:
+            return self.tiles[key]
+
+        path = self.tile_path(lon, lat)
+        if not path.exists():
+            lat_prefix = "N" if lat >= 0 else "S"
+            lon_prefix = "E" if lon >= 0 else "W"
+            url = DEM_TILE_URL.format(
+                lat_prefix=lat_prefix,
+                lat=abs(lat),
+                lon_prefix=lon_prefix,
+                lon=abs(lon),
+            )
+            request = urllib.request.Request(url, headers={"User-Agent": "coaster-sim-dem-generator"})
+            with urllib.request.urlopen(request, timeout=180) as response:
+                path.write_bytes(response.read())
+
+        image = Image.open(path)
+        self.tiles[key] = image
+        return image
+
+    def sample_cm(self, lon: float, lat: float) -> float:
+        tile_lon = math.floor(lon)
+        tile_lat = math.floor(lat)
+        image = self.fetch_tile(tile_lon, tile_lat)
+        width, height = image.size
+        x = (lon - tile_lon) * (width - 1)
+        y = (tile_lat + 1.0 - lat) * (height - 1)
+        x0 = max(0, min(width - 1, math.floor(x)))
+        y0 = max(0, min(height - 1, math.floor(y)))
+        x1 = max(0, min(width - 1, x0 + 1))
+        y1 = max(0, min(height - 1, y0 + 1))
+        tx = x - x0
+        ty = y - y0
+
+        def pixel(px: int, py: int) -> float:
+            return float(image.getpixel((px, py)))
+
+        a = pixel(x0, y0)
+        b = pixel(x1, y0)
+        c = pixel(x0, y1)
+        d = pixel(x1, y1)
+        meters = lerp(lerp(a, b, tx), lerp(c, d, tx), ty)
+        return meters * 100.0
+
+
+def world_to_lon_lat(x: float, y: float) -> tuple[float, float]:
+    u = (x - MIN_X) / (MAX_X - MIN_X)
+    v = (y - MIN_Y) / (MAX_Y - MIN_Y)
+    return lerp(DEM_WEST_LON, DEM_EAST_LON, u), lerp(DEM_SOUTH_LAT, DEM_NORTH_LAT, v)
+
+
+def build_copernicus_height_grid(cache_dir: Path) -> tuple[list[float], dict[str, object]]:
+    dem = CopernicusDem(cache_dir)
+    values: list[float] = []
+    stats = {"min_cm": 999999999.0, "max_cm": -999999999.0}
+    for y_index in range(SIZE):
+        v = y_index / (SIZE - 1)
+        y = lerp(MIN_Y, MAX_Y, v)
+        for x_index in range(SIZE):
+            u = x_index / (SIZE - 1)
+            x = lerp(MIN_X, MAX_X, u)
+            lon, lat = world_to_lon_lat(x, y)
+            height = dem.sample_cm(lon, lat)
+            values.append(height)
+            stats["min_cm"] = min(stats["min_cm"], height)
+            stats["max_cm"] = max(stats["max_cm"], height)
+
+    metadata = {
+        "source": "Copernicus DEM GLO-30 public COG tiles on AWS Open Data",
+        "source_url": "https://registry.opendata.aws/copernicus-dem/",
+        "tile_url_template": DEM_TILE_URL,
+        "bbox_wgs84": {
+            "west_lon": DEM_WEST_LON,
+            "east_lon": DEM_EAST_LON,
+            "south_lat": DEM_SOUTH_LAT,
+            "north_lat": DEM_NORTH_LAT,
+        },
+        "cache_dir": str(cache_dir),
+        "raw_height_range_cm": {
+            "min": round(stats["min_cm"], 2),
+            "max": round(stats["max_cm"], 2),
+        },
+        "encoded_height_range_cm": {
+            "min": HEIGHT_MIN,
+            "max": HEIGHT_MAX,
+        },
+        "note": "Heights are kept in real-world centimeters and clipped only at encode time.",
+    }
+    return values, metadata
 
 
 def forest_amount(x: float, y: float, height: float) -> float:
     lateral = abs(y - river_center_y(x))
-    forest_band = smooth01((lateral - 1700.0) / 1700.0) * (1.0 - smooth01((lateral - 9100.0) / 1900.0))
-    forest_height = 1.0 - smooth01((height - 2150.0) / 760.0)
+    range_cm = HEIGHT_MAX - HEIGHT_MIN
+    forest_band = smooth01((lateral - 90000.0) / 90000.0) * (1.0 - smooth01((lateral - 520000.0) / 130000.0))
+    forest_height = 1.0 - smooth01((height - (HEIGHT_MIN + range_cm * 0.45)) / (range_cm * 0.20))
     patch_noise = 0.58 * value_noise(x, y, 1650.0, 2) + 0.42 * value_noise(x, y, 760.0, 7)
     return max(0.0, min(1.0, forest_band * forest_height * smooth01((patch_noise - 0.18) / 0.42)))
 
 
 def masks(x: float, y: float, height: float) -> tuple[int, int, int, int]:
     lateral = abs(y - river_center_y(x))
-    river = int(max(0.0, 1.0 - lateral / 1150.0) * 255.0)
-    snow = int(smooth01((height - 2860.0) / 520.0) * 255.0)
+    h01 = height01(height)
+    river = int(max(0.0, 1.0 - lateral / 70000.0) * 255.0)
+    snow = int(smooth01((h01 - 0.72) / 0.10) * 255.0)
     forest = int(forest_amount(x, y, height) * 255.0)
-    rock = int(max(0.0, min(1.0, 0.24 + smooth01((height - 950.0) / 2150.0) - forest / 390.0)) * 255.0)
+    rock = int(max(0.0, min(1.0, 0.24 + smooth01((h01 - 0.25) / 0.50) - forest / 390.0)) * 255.0)
     return rock, forest, snow, river
 
 
@@ -111,9 +247,9 @@ def rgb_for_preview(x: float, y: float, height: float) -> tuple[int, int, int]:
     if forest > 18:
         canopy = min(118, max(48, forest // 2 + 36))
         return 20, canopy, 34
-    if abs(y - river_center_y(x)) < 2350.0:
+    if abs(y - river_center_y(x)) < 150000.0:
         return 54, 76, 68
-    shade = int(max(0.0, min(1.0, (height - 250.0) / 2900.0)) * 70.0)
+    shade = int(height01(height) * 70.0)
     grain = int(12.0 * math.sin(x * 0.013 + y * 0.017) + 8.0 * math.sin(x * 0.029 - y * 0.011))
     return (
         max(0, min(255, 55 + shade // 2 + grain)),
@@ -141,11 +277,11 @@ def macro_albedo(x: float, y: float, height: float) -> tuple[int, int, int]:
     lateral = abs(y - river_center_y(x))
     n = noise01(x, y)
 
-    alluvial = smooth01((2350.0 - lateral) / 1200.0) * (1.0 - river / 255.0)
-    slope_wetness = 1.0 - smooth01((height - 1350.0) / 2100.0)
+    alluvial = smooth01((170000.0 - lateral) / 90000.0) * (1.0 - river / 255.0)
+    slope_wetness = 1.0 - smooth01((height01(height) - 0.42) / 0.45)
     base = blend_rgb((23, 71, 46), (52, 101, 63), n)
 
-    rock_color = blend_rgb((58, 75, 72), (125, 139, 135), smooth01((height - 650.0) / 2550.0))
+    rock_color = blend_rgb((58, 75, 72), (125, 139, 135), height01(height))
     forest_color = blend_rgb((12, 67, 31), (37, 111, 48), n)
     alluvial_color = blend_rgb((64, 97, 90), (112, 134, 119), n)
     snow_color = blend_rgb((184, 194, 196), (231, 239, 238), snow / 255.0)
@@ -164,7 +300,7 @@ def macro_albedo(x: float, y: float, height: float) -> tuple[int, int, int]:
 def macro_roughness(x: float, y: float, height: float) -> tuple[int, int, int]:
     rock, forest, snow, river = masks(x, y, height)
     lateral = abs(y - river_center_y(x))
-    alluvial = smooth01((2350.0 - lateral) / 1200.0) * (1.0 - river / 255.0)
+    alluvial = smooth01((170000.0 - lateral) / 90000.0) * (1.0 - river / 255.0)
     value = 204
     value = int(lerp(value, 174, rock / 255.0))
     value = int(lerp(value, 226, forest / 255.0))
@@ -189,16 +325,42 @@ def write_tga(path: Path, pixels: list[tuple[int, int, int]], width: int, height
             f.write(bytes((b, g, r)))
 
 
+def write_hillshade(path: Path, heights: list[float]) -> None:
+    pixels: list[int] = []
+    min_h = min(heights)
+    max_h = max(heights)
+    for y in range(SIZE):
+        for x in range(SIZE):
+            left = heights[y * SIZE + max(0, x - 1)]
+            right = heights[y * SIZE + min(SIZE - 1, x + 1)]
+            down = heights[min(SIZE - 1, y + 1) * SIZE + x]
+            up = heights[max(0, y - 1) * SIZE + x]
+            slope = abs(right - left) + abs(down - up)
+            shade = 0.55 + 0.45 * ((heights[y * SIZE + x] - min_h) / max(max_h - min_h, 1.0))
+            edge = min(1.0, slope / 16000.0)
+            pixels.append(int(max(0.0, min(1.0, shade * 0.62 + edge * 0.38)) * 255.0))
+    image = Image.new("L", (SIZE, SIZE))
+    image.putdata(pixels)
+    image.save(path)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="Content/Generated/YarlungLandscape")
     parser.add_argument("--texture-out", default="SourceAssets/Generated/YarlungLandscape")
+    parser.add_argument("--source", choices=("copernicus", "synthetic"), default="copernicus")
+    parser.add_argument("--dem-cache", default=str(DEM_CACHE_DIR))
     args = parser.parse_args()
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     texture_out_dir = Path(args.texture_out)
     texture_out_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.source == "copernicus":
+        source_heights, source_metadata = build_copernicus_height_grid(Path(args.dem_cache))
+    else:
+        source_heights, source_metadata = [], {"source": "synthetic procedural fallback"}
 
     height_values: list[int] = []
     preview: list[tuple[int, int, int]] = []
@@ -214,7 +376,8 @@ def main() -> None:
         for x_index in range(SIZE):
             u = x_index / (SIZE - 1)
             x = lerp(MIN_X, MAX_X, u)
-            height = terrain_height(x, y)
+            data_index = y_index * SIZE + x_index
+            height = source_heights[data_index] if source_heights else terrain_height(x, y)
             stats["min_cm"] = min(stats["min_cm"], height)
             stats["max_cm"] = max(stats["max_cm"], height)
             encoded = int(max(0.0, min(1.0, (height - HEIGHT_MIN) / (HEIGHT_MAX - HEIGHT_MIN))) * 65535.0)
@@ -231,6 +394,9 @@ def main() -> None:
 
     write_ppm(out_dir / "YarlungTsangpo_preview.ppm", preview)
     write_ppm(out_dir / "YarlungTsangpo_masks.ppm", mask_preview)
+    write_hillshade(out_dir / "YarlungTsangpo_hillshade.png", [
+        lerp(HEIGHT_MIN, HEIGHT_MAX, value / 65535.0) for value in height_values
+    ])
     write_tga(texture_out_dir / "YarlungTsangpo_macro_albedo.tga", macro_pixels, SIZE, SIZE)
     write_tga(texture_out_dir / "YarlungTsangpo_macro_masks.tga", macro_masks, SIZE, SIZE)
     write_tga(texture_out_dir / "YarlungTsangpo_macro_roughness.tga", roughness_pixels, SIZE, SIZE)
@@ -245,14 +411,18 @@ def main() -> None:
         "macro_roughness": str(texture_out_dir / "YarlungTsangpo_macro_roughness.tga"),
         "resolution": [SIZE, SIZE],
         "format": "little-endian uint16 raw",
+        "source": args.source,
+        "dem": source_metadata,
         "world_bounds_cm": {"min_x": MIN_X, "max_x": MAX_X, "min_y": MIN_Y, "max_y": MAX_Y},
         "height_range_cm": {"encoded_min": HEIGHT_MIN, "encoded_max": HEIGHT_MAX, **stats},
         "unreal_import": {
             "landscape_section_size": 63,
             "sections_per_component": 1,
             "component_count": "16 x 16",
-            "xy_scale_cm": round((MAX_X - MIN_X) / (SIZE - 1), 3),
-            "z_scale_note": "Set Z scale so the encoded 3950 cm range maps to the desired mountain relief.",
+            "xy_scale_x_cm": round((MAX_X - MIN_X) / (SIZE - 1), 3),
+            "xy_scale_y_cm": round((MAX_Y - MIN_Y) / (SIZE - 1), 3),
+            "z_scale": round((HEIGHT_MAX - HEIGHT_MIN) / 512.0, 3),
+            "z_scale_note": "Encoded 16-bit heights map to the real-scale 2600m-7300m elevation window.",
             "material_layers": ["River", "AlluvialSand", "DarkForest", "WeatheredRock", "Snow"],
             "nanite_followup": "Import high-poly rock and vegetation StaticMesh assets with bBuildNanite enabled; these generated masks define placement/material zones.",
         },
@@ -262,6 +432,7 @@ def main() -> None:
         "# Yarlung Tsangpo Landscape Assets\n\n"
         "- `YarlungTsangpo_1009.r16`: Unreal Landscape heightmap import source.\n"
         "- `YarlungTsangpo_preview.ppm`: dependency-free color preview of the terrain.\n"
+        "- `YarlungTsangpo_hillshade.png`: real-scale DEM hillshade preview for bbox/orientation checks.\n"
         "- `YarlungTsangpo_masks.ppm`: RGB mask preview where red=river, green=forest, blue=rock/snow.\n"
         "- `SourceAssets/Generated/YarlungLandscape/YarlungTsangpo_macro_albedo.tga`: UE-imported macro color map.\n"
         "- `SourceAssets/Generated/YarlungLandscape/YarlungTsangpo_macro_masks.tga`: UE-imported river/forest/rock-snow mask.\n"

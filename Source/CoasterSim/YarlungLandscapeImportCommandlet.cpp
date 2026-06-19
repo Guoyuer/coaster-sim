@@ -25,12 +25,12 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
 {
 #if WITH_EDITOR
     constexpr int32 HeightmapSize = 1009;
-    constexpr float MinX = -4200.0f;
-    constexpr float MaxX = 12200.0f;
-    constexpr float MinY = -10500.0f;
-    constexpr float MaxY = 8200.0f;
-    constexpr float EncodedMinZ = -360.0f;
-    constexpr float EncodedMaxZ = 3900.0f;
+    constexpr float MinX = -337778.431f;
+    constexpr float MaxX = 337778.431f;
+    constexpr float MinY = -416981.551f;
+    constexpr float MaxY = 416981.551f;
+    constexpr float EncodedMinZ = 260000.0f;
+    constexpr float EncodedMaxZ = 730000.0f;
     constexpr int32 SectionsPerComponent = 1;
     constexpr int32 SectionSizeQuads = 63;
 

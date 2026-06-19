@@ -20,7 +20,9 @@ namespace
 {
 constexpr float CmPerMeter = 100.0f;
 constexpr float GravityCms2 = 980.665f;
-constexpr float RiverZCm = 18.0f;
+constexpr float RiverZCm = 265200.0f;
+constexpr float YarlungRiverAnchorXCm = 95543.0f;
+constexpr float YarlungRiverAnchorYCm = -142330.0f;
 
 FTransform MakeSegmentTransform(const FVector& Start, const FVector& End, const FVector& ScaleCm)
 {
@@ -45,9 +47,10 @@ float Hash01(float A, float B)
 
 float YarlungRiverCenterY(float X)
 {
-    return -1150.0f
-        + 1050.0f * FMath::Sin(X * 0.00048f + 0.7f)
-        + 420.0f * FMath::Sin(X * 0.00115f - 0.6f);
+    const float OffsetX = X - YarlungRiverAnchorXCm;
+    return YarlungRiverAnchorYCm
+        + 9000.0f * FMath::Sin(OffsetX * 0.00009f + 0.25f)
+        + 4200.0f * FMath::Sin(OffsetX * 0.00021f - 0.6f);
 }
 
 float YarlungLandscapeHeight(float X, float Y)

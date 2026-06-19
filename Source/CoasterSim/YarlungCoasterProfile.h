@@ -17,17 +17,14 @@ inline float Smooth01(float Value)
 inline const TArray<FVector>& DefaultTrackControlPoints()
 {
     static const TArray<FVector> Points = {
-        FVector(0.0f, 0.0f, 1320.0f),
-        FVector(1800.0f, 0.0f, 1460.0f),
-        FVector(4200.0f, 280.0f, 2700.0f),
-        FVector(6800.0f, 620.0f, 4450.0f),
-        FVector(9300.0f, 260.0f, 2150.0f),
-        FVector(10400.0f, -1800.0f, 1420.0f),
-        FVector(7700.0f, -3650.0f, 2400.0f),
-        FVector(4100.0f, -3900.0f, 1800.0f),
-        FVector(600.0f, -2500.0f, 2750.0f),
-        FVector(-1800.0f, 300.0f, 1680.0f),
-        FVector(-850.0f, 1500.0f, 1360.0f)
+        FVector(87043.0f, -147129.7f, 266910.5f),
+        FVector(92343.0f, -148529.7f, 267500.0f),
+        FVector(99743.0f, -146629.7f, 269200.0f),
+        FVector(105343.0f, -141129.7f, 273405.1f),
+        FVector(103143.0f, -135229.7f, 273898.5f),
+        FVector(96443.0f, -133129.7f, 271391.0f),
+        FVector(87943.0f, -135629.7f, 271904.3f),
+        FVector(83743.0f, -141429.7f, 274685.5f)
     };
     return Points;
 }
