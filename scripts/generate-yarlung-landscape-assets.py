@@ -27,6 +27,7 @@ MAX_Y = 416981.55087574443
 RIVER_Z = 265200.0
 RIVER_ANCHOR_X = 95543.0
 RIVER_ANCHOR_Y = -142330.0
+RIVER_MASK_HALF_WIDTH_CM = 26000.0
 HEIGHT_MIN = 260000.0
 HEIGHT_MAX = 730000.0
 NATURALIZE_STEEP_TERRAIN = True
@@ -73,6 +74,61 @@ def river_center_y(x: float) -> float:
         + 9000.0 * math.sin(offset_x * 0.00009 + 0.25)
         + 4200.0 * math.sin(offset_x * 0.00021 - 0.6)
     )
+
+
+def grid_y_to_world(y_index: float) -> float:
+    return lerp(MIN_Y, MAX_Y, y_index / (SIZE - 1))
+
+
+def world_x_to_grid(x: float) -> float:
+    return (x - MIN_X) / (MAX_X - MIN_X) * (SIZE - 1)
+
+
+def build_dem_river_guide(heights: list[float], search_radius: int = 70) -> list[float]:
+    first_x = SIZE // 2
+    previous_y = min(
+        range(int(SIZE * 0.12), int(SIZE * 0.88)),
+        key=lambda y: heights[y * SIZE + first_x],
+    )
+
+    center_y = [float(previous_y)] * SIZE
+    for x in range(first_x, SIZE):
+        y_min = max(2, previous_y - search_radius)
+        y_max = min(SIZE - 3, previous_y + search_radius)
+        previous_y = min(
+            range(y_min, y_max + 1),
+            key=lambda y: heights[y * SIZE + x] + abs(y - previous_y) * 45.0,
+        )
+        center_y[x] = float(previous_y)
+
+    previous_y = int(round(center_y[first_x]))
+    for x in range(first_x - 1, -1, -1):
+        y_min = max(2, previous_y - search_radius)
+        y_max = min(SIZE - 3, previous_y + search_radius)
+        previous_y = min(
+            range(y_min, y_max + 1),
+            key=lambda y: heights[y * SIZE + x] + abs(y - previous_y) * 45.0,
+        )
+        center_y[x] = float(previous_y)
+
+    smoothed = center_y
+    for _ in range(3):
+        next_y = []
+        for x in range(SIZE):
+            start = max(0, x - 5)
+            end = min(SIZE, x + 6)
+            next_y.append(sum(smoothed[start:end]) / (end - start))
+        smoothed = next_y
+    return [grid_y_to_world(value) for value in smoothed]
+
+
+def guided_river_center_y(x: float, river_guide: list[float] | None) -> float:
+    if not river_guide:
+        return river_center_y(x)
+    gx = max(0.0, min(SIZE - 1.0, world_x_to_grid(x)))
+    x0 = int(math.floor(gx))
+    x1 = min(SIZE - 1, x0 + 1)
+    return lerp(river_guide[x0], river_guide[x1], gx - x0)
 
 
 def terrain_height(x: float, y: float) -> float:
@@ -330,8 +386,9 @@ def naturalize_height_grid(heights: list[float]) -> list[float]:
     return relax_height_slopes(conditioned, max_slope=0.78, passes=8)
 
 
-def forest_amount(x: float, y: float, height: float) -> float:
-    lateral = abs(y - river_center_y(x))
+def forest_amount(x: float, y: float, height: float, river_y: float | None = None) -> float:
+    center_y = river_center_y(x) if river_y is None else river_y
+    lateral = abs(y - center_y)
     range_cm = HEIGHT_MAX - HEIGHT_MIN
     forest_band = smooth01((lateral - 90000.0) / 90000.0) * (1.0 - smooth01((lateral - 520000.0) / 130000.0))
     forest_height = 1.0 - smooth01((height - (HEIGHT_MIN + range_cm * 0.45)) / (range_cm * 0.20))
@@ -339,12 +396,13 @@ def forest_amount(x: float, y: float, height: float) -> float:
     return max(0.0, min(1.0, forest_band * forest_height * smooth01((patch_noise - 0.18) / 0.42)))
 
 
-def masks(x: float, y: float, height: float) -> tuple[int, int, int, int]:
-    lateral = abs(y - river_center_y(x))
+def masks(x: float, y: float, height: float, river_y: float | None = None) -> tuple[int, int, int, int]:
+    center_y = river_center_y(x) if river_y is None else river_y
+    lateral = abs(y - center_y)
     h01 = height01(height)
-    river = int(max(0.0, 1.0 - lateral / 70000.0) * 255.0)
+    river = int(max(0.0, 1.0 - lateral / RIVER_MASK_HALF_WIDTH_CM) * 255.0)
     snow = int(smooth01((h01 - 0.72) / 0.10) * 255.0)
-    forest = int(forest_amount(x, y, height) * 255.0)
+    forest = int(forest_amount(x, y, height, center_y) * 255.0)
     rock = int(max(0.0, min(1.0, 0.24 + smooth01((h01 - 0.25) / 0.50) - forest / 390.0)) * 255.0)
     return rock, forest, snow, river
 
@@ -353,8 +411,9 @@ def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
 
 
-def rgb_for_preview(x: float, y: float, height: float) -> tuple[int, int, int]:
-    rock, forest, snow, river = masks(x, y, height)
+def rgb_for_preview(x: float, y: float, height: float, river_y: float | None = None) -> tuple[int, int, int]:
+    center_y = river_center_y(x) if river_y is None else river_y
+    rock, forest, snow, river = masks(x, y, height, center_y)
     if river > 8:
         return 12, min(255, 88 + river // 3), min(255, 102 + river // 3)
     if snow > 24:
@@ -363,7 +422,7 @@ def rgb_for_preview(x: float, y: float, height: float) -> tuple[int, int, int]:
     if forest > 18:
         canopy = min(118, max(48, forest // 2 + 36))
         return 20, canopy, 34
-    if abs(y - river_center_y(x)) < 150000.0:
+    if abs(y - center_y) < 150000.0:
         return 54, 76, 68
     shade = int(height01(height) * 70.0)
     grain = int(12.0 * math.sin(x * 0.013 + y * 0.017) + 8.0 * math.sin(x * 0.029 - y * 0.011))
@@ -388,9 +447,10 @@ def blend_rgb(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tup
     )
 
 
-def macro_albedo(x: float, y: float, height: float) -> tuple[int, int, int]:
-    rock, forest, snow, river = masks(x, y, height)
-    lateral = abs(y - river_center_y(x))
+def macro_albedo(x: float, y: float, height: float, river_y: float | None = None) -> tuple[int, int, int]:
+    center_y = river_center_y(x) if river_y is None else river_y
+    rock, forest, snow, river = masks(x, y, height, center_y)
+    lateral = abs(y - center_y)
     n = noise01(x, y)
 
     alluvial = smooth01((170000.0 - lateral) / 90000.0) * (1.0 - river / 255.0)
@@ -413,9 +473,10 @@ def macro_albedo(x: float, y: float, height: float) -> tuple[int, int, int]:
     return tuple(max(0, min(255, int(channel * humid_shade))) for channel in color)
 
 
-def macro_roughness(x: float, y: float, height: float) -> tuple[int, int, int]:
-    rock, forest, snow, river = masks(x, y, height)
-    lateral = abs(y - river_center_y(x))
+def macro_roughness(x: float, y: float, height: float, river_y: float | None = None) -> tuple[int, int, int]:
+    center_y = river_center_y(x) if river_y is None else river_y
+    rock, forest, snow, river = masks(x, y, height, center_y)
+    lateral = abs(y - center_y)
     alluvial = smooth01((170000.0 - lateral) / 90000.0) * (1.0 - river / 255.0)
     value = 204
     value = int(lerp(value, 174, rock / 255.0))
@@ -470,6 +531,8 @@ def main() -> None:
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = out_dir / "manifest.json"
+    previous_manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
     texture_out_dir = Path(args.texture_out)
     texture_out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -484,6 +547,15 @@ def main() -> None:
         }
     else:
         source_heights, source_metadata = [], {"source": "synthetic procedural fallback"}
+
+    river_guide = build_dem_river_guide(source_heights) if source_heights else None
+    if river_guide:
+        source_metadata["river_mask"] = {
+            "centerline": "DEM thalweg extracted from the naturalized height grid",
+            "search_radius_px": 70,
+            "smoothing": "moving average radius=5, passes=3",
+            "purpose": "Keep macro river/water masks aligned with the valley floor and generated coaster route.",
+        }
 
     height_values: list[int] = []
     preview: list[tuple[int, int, int]] = []
@@ -501,16 +573,17 @@ def main() -> None:
             x = lerp(MIN_X, MAX_X, u)
             data_index = y_index * SIZE + x_index
             height = source_heights[data_index] if source_heights else terrain_height(x, y)
+            river_y = guided_river_center_y(x, river_guide)
             stats["min_cm"] = min(stats["min_cm"], height)
             stats["max_cm"] = max(stats["max_cm"], height)
             encoded = int(max(0.0, min(1.0, (height - HEIGHT_MIN) / (HEIGHT_MAX - HEIGHT_MIN))) * 65535.0)
             height_values.append(encoded)
-            preview.append(rgb_for_preview(x, y, height))
-            rock, forest, snow, river = masks(x, y, height)
+            preview.append(rgb_for_preview(x, y, height, river_y))
+            rock, forest, snow, river = masks(x, y, height, river_y)
             mask_preview.append((river, forest, max(rock, snow)))
-            macro_pixels.append(macro_albedo(x, y, height))
+            macro_pixels.append(macro_albedo(x, y, height, river_y))
             macro_masks.append((river, forest, max(rock, snow)))
-            roughness_pixels.append(macro_roughness(x, y, height))
+            roughness_pixels.append(macro_roughness(x, y, height, river_y))
 
     with (out_dir / "YarlungTsangpo_1009.r16").open("wb") as f:
         f.write(struct.pack("<" + "H" * len(height_values), *height_values))
@@ -550,7 +623,9 @@ def main() -> None:
             "nanite_followup": "Import high-poly rock and vegetation StaticMesh assets with bBuildNanite enabled; these generated masks define placement/material zones.",
         },
     }
-    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    if "track" in previous_manifest:
+        manifest["track"] = previous_manifest["track"]
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     (out_dir / "README.md").write_text(
         "# Yarlung Tsangpo Landscape Assets\n\n"
         "- `YarlungTsangpo_1009.r16`: Unreal Landscape heightmap import source.\n"

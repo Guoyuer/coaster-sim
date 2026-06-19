@@ -37,6 +37,12 @@
       "purpose": "Preserve broad Yarlung canyon shapes while reshaping near-vertical 30m DEM cliffs into ride-scale natural slopes for first-person photorealism.",
       "broad_blur": "box blur radius=18, passes=3, steep-relief weighted blend",
       "slope_relaxation": "max_slope=0.78, passes=8"
+    },
+    "river_mask": {
+      "centerline": "DEM thalweg extracted from the naturalized height grid",
+      "search_radius_px": 70,
+      "smoothing": "moving average radius=5, passes=3",
+      "purpose": "Keep macro river/water masks aligned with the valley floor and generated coaster route."
     }
   },
   "world_bounds_cm": {
