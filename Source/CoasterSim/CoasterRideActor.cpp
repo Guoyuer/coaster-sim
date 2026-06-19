@@ -133,7 +133,7 @@ ACoasterRideActor::ACoasterRideActor()
     RideCamera->PostProcessSettings.bOverride_CameraISO = true;
     RideCamera->PostProcessSettings.CameraISO = 100.0f;
     RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-    RideCamera->PostProcessSettings.AutoExposureBias = 0.0f;
+    RideCamera->PostProcessSettings.AutoExposureBias = 1.2f;
     RideCamera->PostProcessSettings.bOverride_FilmSlope = true;
     RideCamera->PostProcessSettings.FilmSlope = 0.86f;
     RideCamera->PostProcessSettings.bOverride_FilmToe = true;
