@@ -138,7 +138,7 @@ def create_texture_sample(material, texture, x, y, coordinates=None):
     return expression
 
 
-def create_landscape_coords(material, x, y):
+def create_landscape_coords(material, x, y, mapping_scale=1009.0):
     expression = unreal.MaterialEditingLibrary.create_material_expression(
         material,
         unreal.MaterialExpressionLandscapeLayerCoords,
@@ -147,10 +147,28 @@ def create_landscape_coords(material, x, y):
     )
     expression.set_editor_property("mapping_type", unreal.TerrainCoordMappingType.TCMT_XY)
     expression.set_editor_property("custom_uv_type", unreal.LandscapeCustomizedCoordType.LCCT_NONE)
-    expression.set_editor_property("mapping_scale", 1009.0)
+    expression.set_editor_property("mapping_scale", mapping_scale)
     expression.set_editor_property("mapping_rotation", 0.0)
     expression.set_editor_property("mapping_pan_u", 0.0)
     expression.set_editor_property("mapping_pan_v", 0.0)
+    return expression
+
+
+def create_lerp(material, a_expression, a_output, b_expression, b_output, alpha_expression, alpha_output, x, y, label):
+    expression = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionLinearInterpolate,
+        x,
+        y,
+    )
+    connections = [
+        (a_expression, a_output, "A"),
+        (b_expression, b_output, "B"),
+        (alpha_expression, alpha_output, "Alpha"),
+    ]
+    for source, output_name, input_name in connections:
+        if not unreal.MaterialEditingLibrary.connect_material_expressions(source, output_name, expression, input_name):
+            raise RuntimeError(f"Unable to connect {label} {input_name}")
     return expression
 
 
@@ -320,29 +338,191 @@ def create_river_materials():
     )
 
 
-def create_landscape_material(detail_textures, macro_textures):
+def create_landscape_material(rock_textures, grass_textures, macro_textures):
     material = create_material_asset(LANDSCAPE_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
-    macro_coordinates = create_landscape_coords(material, -1240, -40)
+    macro_coordinates = create_landscape_coords(material, -1460, -40, 1009.0)
+    # Keep detail UVs intentionally broad. Tiny tiling on a 1:1 Himalayan heightfield
+    # reintroduces shimmer/moire in first-person motion.
+    detail_coordinates = create_landscape_coords(material, -1460, 360, 140.0)
+
+    macro_albedo = create_texture_sample(
+        material,
+        macro_textures["T_YarlungMacroAlbedo"],
+        -1160,
+        -420,
+        macro_coordinates,
+    )
+    macro_masks = create_texture_sample(
+        material,
+        macro_textures["T_YarlungMacroMasks"],
+        -1160,
+        -120,
+        macro_coordinates,
+    )
+    macro_roughness = create_texture_sample(
+        material,
+        macro_textures["T_YarlungMacroRoughness"],
+        -1160,
+        120,
+        macro_coordinates,
+    )
+
+    rock_diffuse = create_texture_sample(
+        material,
+        rock_textures["T_AerialGrassRock_Diffuse"],
+        -1160,
+        520,
+        detail_coordinates,
+    )
+    grass_diffuse = create_texture_sample(
+        material,
+        grass_textures["T_LeafyGrass_Diffuse"],
+        -1160,
+        740,
+        detail_coordinates,
+    )
+    detail_base = create_lerp(
+        material,
+        rock_diffuse,
+        "",
+        grass_diffuse,
+        "",
+        macro_masks,
+        "G",
+        -800,
+        620,
+        "landscape detail base",
+    )
+    final_base = create_lerp(
+        material,
+        macro_albedo,
+        "",
+        detail_base,
+        "",
+        create_scalar_parameter(material, "DetailColorStrength", 0.34, -800, 360),
+        "",
+        -520,
+        -260,
+        "landscape macro/detail base",
+    )
 
     connect_material_property(
         material,
-        create_texture_sample(material, macro_textures["T_YarlungMacroAlbedo"], -980, -320, macro_coordinates),
+        final_base,
         unreal.MaterialProperty.MP_BASE_COLOR,
         "landscape BaseColor",
     )
-    roughness = create_texture_sample(material, macro_textures["T_YarlungMacroRoughness"], -980, 220, macro_coordinates)
+
+    rock_normal = create_texture_sample(
+        material,
+        rock_textures["T_AerialGrassRock_Normal"],
+        -520,
+        520,
+        detail_coordinates,
+    )
+    grass_normal = create_texture_sample(
+        material,
+        grass_textures["T_LeafyGrass_Normal"],
+        -520,
+        760,
+        detail_coordinates,
+    )
+    detail_normal = create_lerp(
+        material,
+        rock_normal,
+        "",
+        grass_normal,
+        "",
+        macro_masks,
+        "G",
+        -180,
+        640,
+        "landscape detail normal",
+    )
     connected = unreal.MaterialEditingLibrary.connect_material_property(
-        roughness,
+        detail_normal,
+        "",
+        unreal.MaterialProperty.MP_NORMAL,
+    )
+    if not connected:
+        raise RuntimeError("Unable to connect landscape Normal")
+
+    rock_roughness = create_texture_sample(
+        material,
+        rock_textures["T_AerialGrassRock_Rough"],
+        -520,
+        1000,
+        detail_coordinates,
+    )
+    grass_roughness = create_texture_sample(
+        material,
+        grass_textures["T_LeafyGrass_Rough"],
+        -520,
+        1200,
+        detail_coordinates,
+    )
+    detail_roughness = create_lerp(
+        material,
+        rock_roughness,
         "R",
+        grass_roughness,
+        "R",
+        macro_masks,
+        "G",
+        -180,
+        1100,
+        "landscape detail roughness",
+    )
+    final_roughness = create_lerp(
+        material,
+        macro_roughness,
+        "R",
+        detail_roughness,
+        "",
+        create_scalar_parameter(material, "DetailRoughnessStrength", 0.60, -180, 1360),
+        "",
+        120,
+        1120,
+        "landscape macro/detail roughness",
+    )
+    connected = unreal.MaterialEditingLibrary.connect_material_property(
+        final_roughness,
+        "",
         unreal.MaterialProperty.MP_ROUGHNESS,
     )
     if not connected:
         raise RuntimeError("Unable to connect landscape Roughness")
-    ambient_occlusion = create_texture_sample(material, detail_textures["T_AerialGrassRock_AO"], -980, 460)
+
+    rock_ao = create_texture_sample(
+        material,
+        rock_textures["T_AerialGrassRock_AO"],
+        120,
+        520,
+        detail_coordinates,
+    )
+    grass_ao = create_texture_sample(
+        material,
+        grass_textures["T_LeafyGrass_AO"],
+        120,
+        740,
+        detail_coordinates,
+    )
+    ambient_occlusion = create_lerp(
+        material,
+        rock_ao,
+        "R",
+        grass_ao,
+        "R",
+        macro_masks,
+        "G",
+        420,
+        640,
+        "landscape detail ao",
+    )
     connected = unreal.MaterialEditingLibrary.connect_material_property(
         ambient_occlusion,
-        "R",
+        "",
         unreal.MaterialProperty.MP_AMBIENT_OCCLUSION,
     )
     if not connected:
@@ -364,7 +544,7 @@ def main():
     ensure_folder(YARLUNG_MACRO_PACKAGE_PATH)
     create_tint_material()
     create_river_materials()
-    import_textures(LEAFY_GRASS_PACKAGE_PATH, LEAFY_GRASS_SOURCE_DIR, LEAFY_GRASS_TEXTURES)
+    leafy_grass_textures = import_textures(LEAFY_GRASS_PACKAGE_PATH, LEAFY_GRASS_SOURCE_DIR, LEAFY_GRASS_TEXTURES)
     aerial_grass_rock_textures = import_textures(
         AERIAL_GRASS_ROCK_PACKAGE_PATH,
         AERIAL_GRASS_ROCK_SOURCE_DIR,
@@ -375,7 +555,7 @@ def main():
         YARLUNG_MACRO_SOURCE_DIR,
         YARLUNG_MACRO_TEXTURES,
     )
-    create_landscape_material(aerial_grass_rock_textures, yarlung_macro_textures)
+    create_landscape_material(aerial_grass_rock_textures, leafy_grass_textures, yarlung_macro_textures)
     marker_path = unreal.Paths.convert_relative_path_to_full(
         unreal.Paths.project_saved_dir() + SUCCESS_MARKER
     )
