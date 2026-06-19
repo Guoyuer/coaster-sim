@@ -14,6 +14,7 @@
 ## 1. 真相源文档（每次迭代开始前必读）
 | 文件 | 作用 |
 |---|---|
+| `docs/plans/worlds-longest-coaster.md` | **定位 spec（2026-06-19 重定位，最高层）**：世界最长~5km 沿江往返实景过山车 + 真物理 + 风景优先；轨道/走廊/验收受其约束 |
 | `docs/plans/photoreal-overhaul.md` | 顺序计划：阶段 0→F，每步目标/改动/验收 |
 | `docs/specs/photoreal-acceptance.md` | 验收 spec：到位定义 + 打分量规 + 每阶段出口标准 |
 | `docs/plans/photoreal-progress.md` | 进度状态（**你每轮都要更新它**，断点续跑靠它） |
@@ -22,7 +23,7 @@
 | `CONTEXT.md` / `docs/specs/visual.md` | 视觉锚点与规范 |
 | `docs/bugs/2026-06-18-visual-pipeline-bugs.md` | 既往坑（moire/暖色/雾回归/headless 假成功） |
 
-**层级规则**：当前 Yarlung 照片级迭代以本文件、`photoreal-overhaul.md`、`photoreal-acceptance.md`、`photoreal-progress.md` 为最高优先级。旧的 `docs/specs/*.md` 是基础仿真/M1 设计资料；若它们允许 free camera、sky dome、procedural placeholder、灰盒美术等，与照片级计划冲突时，按照片级计划执行。
+**层级规则**：当前 Yarlung 迭代以本文件、`worlds-longest-coaster.md`（定位）、`photoreal-overhaul.md`、`photoreal-acceptance.md`、`photoreal-progress.md` 为最高优先级。定位冲突时以 `worlds-longest-coaster.md` 为准。旧的 `docs/specs/*.md` 是基础仿真/M1 设计资料；若它们允许 free camera、sky dome、procedural placeholder、灰盒美术等，与照片级计划冲突时，按照片级计划执行。
 
 ## 2. 环境与命令
 引擎：UE 5.8。路径：

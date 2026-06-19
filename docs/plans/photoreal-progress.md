@@ -51,6 +51,7 @@
 - `hero-baseline @t12s`: D1=1 D2=1 D3=1 D4=0 D5=1 D6=1 D7=2 D8=1，均值=1.0，短板=植被缺失/假天空云/顶点色河道/程序化坡面/方条轨道。根因/下一步=A1 删除假环境几何，A2 用真实 DEM 建立地形轮廓。
 
 ## 决策记录（不可逆/重要选择，最新在上）
+- 2026-06-19（**用户拍板，项目重定位 — 流程级、不可逆**）：目标从「峡谷里的 ~600m 小设施」重定位为 **世界最长(~5,000m)沿江往返(out-and-back)实景过山车 + 真物理动力学 + 风景优先**。优先级：安全/舒适 G 限(硬) > 长度(≥2,500m，目标~5km，硬底) > 风景 > 乘坐刺激。舒适包络定「更刺激」档（垂直[-1.5,+5.5]/横向≤1.7/纵向≤2.5，airtime ejector）。完整 codex-ready 设计见 **`docs/plans/worlds-longest-coaster.md`**。架构=离线轨道生成器(thalweg自动提取)+净空/舒适校验器(硬门禁，闭环未结外审的「全环不穿山」)+运行时数据驱动长轨道；先做 **P0 行为保持式 C++ 重构**(切 `UCoasterTrackComponent`/`ECoasterSection`/banking 纯函数，瘦身 802 行 god actor) ∥ **P1 离线生成器+校验器**。photoreal A–F 走廊范围与验收(新增 D9 乘坐/D10 尺度)受此约束。下一步=writing-plans 出 P0/P1 分步计划。
 - 2026-06-18（A2 剖面诊断落地）：新增 `scripts\dump-yarlung-height-profile.py`，自动找 `.r16` 中最陡横向崖面剖面并输出 CSV/PNG。当前 1009 profile 显示：高度曲线连续、96/96 unique、无 8-bit/posterize 平台；但坡度有 bilinear 分段重复和 C1 断点。结论：**台阶不是高度量化 bug，而是 bilinear piecewise slope + heightfield 法线/材质暴露**。下一步仍是 bicubic/样条（直接针对 C1 断点），不是先升 2017；2017 如需只作对照。
 - 2026-06-19（B-spline cheap fix 结果）：Catmull-Rom bicubic 在陡坡有过冲，剖面 kink 指标变差；改用 cubic B-spline 后数据剖面明显更平顺（同线 `kinks 10→2`）。但 1440p 英雄帧仍有近景巨大水平台阶，确认主因已经超出 DEM 插值：单值 heightfield 不能表达近垂直崖、30m 源分辨率不足、裸 macro 无 detail normal。**结论：不要继续在 2017/插值上耗时；近景崖归 stage C，A2 只按中远景/不穿山/贴地口径验收。**
 - 2026-06-19（用户拍板，照片自然性 > 原始地形忠实；轨道适配地形）：用户明确要求“不用特别忠于原始地形，看着必须自然，像照片”。据 `a2-naturalized-v1` 观察，单纯 naturalize `.r16` 数据剖面有改善，但英雄帧近景货架墙几乎不变；结合 commandlet 逻辑，主因是 `ApplyTrackClearanceCut` 用窄半径把山体硬切到轨道净空高度，形成人工台阶峡谷。**流程级决策：DEM 只做大轮廓参考；地形生成要照片向自然化；更重要的是不要挖山适配轨道，而是让轨道高度/路径适配自然地形。** 下一步应撤掉/弱化 clearance cut，并按自然地形重新求轨道控制点 Z/XY（保证不穿山、贴近谷底/坡面、第一人称构图自然）。
@@ -86,6 +87,9 @@
 - [ ] **A2 Done（新口径）**：用 hero `WaitSeconds 12` 或补充中远景取景验**中远景峡谷轮廓/尺度正确、不穿山、轨道贴地**即可标 Done；近景若仍有材质细节不足 deferred 到 C，但**人工货架墙/硬切槽不能放行**。**追加（独立审阅）：必须先过上一条全环穿山诊断；单机位截图不算数。**
 - [x] **低打扰截图实测**：已成功。推荐命令：`powershell -ExecutionPolicy Bypass -File scripts\offscreen-shot.ps1 -Name <name> -WaitSeconds <seconds> -ResX 2560 -ResY 1440`。注意这是 offscreen/低打扰 smoke path，最终验收仍需确认画面有效并按量规打分。
 - [ ] **英雄段人工确认**（阶段 0）：已先选 `WaitSeconds 12` 作为最佳努力默认；如用户想换英雄段，再重新截图并更新本文件。
+- [ ] **【重定位 2026-06-19】P0：C++ 行为保持式重构**（spec §6.0/§8）：切 `UCoasterTrackComponent`+`ECoasterSection`+banking 纯函数，瘦身 god actor，零行为变更（offscreen smoke 逐帧零回归）。可与 P1 并行。
+- [ ] **【重定位 2026-06-19】P1：离线轨道生成器 + 净空/舒适校验器**（spec §4/§5）：thalweg 自动提取→5km 沿江往返 `YarlungTrack.csv`，过净空(闭环穿山外审)+「更刺激」G 门禁，centerline 叠 hillshade 确认贴江。
+- [ ] **【重定位 2026-06-19】P2–P5**：运行时接入长轨道 / 乘坐打磨(曲率banking+调参) / 走廊照片化(含环境迁出) / 验收增 D9 D10。依赖 (P0∥P1)→P2→P3。
 
 ## 最终总结（到位后填写）
 - （未到位）

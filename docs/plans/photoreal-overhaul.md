@@ -5,7 +5,8 @@
 
 ## 文档层级（避免拿旧 spec 走回头路）
 
-- 当前 Yarlung 照片级画质迭代以 `AGENTS.md`、本文、`docs/specs/photoreal-acceptance.md`、`docs/plans/photoreal-progress.md` 为最高优先级。
+- **⚠️ 定位已变更（2026-06-19 用户拍板）**：项目目标从「峡谷里的小设施」重定位为 **世界最长(~5km)沿江往返实景过山车 + 真物理 + 风景优先**。详见 **`docs/plans/worlds-longest-coaster.md`**（codex-ready 设计 spec）。本「画质重构计划」的走廊/轨道范围受其约束；冲突时以 worlds-longest spec 的定位与优先级为准。
+- 当前 Yarlung 照片级画质迭代以 `AGENTS.md`、本文、`docs/specs/photoreal-acceptance.md`、`docs/plans/photoreal-progress.md`、`docs/plans/worlds-longest-coaster.md` 为最高优先级。
 - `docs/specs/product.md`、`architecture.md`、`physics.md`、`validation.md`、`visual.md` 是基础仿真/M1 资料。它们若提到 free camera、sky dome、procedural placeholder、灰盒美术，只能作为历史/调试语境；照片级验收只看第一人称 on-rails 帧。
 - 永久环境美术的归属是 generated level / commandlet / PCG/Foliage / asset pipeline，不是 `ACoasterRideActor`。Ride actor 只负责仿真、轨道/车、相机、HUD 所需状态，最多做临时诊断查询。
 
