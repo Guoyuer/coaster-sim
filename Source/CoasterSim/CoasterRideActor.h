@@ -5,13 +5,13 @@
 #include "CoasterRideActor.generated.h"
 
 class UCameraComponent;
+class UCoasterTrackComponent;
 class UDirectionalLightComponent;
 class UExponentialHeightFogComponent;
 class UInstancedStaticMeshComponent;
 class UProceduralMeshComponent;
 class USkyAtmosphereComponent;
 class USkyLightComponent;
-class USplineComponent;
 
 USTRUCT(BlueprintType)
 struct FCoasterTelemetry
@@ -69,7 +69,7 @@ protected:
     TObjectPtr<USceneComponent> SceneRoot;
 
     UPROPERTY(VisibleAnywhere, Category = "Components")
-    TObjectPtr<USplineComponent> TrackSpline;
+    TObjectPtr<UCoasterTrackComponent> TrackSpline;
 
     UPROPERTY(VisibleAnywhere, Category = "Components")
     TObjectPtr<USceneComponent> TrainRoot;

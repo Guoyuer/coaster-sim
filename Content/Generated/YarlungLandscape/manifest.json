@@ -67,5 +67,23 @@
       "Snow"
     ],
     "nanite_followup": "Import high-poly rock and vegetation StaticMesh assets with bBuildNanite enabled; these generated masks define placement/material zones."
+  },
+  "track": {
+    "path": "Content/Generated/YarlungLandscape/YarlungTrack.csv",
+    "length_m": 5026.22,
+    "control_point_count": 90,
+    "out_back_split_m": 2513.11,
+    "min_clearance_m": 24.0,
+    "section_distances_m": {
+      "Station": 240.99,
+      "Lift": 329.1,
+      "Outbound": 1874.52,
+      "Turnaround": 583.69,
+      "Return": 1384.82,
+      "Launch": 343.98,
+      "Brake": 269.11
+    },
+    "generator": "scripts/generate-yarlung-track.py",
+    "note": "Generated scenic out-and-back track; runtime CSV integration begins in P2."
   }
 }

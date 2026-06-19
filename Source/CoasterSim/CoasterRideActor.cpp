@@ -1,5 +1,7 @@
 #include "CoasterRideActor.h"
 
+#include "CoasterBanking.h"
+#include "CoasterTrackComponent.h"
 #include "YarlungCoasterProfile.h"
 
 #include "Camera/CameraComponent.h"
@@ -8,7 +10,6 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
-#include "Components/SplineComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Scene.h"
 #include "Engine/StaticMesh.h"
@@ -92,7 +93,7 @@ ACoasterRideActor::ACoasterRideActor()
     SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
     RootComponent = SceneRoot;
 
-    TrackSpline = CreateDefaultSubobject<USplineComponent>(TEXT("TrackSpline"));
+    TrackSpline = CreateDefaultSubobject<UCoasterTrackComponent>(TEXT("TrackSpline"));
     TrackSpline->SetupAttachment(SceneRoot);
     TrackSpline->SetClosedLoop(true);
 
@@ -342,17 +343,8 @@ void ACoasterRideActor::StartRideFromCommandLine(float DefaultTrackRatio, float 
 
 void ACoasterRideActor::RebuildSpline()
 {
-    TrackSpline->ClearSplinePoints(false);
-
-    for (int32 Index = 0; Index < ControlPoints.Num(); ++Index)
-    {
-        TrackSpline->AddSplinePoint(ControlPoints[Index], ESplineCoordinateSpace::Local, false);
-        TrackSpline->SetSplinePointType(Index, ESplinePointType::Curve, false);
-    }
-
-    TrackSpline->SetClosedLoop(true, false);
-    TrackSpline->UpdateSpline();
-    TrackLengthCm = FMath::Max(TrackSpline->GetSplineLength(), 1.0f);
+    TrackSpline->RebuildFromControlPoints(ControlPoints);
+    TrackLengthCm = TrackSpline->GetTrackLengthCm();
 }
 
 void ACoasterRideActor::RebuildVisuals()
@@ -760,43 +752,14 @@ void ACoasterRideActor::UpdateFirstPersonCamera()
 void ACoasterRideActor::SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const
 {
     const float WrappedDistance = FMath::Fmod(FMath::Max(DistanceCm, 0.0f), TrackLengthCm);
-    OutLocation = TrackSpline->GetLocationAtDistanceAlongSpline(WrappedDistance, ESplineCoordinateSpace::Local);
-    OutForward = TrackSpline->GetDirectionAtDistanceAlongSpline(WrappedDistance, ESplineCoordinateSpace::Local).GetSafeNormal();
-
-    OutRight = FVector::CrossProduct(FVector::UpVector, OutForward).GetSafeNormal();
-    if (OutRight.IsNearlyZero())
-    {
-        OutRight = FVector::RightVector;
-    }
-
-    OutUp = FVector::CrossProduct(OutForward, OutRight).GetSafeNormal();
-
+    TrackSpline->SampleBaseFrame(WrappedDistance, OutLocation, OutRotation, OutForward, OutRight, OutUp);
     const float TrackRatio = WrappedDistance / TrackLengthCm;
-    const float BankRadians = FMath::DegreesToRadians(28.0f * FMath::Sin(TrackRatio * UE_TWO_PI * 3.0f));
-    const FQuat BankQuat(OutForward, BankRadians);
-    OutRight = BankQuat.RotateVector(OutRight).GetSafeNormal();
-    OutUp = BankQuat.RotateVector(OutUp).GetSafeNormal();
+    CoasterBanking::ApplyBank(CoasterBanking::LegacyBankRadians(TrackRatio), OutForward, OutRight, OutUp);
 
     OutRotation = FRotationMatrix::MakeFromXZ(OutForward, OutUp).Rotator();
 }
 
 FName ACoasterRideActor::GetSectionName(float TrackRatio) const
 {
-    if (TrackRatio < 0.04f)
-    {
-        return TEXT("Station");
-    }
-    if (TrackRatio < 0.24f)
-    {
-        return TEXT("Lift");
-    }
-    if (TrackRatio > 0.56f && TrackRatio < 0.62f)
-    {
-        return TEXT("Launch");
-    }
-    if (TrackRatio > 0.88f)
-    {
-        return TEXT("Brake");
-    }
-    return TEXT("Coast");
+    return TrackSpline->GetLegacySectionName(TrackRatio);
 }

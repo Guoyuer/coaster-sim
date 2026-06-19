@@ -66,6 +66,6 @@ the diagnostic proves where it is needed.
 
 ## Agent Disposition
 
-- Status: Open
+- Status: Superseded by generated 5km track path; runtime closure pending
 - Progress link: `docs/plans/photoreal-progress.md`
-- Follow-up evidence: pending
+- Follow-up evidence: P1 generated `Content/Generated/YarlungLandscape/YarlungTrack.csv` and `scripts/verify-track-clearance.py` reports `length=5031.8m`, `min_clearance=22.49m`, `violations=0` under the draft scenic-route gate. This supersedes the old 8-point `a2-track-adapts-v1` path but does not make A2 Done until P2 loads the generated track at runtime.

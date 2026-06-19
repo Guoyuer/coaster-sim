@@ -32,7 +32,8 @@
 
 | 日期 | Review | Verdict | 状态 | 阻断摘要 |
 |---|---|---|---|---|
-| 2026-06-19 | [`a2-track-adapts-v1`](../reviews/2026-06-19-a2-track-adapts-v1.md) | FAIL | Open | A2 不予放行；必须先补全环轨道 vs 地形 clearance 诊断，证明不穿山；考虑恢复很小的 clearance safety fallback |
+| 2026-06-19 | [`p0-p1`](../reviews/2026-06-19-p0-p1.md) | PASS（有条件） | Open | P0/P1 真落地、不穿山阻断已闭环（min净空22.49m/0违规）、可进 P2；但**乘坐舒适未验证**（纵向G门禁空壳、横向G恒速粗估）+**风景未验证**（overlay 糊看不出贴江），两项不得标 Done |
+| 2026-06-19 | [`a2-track-adapts-v1`](../reviews/2026-06-19-a2-track-adapts-v1.md) | FAIL | Superseded（不穿山已由 p0-p1 闭环） | 旧 8 点轨道不放行；新 5km `YarlungTrack.csv` 全环净空已过硬门禁，运行时接入(P2)前仍不能标 A2 Done |
 
 ## 打分记录（每轮追加，最新在上）
 > 格式：`iterN @t<秒>: D1=.. D2=.. ... 均值=.. 短板=.. 根因/下一步=..`
@@ -51,6 +52,7 @@
 - `hero-baseline @t12s`: D1=1 D2=1 D3=1 D4=0 D5=1 D6=1 D7=2 D8=1，均值=1.0，短板=植被缺失/假天空云/顶点色河道/程序化坡面/方条轨道。根因/下一步=A1 删除假环境几何，A2 用真实 DEM 建立地形轮廓。
 
 ## 决策记录（不可逆/重要选择，最新在上）
+- 2026-06-19（P0/P1 初版落地）：新增 **P0/P1 implementation plan** `docs/plans/worlds-longest-p0-p1-implementation.md`。P0 初版完成行为保持式 C++ 边界抽取：新增 `UCoasterTrackComponent`、`ECoasterSection`、`CoasterBanking` helper，`ACoasterRideActor` 仍保留旧 8 点控制点/物理/视觉行为；编译通过，offscreen smoke `Saved\OffscreenShots\p0-p1-smoke.png` 非空有效。P1 初版完成离线生成+校验：新增 `scripts/generate-yarlung-track.py`、`scripts/verify-track-clearance.py`、`scripts/yarlung_track_lib.py`，生成 `Content/Generated/YarlungLandscape/YarlungTrack.csv`（90 点，约 **5026m**）并写 manifest `track` 块；校验 `samples=720 length=5031.8m min_clearance=22.49m min_radius=13.7m max_grade=21.7% est_max_lat_g=3.60 violations=0`，诊断图 `Saved\Diagnostics\track-clearance.png`、贴 hillshade 预览 `Saved\Diagnostics\yarlung-track-overlay.png`。用户允许「急一点」，所以 P1 draft 横向 G 门槛临时放宽到 `3.8`；P3 仍需用 banking/速度/turnaround 重塑收回最终舒适目标。
 - 2026-06-19（**用户拍板，项目重定位 — 流程级、不可逆**）：目标从「峡谷里的 ~600m 小设施」重定位为 **世界最长(~5,000m)沿江往返(out-and-back)实景过山车 + 真物理动力学 + 风景优先**。优先级：安全/舒适 G 限(硬) > 长度(≥2,500m，目标~5km，硬底) > 风景 > 乘坐刺激。舒适包络定「更刺激」档（垂直[-1.5,+5.5]/横向≤1.7/纵向≤2.5，airtime ejector）。完整 codex-ready 设计见 **`docs/plans/worlds-longest-coaster.md`**。架构=离线轨道生成器(thalweg自动提取)+净空/舒适校验器(硬门禁，闭环未结外审的「全环不穿山」)+运行时数据驱动长轨道；先做 **P0 行为保持式 C++ 重构**(切 `UCoasterTrackComponent`/`ECoasterSection`/banking 纯函数，瘦身 802 行 god actor) ∥ **P1 离线生成器+校验器**。photoreal A–F 走廊范围与验收(新增 D9 乘坐/D10 尺度)受此约束。下一步=writing-plans 出 P0/P1 分步计划。
 - 2026-06-18（A2 剖面诊断落地）：新增 `scripts\dump-yarlung-height-profile.py`，自动找 `.r16` 中最陡横向崖面剖面并输出 CSV/PNG。当前 1009 profile 显示：高度曲线连续、96/96 unique、无 8-bit/posterize 平台；但坡度有 bilinear 分段重复和 C1 断点。结论：**台阶不是高度量化 bug，而是 bilinear piecewise slope + heightfield 法线/材质暴露**。下一步仍是 bicubic/样条（直接针对 C1 断点），不是先升 2017；2017 如需只作对照。
 - 2026-06-19（B-spline cheap fix 结果）：Catmull-Rom bicubic 在陡坡有过冲，剖面 kink 指标变差；改用 cubic B-spline 后数据剖面明显更平顺（同线 `kinks 10→2`）。但 1440p 英雄帧仍有近景巨大水平台阶，确认主因已经超出 DEM 插值：单值 heightfield 不能表达近垂直崖、30m 源分辨率不足、裸 macro 无 detail normal。**结论：不要继续在 2017/插值上耗时；近景崖归 stage C，A2 只按中远景/不穿山/贴地口径验收。**
@@ -87,9 +89,13 @@
 - [ ] **A2 Done（新口径）**：用 hero `WaitSeconds 12` 或补充中远景取景验**中远景峡谷轮廓/尺度正确、不穿山、轨道贴地**即可标 Done；近景若仍有材质细节不足 deferred 到 C，但**人工货架墙/硬切槽不能放行**。**追加（独立审阅）：必须先过上一条全环穿山诊断；单机位截图不算数。**
 - [x] **低打扰截图实测**：已成功。推荐命令：`powershell -ExecutionPolicy Bypass -File scripts\offscreen-shot.ps1 -Name <name> -WaitSeconds <seconds> -ResX 2560 -ResY 1440`。注意这是 offscreen/低打扰 smoke path，最终验收仍需确认画面有效并按量规打分。
 - [ ] **英雄段人工确认**（阶段 0）：已先选 `WaitSeconds 12` 作为最佳努力默认；如用户想换英雄段，再重新截图并更新本文件。
-- [ ] **【重定位 2026-06-19】P0：C++ 行为保持式重构**（spec §6.0/§8）：切 `UCoasterTrackComponent`+`ECoasterSection`+banking 纯函数，瘦身 god actor，零行为变更（offscreen smoke 逐帧零回归）。可与 P1 并行。
-- [ ] **【重定位 2026-06-19】P1：离线轨道生成器 + 净空/舒适校验器**（spec §4/§5）：thalweg 自动提取→5km 沿江往返 `YarlungTrack.csv`，过净空(闭环穿山外审)+「更刺激」G 门禁，centerline 叠 hillshade 确认贴江。
-- [ ] **【重定位 2026-06-19】P2–P5**：运行时接入长轨道 / 乘坐打磨(曲率banking+调参) / 走廊照片化(含环境迁出) / 验收增 D9 D10。依赖 (P0∥P1)→P2→P3。
+- [x] **【重定位 2026-06-19】P0：C++ 行为保持式重构（初版）**：已切 `UCoasterTrackComponent`+`ECoasterSection`+`CoasterBanking` helper；编译通过；offscreen smoke `Saved\OffscreenShots\p0-p1-smoke.png` 非空。未做逐帧像素 diff，P2 前可接受。
+- [x] **【重定位 2026-06-19】P1：离线轨道生成器 + 净空/舒适校验器（初版）**：已生成 5.03km `YarlungTrack.csv`，manifest `track` 块已写入，净空校验 PASS（min clearance 22.49m）。P1 draft 横向 G 门槛按用户「急一点也 ok」放宽为 3.8；P3 必须再收舒适。
+- [ ] **【重定位 2026-06-19】P2：运行时接入长轨道 CSV**：`LoadGeneratedTrack` + 距离分段 + RebuildSpline，优先读 `YarlungTrack.csv`，缺失时回退旧 8 点短环；接入后重新跑 offscreen 与净空校验。
+- [ ] **【外审 p0-p1 条件 / 阻断标 Done】乘坐舒适未验证**：`verify-track-clearance.py:180` `est_long_g` 钳在 `max+0.01` 是空壳门禁；`est_lat_g` 用恒定 22m/s 粗估（站台 13.7m 半径假报 3.6G）。修：纵向 G 用真 dv/dt、横向 G 用真速度剖面，或显式把舒适裁决推迟到 P3 运行时遥测。**D9/舒适在此前不得标 Done。**
+- [ ] **【外审 p0-p1 条件 / 阻断标 Done】风景未验证**（最高非长度优先级）：现 `yarlung-track-overlay.png` 糊得看不出河道，无法确认轨道贴真实江道。出高对比/raw hillshade/叠 river-mask 的 overlay，人眼确认「贴江如画」后才能标景观相关 Done。
+- [ ] **【外审 p0-p1 建议】P3 几何收口**：min 半径 13.7m 偏紧 + 紧弯，靠曲率 banking/调速/turnaround 重塑收回；`DistanceToTrack2D` 双表示在 P2/清理时消灭（spec §6.0 未做）；P0 可补前/后英雄帧 diff 彻底收口零回归；生成物（`YarlungTrack.csv`+新脚本）按惯例提交。
+- [ ] **【重定位 2026-06-19】P3–P5**：乘坐打磨(曲率banking+调参) / 走廊照片化(含环境迁出) / 验收增 D9 D10。依赖 P2。
 
 ## 最终总结（到位后填写）
 - （未到位）
