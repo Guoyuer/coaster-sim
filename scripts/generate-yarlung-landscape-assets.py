@@ -14,6 +14,7 @@ import json
 import math
 import struct
 import urllib.request
+import csv
 from pathlib import Path
 
 from PIL import Image
@@ -76,6 +77,10 @@ def river_center_y(x: float) -> float:
     )
 
 
+def grid_x_to_world(x_index: float) -> float:
+    return lerp(MIN_X, MAX_X, x_index / (SIZE - 1))
+
+
 def grid_y_to_world(y_index: float) -> float:
     return lerp(MIN_Y, MAX_Y, y_index / (SIZE - 1))
 
@@ -129,6 +134,52 @@ def guided_river_center_y(x: float, river_guide: list[float] | None) -> float:
     x0 = int(math.floor(gx))
     x1 = min(SIZE - 1, x0 + 1)
     return lerp(river_guide[x0], river_guide[x1], gx - x0)
+
+
+def sample_height_from_grid(heights: list[float], x: float, y: float) -> float:
+    gx = max(0.0, min(SIZE - 1.0, world_x_to_grid(x)))
+    gy = max(0.0, min(SIZE - 1.0, (y - MIN_Y) / (MAX_Y - MIN_Y) * (SIZE - 1)))
+    x0 = int(math.floor(gx))
+    y0 = int(math.floor(gy))
+    x1 = min(SIZE - 1, x0 + 1)
+    y1 = min(SIZE - 1, y0 + 1)
+    tx = gx - x0
+    ty = gy - y0
+
+    def at(ix: int, iy: int) -> float:
+        return heights[iy * SIZE + ix]
+
+    a = lerp(at(x0, y0), at(x1, y0), tx)
+    b = lerp(at(x0, y1), at(x1, y1), tx)
+    return lerp(a, b, ty)
+
+
+def write_river_csv(path: Path, heights: list[float], river_guide: list[float] | None) -> None:
+    if not river_guide:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    step = 4
+    half_width_cm = 22000.0
+    with path.open("w", newline="", encoding="ascii") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["idx", "x", "y", "z", "half_width_cm", "flow"])
+        row_index = 0
+        for x_index in range(int(SIZE * 0.08), int(SIZE * 0.92) + 1, step):
+            x = grid_x_to_world(float(x_index))
+            y = river_guide[x_index]
+            z = sample_height_from_grid(heights, x, y) + 180.0
+            flow = row_index / max(1.0, ((SIZE * 0.84) / step))
+            writer.writerow(
+                [
+                    row_index,
+                    f"{x:.3f}",
+                    f"{y:.3f}",
+                    f"{z:.3f}",
+                    f"{half_width_cm:.3f}",
+                    f"{flow:.6f}",
+                ]
+            )
+            row_index += 1
 
 
 def terrain_height(x: float, y: float) -> float:
@@ -590,6 +641,7 @@ def main() -> None:
 
     write_ppm(out_dir / "YarlungTsangpo_preview.ppm", preview)
     write_ppm(out_dir / "YarlungTsangpo_masks.ppm", mask_preview)
+    write_river_csv(out_dir / "YarlungRiver.csv", source_heights, river_guide)
     write_hillshade(out_dir / "YarlungTsangpo_hillshade.png", [
         lerp(HEIGHT_MIN, HEIGHT_MAX, value / 65535.0) for value in height_values
     ])
@@ -600,6 +652,7 @@ def main() -> None:
     manifest = {
         "name": "Yarlung Tsangpo cinematic canyon landscape",
         "heightmap": "YarlungTsangpo_1009.r16",
+        "river_csv": "YarlungRiver.csv",
         "preview": "YarlungTsangpo_preview.ppm",
         "masks_preview": "YarlungTsangpo_masks.ppm",
         "macro_albedo": str(texture_out_dir / "YarlungTsangpo_macro_albedo.tga"),
@@ -622,6 +675,12 @@ def main() -> None:
             "material_layers": ["River", "AlluvialSand", "DarkForest", "WeatheredRock", "Snow"],
             "nanite_followup": "Import high-poly rock and vegetation StaticMesh assets with bBuildNanite enabled; these generated masks define placement/material zones.",
         },
+        "river": {
+            "path": "Content/Generated/YarlungLandscape/YarlungRiver.csv",
+            "source": "DEM thalweg extracted from naturalized height grid",
+            "half_width_cm": 22000.0,
+            "water_z_offset_cm": 180.0,
+        },
     }
     if "track" in previous_manifest:
         manifest["track"] = previous_manifest["track"]
@@ -632,6 +691,7 @@ def main() -> None:
         "- `YarlungTsangpo_preview.ppm`: dependency-free color preview of the terrain.\n"
         "- `YarlungTsangpo_hillshade.png`: real-scale DEM hillshade preview for bbox/orientation checks.\n"
         "- `YarlungTsangpo_masks.ppm`: RGB mask preview where red=river, green=forest, blue=rock/snow.\n"
+        "- `YarlungRiver.csv`: DEM-thalweg river ribbon samples for the scenery river actor.\n"
         "- `SourceAssets/Generated/YarlungLandscape/YarlungTsangpo_macro_albedo.tga`: UE-imported macro color map.\n"
         "- `SourceAssets/Generated/YarlungLandscape/YarlungTsangpo_macro_masks.tga`: UE-imported river/forest/rock-snow mask.\n"
         "- `SourceAssets/Generated/YarlungLandscape/YarlungTsangpo_macro_roughness.tga`: UE-imported roughness macro map.\n"

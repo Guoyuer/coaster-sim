@@ -1,6 +1,7 @@
 {
   "name": "Yarlung Tsangpo cinematic canyon landscape",
   "heightmap": "YarlungTsangpo_1009.r16",
+  "river_csv": "YarlungRiver.csv",
   "preview": "YarlungTsangpo_preview.ppm",
   "masks_preview": "YarlungTsangpo_masks.ppm",
   "macro_albedo": "SourceAssets\\Generated\\YarlungLandscape\\YarlungTsangpo_macro_albedo.tga",
@@ -73,6 +74,12 @@
       "Snow"
     ],
     "nanite_followup": "Import high-poly rock and vegetation StaticMesh assets with bBuildNanite enabled; these generated masks define placement/material zones."
+  },
+  "river": {
+    "path": "Content/Generated/YarlungLandscape/YarlungRiver.csv",
+    "source": "DEM thalweg extracted from naturalized height grid",
+    "half_width_cm": 22000.0,
+    "water_z_offset_cm": 180.0
   },
   "track": {
     "path": "Content/Generated/YarlungLandscape/YarlungTrack.csv",

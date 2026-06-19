@@ -6,6 +6,8 @@ LEAFY_GRASS_PACKAGE_PATH = f"{PACKAGE_PATH}/PolyHaven/LeafyGrass"
 AERIAL_GRASS_ROCK_PACKAGE_PATH = f"{PACKAGE_PATH}/PolyHaven/AerialGrassRock"
 YARLUNG_MACRO_PACKAGE_PATH = f"{PACKAGE_PATH}/YarlungMacro"
 TINT_MATERIAL_NAME = "M_CoasterTint"
+RIVER_WATER_MATERIAL_NAME = "M_YarlungRiverWater"
+RIVER_FOAM_MATERIAL_NAME = "M_YarlungRiverFoam"
 LANDSCAPE_MATERIAL_NAME = "M_YarlungLandscapeGround"
 SUCCESS_MARKER = "material-generation-ok.txt"
 LEAFY_GRASS_SOURCE_DIR = "SourceAssets/PolyHaven/leafy_grass"
@@ -223,6 +225,63 @@ def create_tint_material():
     finalize_material(material)
 
 
+def set_optional_material_usage(material, usage_name):
+    usage = getattr(unreal.MaterialUsage, usage_name, None)
+    if usage is not None:
+        unreal.MaterialEditingLibrary.set_material_usage(material, usage)
+
+
+def create_translucent_parameter_material(name, base_color, opacity, roughness, specular):
+    material = create_material_asset(name, PACKAGE_PATH)
+    unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
+    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    material.set_editor_property("two_sided", True)
+
+    connect_material_property(
+        material,
+        create_vector_parameter(material, "BaseColor", base_color, -620, -240),
+        unreal.MaterialProperty.MP_BASE_COLOR,
+        f"{name} BaseColor",
+    )
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "Opacity", opacity, -620, -40),
+        unreal.MaterialProperty.MP_OPACITY,
+        f"{name} Opacity",
+    )
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "Roughness", roughness, -620, 160),
+        unreal.MaterialProperty.MP_ROUGHNESS,
+        f"{name} Roughness",
+    )
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "Specular", specular, -620, 340),
+        unreal.MaterialProperty.MP_SPECULAR,
+        f"{name} Specular",
+    )
+    set_optional_material_usage(material, "MATUSAGE_PROCEDURAL_MESHES")
+    finalize_material(material)
+
+
+def create_river_materials():
+    create_translucent_parameter_material(
+        RIVER_WATER_MATERIAL_NAME,
+        unreal.LinearColor(0.16, 0.50, 0.54, 0.72),
+        0.72,
+        0.18,
+        0.75,
+    )
+    create_translucent_parameter_material(
+        RIVER_FOAM_MATERIAL_NAME,
+        unreal.LinearColor(0.82, 0.92, 0.84, 0.78),
+        0.82,
+        0.62,
+        0.20,
+    )
+
+
 def create_landscape_material(detail_textures, macro_textures):
     material = create_material_asset(LANDSCAPE_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
@@ -266,6 +325,7 @@ def main():
     ensure_folder(AERIAL_GRASS_ROCK_PACKAGE_PATH)
     ensure_folder(YARLUNG_MACRO_PACKAGE_PATH)
     create_tint_material()
+    create_river_materials()
     import_textures(LEAFY_GRASS_PACKAGE_PATH, LEAFY_GRASS_SOURCE_DIR, LEAFY_GRASS_TEXTURES)
     aerial_grass_rock_textures = import_textures(
         AERIAL_GRASS_ROCK_PACKAGE_PATH,

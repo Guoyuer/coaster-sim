@@ -9,7 +9,6 @@ class UCoasterTrackComponent;
 class UDirectionalLightComponent;
 class UExponentialHeightFogComponent;
 class UInstancedStaticMeshComponent;
-class UProceduralMeshComponent;
 class USkyAtmosphereComponent;
 class USkyLightComponent;
 
@@ -38,14 +37,6 @@ struct FCoasterTelemetry
 
     UPROPERTY(BlueprintReadOnly, Category = "Coaster")
     FName SectionName = TEXT("Station");
-};
-
-struct FEnvironmentRiverSample
-{
-    FVector Center = FVector::ZeroVector;
-    FVector Forward = FVector::ForwardVector;
-    FVector Right = FVector::RightVector;
-    float Ratio = 0.0f;
 };
 
 UCLASS()
@@ -105,22 +96,7 @@ protected:
     TObjectPtr<UInstancedStaticMeshComponent> Supports;
 
     UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UInstancedStaticMeshComponent> RiverSurface;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UInstancedStaticMeshComponent> Rapids;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UInstancedStaticMeshComponent> MistBands;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UInstancedStaticMeshComponent> BoulderOutcrops;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UProceduralMeshComponent> RiverRibbonMesh;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UProceduralMeshComponent> FoamRibbonMesh;
 
     UPROPERTY(EditAnywhere, Category = "Track")
     TArray<FVector> ControlPoints;
@@ -159,11 +135,6 @@ private:
     void RebuildEnvironment();
     void ClearEnvironmentVisuals();
     void BuildBoulderOutcrops();
-    void BuildRiverEffects();
-    void BuildRiverSamples(TArray<FEnvironmentRiverSample>& OutSamples, int32 SampleCount) const;
-    void BuildRiverRibbon(const TArray<FEnvironmentRiverSample>& Samples, float RiverHalfWidth);
-    void BuildFoamRibbon(const TArray<FEnvironmentRiverSample>& Samples, float RiverHalfWidth);
-    void BuildRapids(const TArray<FEnvironmentRiverSample>& Samples, float RiverHalfWidth);
     void ApplyVisualMaterials();
     void AdvanceRide(float DeltaSeconds);
     void UpdateFirstPersonCamera();
