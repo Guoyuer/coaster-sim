@@ -265,18 +265,56 @@ def create_translucent_parameter_material(name, base_color, opacity, roughness, 
     finalize_material(material)
 
 
+def create_translucent_vertex_color_material(name, opacity, roughness, specular):
+    material = create_material_asset(name, PACKAGE_PATH)
+    unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
+    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
+    material.set_editor_property("two_sided", True)
+
+    vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionVertexColor,
+        -620,
+        -160,
+    )
+    if not unreal.MaterialEditingLibrary.connect_material_property(
+        vertex_color,
+        "",
+        unreal.MaterialProperty.MP_BASE_COLOR,
+    ):
+        raise RuntimeError(f"Unable to connect {name} vertex BaseColor")
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "Opacity", opacity, -620, -360),
+        unreal.MaterialProperty.MP_OPACITY,
+        f"{name} Opacity",
+    )
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "Roughness", roughness, -620, 160),
+        unreal.MaterialProperty.MP_ROUGHNESS,
+        f"{name} Roughness",
+    )
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "Specular", specular, -620, 340),
+        unreal.MaterialProperty.MP_SPECULAR,
+        f"{name} Specular",
+    )
+    set_optional_material_usage(material, "MATUSAGE_PROCEDURAL_MESHES")
+    finalize_material(material)
+
+
 def create_river_materials():
-    create_translucent_parameter_material(
+    create_translucent_vertex_color_material(
         RIVER_WATER_MATERIAL_NAME,
-        unreal.LinearColor(0.16, 0.50, 0.54, 0.72),
-        0.72,
+        0.68,
         0.18,
         0.75,
     )
-    create_translucent_parameter_material(
+    create_translucent_vertex_color_material(
         RIVER_FOAM_MATERIAL_NAME,
-        unreal.LinearColor(0.82, 0.92, 0.84, 0.78),
-        0.82,
+        0.74,
         0.62,
         0.20,
     )

@@ -47,6 +47,11 @@ bool ParseRiverRow(const FString& Line, FYarlungRiverSample& OutSample)
     OutSample.Flow = FCString::Atof(*Columns[5]);
     return true;
 }
+
+float Saturate(float Value)
+{
+    return FMath::Clamp(Value, 0.0f, 1.0f);
+}
 }
 
 AYarlungRiverActor::AYarlungRiverActor()
@@ -133,7 +138,7 @@ void AYarlungRiverActor::BuildWaterMesh(const TArray<FYarlungRiverSample>& Sampl
     TArray<FLinearColor> Colors;
     TArray<FProcMeshTangent> Tangents;
 
-    const TArray<float> AcrossValues = { -1.0f, -0.58f, 0.0f, 0.58f, 1.0f };
+    const TArray<float> AcrossValues = { -1.0f, -0.88f, -0.72f, -0.52f, -0.30f, 0.0f, 0.30f, 0.52f, 0.72f, 0.88f, 1.0f };
     Vertices.Reserve(Samples.Num() * AcrossValues.Num());
 
     for (int32 Along = 0; Along < Samples.Num(); ++Along)
@@ -144,16 +149,23 @@ void AYarlungRiverActor::BuildWaterMesh(const TArray<FYarlungRiverSample>& Sampl
         for (int32 Across = 0; Across < AcrossValues.Num(); ++Across)
         {
             const float AcrossValue = AcrossValues[Across];
+            const float EdgeWeight = FMath::Abs(AcrossValue);
             const float CenterWeight = 1.0f - FMath::Abs(AcrossValue);
-            const float Ripple = 8.0f * FMath::Sin(Sample.Flow * 72.0f + AcrossValue * 3.2f);
-            Vertices.Add(Sample.Center + Right * (AcrossValue * Sample.HalfWidthCm) + FVector(0.0f, 0.0f, Ripple));
+            const float BankNoise = 0.018f * FMath::Sin(Sample.Flow * 67.0f + AcrossValue * 5.9f)
+                + 0.011f * FMath::Sin(Sample.Flow * 151.0f - AcrossValue * 4.1f);
+            const float BankedAcross = AcrossValue + FMath::Sign(AcrossValue) * BankNoise * Saturate((EdgeWeight - 0.55f) / 0.45f);
+            const float Ripple = (3.0f + CenterWeight * 11.0f) * FMath::Sin(Sample.Flow * 92.0f + AcrossValue * 3.2f)
+                + CenterWeight * 5.0f * FMath::Sin(Sample.Flow * 211.0f - AcrossValue * 6.4f);
+            Vertices.Add(Sample.Center + Right * (BankedAcross * Sample.HalfWidthCm) + FVector(0.0f, 0.0f, Ripple));
             Normals.Add(FVector::UpVector);
             UVs.Add(FVector2D(Sample.Flow * 28.0f, AcrossValue * 0.5f + 0.5f));
+            const float BankFade = Saturate((EdgeWeight - 0.72f) / 0.28f);
+            const float Alpha = FMath::Lerp(0.76f, 0.24f, BankFade);
             Colors.Add(FLinearColor(
-                0.18f + CenterWeight * 0.12f,
-                0.46f + CenterWeight * 0.18f,
-                0.50f + CenterWeight * 0.20f,
-                0.74f));
+                0.12f + CenterWeight * 0.28f,
+                0.42f + CenterWeight * 0.24f,
+                0.46f + CenterWeight * 0.24f,
+                Alpha));
             Tangents.Add(FProcMeshTangent(Forward, false));
         }
     }
@@ -182,7 +194,7 @@ void AYarlungRiverActor::BuildFoamMesh(const TArray<FYarlungRiverSample>& Sample
     TArray<FLinearColor> Colors;
     TArray<FProcMeshTangent> Tangents;
 
-    const TArray<float> FoamLanes = { -0.72f, -0.34f, 0.22f, 0.66f };
+    const TArray<float> FoamLanes = { -0.82f, -0.62f, -0.36f, -0.12f, 0.18f, 0.46f, 0.72f };
     for (int32 Lane = 0; Lane < FoamLanes.Num(); ++Lane)
     {
         for (int32 Along = 0; Along < Samples.Num(); ++Along)
@@ -190,18 +202,22 @@ void AYarlungRiverActor::BuildFoamMesh(const TArray<FYarlungRiverSample>& Sample
             const FYarlungRiverSample& Sample = Samples[Along];
             const FVector Forward = SampleForward(Samples, Along);
             const FVector Right = SampleRight(Samples, Along);
-            const float LaneNoise = FMath::Sin(Sample.Flow * 92.0f + Lane * 1.7f);
-            const float Lateral = (FoamLanes[Lane] + LaneNoise * 0.035f) * Sample.HalfWidthCm;
-            const float HalfWidth = 115.0f + 38.0f * FMath::Sin(Sample.Flow * 57.0f + Lane * 0.9f);
-            const FVector Center = Sample.Center + Right * Lateral + FVector(0.0f, 0.0f, 28.0f);
+            const float LaneNoise = FMath::Sin(Sample.Flow * 92.0f + Lane * 1.7f)
+                + 0.55f * FMath::Sin(Sample.Flow * 233.0f - Lane * 0.8f);
+            const float Lateral = (FoamLanes[Lane] + LaneNoise * 0.030f) * Sample.HalfWidthCm;
+            const float EdgeWeight = FMath::Abs(FoamLanes[Lane]);
+            const float HalfWidth = FMath::Lerp(72.0f, 210.0f, EdgeWeight)
+                + 44.0f * FMath::Sin(Sample.Flow * 57.0f + Lane * 0.9f);
+            const FVector Center = Sample.Center + Right * Lateral + FVector(0.0f, 0.0f, 34.0f);
             Vertices.Add(Center - Right * HalfWidth);
             Vertices.Add(Center + Right * HalfWidth);
             Normals.Add(FVector::UpVector);
             Normals.Add(FVector::UpVector);
             UVs.Add(FVector2D(Sample.Flow * 34.0f, 0.0f));
             UVs.Add(FVector2D(Sample.Flow * 34.0f, 1.0f));
-            Colors.Add(FLinearColor(0.74f, 0.84f, 0.78f, 0.68f));
-            Colors.Add(FLinearColor(0.92f, 0.98f, 0.90f, 0.76f));
+            const float Alpha = FMath::Lerp(0.46f, 0.86f, EdgeWeight);
+            Colors.Add(FLinearColor(0.70f, 0.82f, 0.77f, Alpha * 0.62f));
+            Colors.Add(FLinearColor(0.93f, 0.98f, 0.91f, Alpha));
             Tangents.Add(FProcMeshTangent(Forward, false));
             Tangents.Add(FProcMeshTangent(Forward, false));
         }
