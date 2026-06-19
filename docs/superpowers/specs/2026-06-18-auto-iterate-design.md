@@ -71,6 +71,8 @@ task_status: in_progress        # todo | in_progress | passed | needs_human | bl
 last_iter: b2-daylight-exposure-v1
 last_verdict: PASS              # PASS | FAIL | NEEDS-HUMAN | UNKNOWN
 fail_streak: 0
+need_help: false               # codex-execute 自报受阻时置 true (辅助触发诊断, 见 §5)
+stuck_reason:                  # need_help=true 时的一行原因
 updated_by: claude-verify       # 谁最后写的: codex-execute | claude-verify | driver
 updated_at_commit: 18e66ac
 -->
@@ -102,12 +104,19 @@ updated_at_commit: 18e66ac
 
 **任一不一致 → 不修正、不继续，停在检查点，原样打印三方状态让人判。** 这是"状态识别准确"的兜底。
 
-## 5. 卡住检测
+## 5. 卡住检测（双触发：客观信号为主，自报为辅）
 
-`fail_streak` 由 claude-verify 维护，按 `current_task` 计数：
+复刻人工习惯"识别卡住 → 问要不要外援"，但**不能只靠 Codex 自报**——真卡住的 agent 常不自知甚至谎报成功（这正是要独立验收的原因）。两路信号任一命中即自动触发第 4 步外援诊断。
+
+**主：客观信号（地面真值，可脚本化兜底）**。`fail_streak` 由 claude-verify 维护，按 `current_task` 计数：
 - 同一 `task:` 且 `VERDICT=FAIL` → `fail_streak += 1`。
 - `PASS` 或 `current_task` 变化 → 归 0。
-- `fail_streak >= 2` → 触发第 4 步诊断，并**强制停**（即使用户上轮选了 Enter 连跑），把"反复失败"显式抛给人。
+- `fail_streak >= 2` → 触发诊断，并**强制停**（即使用户上轮选了 Enter 连跑），把"反复失败"显式抛给人。
+- 其他客观卡住信号同样触发：本轮无新 commit / 无新 PNG / 验收维度出现回归（任一 `dim.Dx` 比上轮下降）。
+
+**辅：自报信号（便宜的提前升级）**。codex-execute prompt 允许 Codex 在判定自己受阻时，于输出和 AUTOSTATE 写 `need_help: true` + 一行 `STUCK: <原因>`；driver 读到即**立刻**触发诊断（不必等 fail_streak 攒到阈值）。这对应"它主动喊救命就马上给外援"。
+
+**判据**：`触发诊断 = 客观信号命中 OR need_help==true`。自报只能让诊断**提前**，不能阻止客观信号触发——Codex 说"没事"但 fail_streak 到阈值，照样起诊断。
 
 ## 6. 组件清单（每个单元：职责/接口/依赖）
 
