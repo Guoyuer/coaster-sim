@@ -45,6 +45,7 @@ $CommonArgs = @(
     "-NoLiveCoding",
     "-NoSound",
     "-noscreenmessages",
+    "-ForceRes",
     "-ResX=$ResX",
     "-ResY=$ResY",
     "-stdout",
@@ -72,7 +73,8 @@ if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
     Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
     throw "Offscreen screenshot timed out after $TimeoutSeconds seconds. See $LogPath"
 }
-if ($Process.ExitCode -ne 0) {
+$Process.Refresh()
+if ($null -ne $Process.ExitCode -and $Process.ExitCode -ne 0) {
     throw "Offscreen screenshot failed with exit code $($Process.ExitCode). See $LogPath"
 }
 
