@@ -8,7 +8,7 @@
 - **基线**：当前为原型/灰盒（顶点色假天空/假河、Cube 轨道、程序化解析地形、单张 macro 平涂地表）。基线截图：`Saved\hero-baseline.png`（2560×1440，`WaitSeconds 12`）
 - **英雄段时间点**：`WaitSeconds 12`。理由：六张候选图（3/6/9/12/15/18s）中，12s 同框包含第一人称轨道、山谷/河道走廊、对岸坡面与远处山形，最接近“临江高弯 + 远中景”验收目标。
 - **参考锚点**：`docs/refs/references.md`（外链，不下载入库；逐文件 license 验证后才可提交图片）
-- **下一步动作**：在不打断用户全屏的时机执行 UE commandlet 导入 + `visual-check.ps1` 截图验证。后台已完成 Copernicus GLO-30 DEM 生成、hillshade 检查、真实尺度编码窗口、轨道/占位河线重定位。A1 已删除假天穹/方块云/平面远山；橙色非物理天空留到阶段 B 处理。
+- **下一步动作**：先尝试低打扰截图路径 `scripts\offscreen-shot.ps1`（`UnrealEditor-Cmd.exe -RenderOffScreen`，实验，尚未实测），若失败再等用户不全屏时执行 UE commandlet 导入 + `visual-check.ps1` 截图验证。后台已完成 Copernicus GLO-30 DEM 生成、hillshade 检查、真实尺度编码窗口、轨道/占位河线重定位。A1 已删除假天穹/方块云/平面远山；橙色非物理天空留到阶段 B 处理。
 
 ## 阶段状态表
 | 阶段 | 内容 | 状态 | 出口标准（见 acceptance §3） | 备注 |
@@ -30,6 +30,7 @@
 
 ## 决策记录（不可逆/重要选择，最新在上）
 - 2026-06-18（后台执行）：A2 资产生成已跑通：`scripts/generate-yarlung-landscape-assets.py --source copernicus` 下载/缓存 Copernicus GLO-30 N29E094/N29E095 COG 到 gitignored `SourceAssets/DEM/CopernicusGLO30/`，生成 `Content/Generated/YarlungLandscape/YarlungTsangpo_1009.r16`、macro textures、`manifest.json` 和 `YarlungTsangpo_hillshade.png`。实采高程范围约 **2613m–7144m**，编码窗口改为 **2600m–7300m**，导入 scale 为 X≈6.70m/quad、Y≈8.27m/quad、Z≈917.97。轨道控制点已重定位到 `29.769–29.771N / 94.989–94.991E` 谷底附近，控制点 clearance 约 **18m–82m**；占位河高/river mask 同步到 DEM 谷底。UE 导入与截图未执行，避免抢占用户全屏。
+- 2026-06-18（低打扰截图探索）：新增实验脚本 `scripts/offscreen-shot.ps1`，尝试用 `UnrealEditor-Cmd.exe -RenderOffScreen` + UE 自己输出 PNG/`-DUMPMOVIE`，避免现有 `visual-check.ps1` 的窗口创建 + `PrintWindow` 抓图路径。尚未实测；若成功，可用于用户全屏游戏期间的视觉 smoke test。`-NullRHI` 仍只适合 commandlet/资产导入，不能用于照片级截图。
 - 2026-06-18（用户拍板）：**A2 选定子区域=大拐弯最深峡谷段**（南迦巴瓦↔加拉白垒之间，世界最深）。bbox `lat 29.745–29.820°N, lon 94.945–95.015°E`（~8.3×6.8km，谷底最深点 29.7697N/94.9899E 居中、加拉白垒作远景雪峰、落差~4500m）。DEM 源=Copernicus GLO-30 优先（ALOS 备选，不用 SRTM）。分辨率维持 1009。**垂直 1:1 真实尺度**：改 commandlet `EncodedMinZ/MaxZ` 为真实海拔(当前 2600–7300m)。导入前先出 hillshade 预览确认河道/雪峰。细节见 plan A2。
 - 2026-06-18（用户拍板）：**A2 尺度方案=真实尺度子区域**。近 1:1 导成公里级 Landscape，崖壁/雪山保持真实尺度，过山车样条重定位到峡谷中。**否决"压进 164m 玩具尺度"方案**（Codex 曾算 1083km²→30,668m²，水平~212×/垂直~114× 压缩，第一人称读成桌面沙盘）。轨道样条坐标随新尺度重定位是 A2 核心工作。
 - 2026-06-18：A1 完成，代码移除 `SkyDomeMesh`、`CloudLayerMesh`、`DistantRidgeMesh` 及对应 build 函数；验证图 `Saved\hero-a1-no-fake-sky-ridges.png`。不在 A1 里用调色修橙色天空，避免偏离阶段顺序。
@@ -41,6 +42,7 @@
 - [x] **尺度方案**（阶段 A2）：已定=真实尺度子区域（见决策记录）。
 - [x] **DEM 选型 + 裁哪段**（阶段 A2）：已定并已生成资产（见决策记录与 plan A2）。源=Copernicus GLO-30；bbox=`lat 29.745–29.820°N, lon 94.945–95.015°E`；分辨率维持 1009；垂直真实海拔编码 2600–7300m；轨道样条已重定位；hillshade 已检查。
 - [ ] **A2 UE 导入 + 截图验收**：等待可拉起 UE/截图的时机。运行 `scripts\import-yarlung-landscape.ps1` 后再跑 `scripts\visual-check.ps1`，把结果图和 D1/D2/D3 短板追加到打分记录。
+- [ ] **低打扰截图实测**：尝试 `scripts\offscreen-shot.ps1 -Name a2-real-dem -WaitSeconds 12 -ResX 2560 -ResY 1440`。若无 PNG 或图像无效，记录失败并回退到 `visual-check.ps1`。
 - [ ] **英雄段人工确认**（阶段 0）：已先选 `WaitSeconds 12` 作为最佳努力默认；如用户想换英雄段，再重新截图并更新本文件。
 
 ## 最终总结（到位后填写）
