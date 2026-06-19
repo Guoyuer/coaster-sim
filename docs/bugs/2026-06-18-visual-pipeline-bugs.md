@@ -72,7 +72,7 @@ This records the visual/asset bugs found during the Yarlung Tsangpo canyon itera
 
 ## Harness Notes
 
-- `scripts/visual-check.ps1` is still the fastest useful validation path for this project: build if needed, run game, capture multiple time offsets.
+- `scripts/offscreen-shot.ps1` is the default validation path for this project: build if needed, jump directly to the target on-rails time, capture a high-resolution first-person frame, and avoid stealing focus from fullscreen apps.
 - UE Python stdout is not always visible in terminal; inspect `Saved/Logs/CoasterSim.log` for script output such as `[YARLUNG-MATERIAL]`.
 - `scripts/inspect-yarlung-material.py` was added as a small read-only material introspection helper while debugging the orange landscape issue.
 - `scripts/export-yarlung-macro-texture.py` exports the imported UE macro albedo texture so source TGA, UE asset, and final PNG pixels can be compared separately.

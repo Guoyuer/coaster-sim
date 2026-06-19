@@ -50,11 +50,11 @@
 
 **画面验证（截图回归——这就是验收标准，因为它抓的正是真实第一人称画面）：**
 ```powershell
-.\scripts\visual-check.ps1 -Build -Name "hero-stepN" -ResX 2560 -ResY 1440 -WaitSeconds 6,12,18
+.\scripts\offscreen-shot.ps1 -Build -Name "hero-stepN" -ResX 2560 -ResY 1440 -WaitSeconds 12
 ```
-- **必须升到高分辨率（≥1440p）**：720p 的 GDI 抓图看不出照片级；若脚本默认值不是 1440p，执行验收时必须显式传 `-ResX 2560 -ResY 1440`。低于 1440p 的图只能算 smoke test，不能算 acceptance。
-- 验收每步：跑 visual-check → **用 Read 工具把 PNG 当图片看** → 对照 §"目标"和参考照片。**禁止"脚本没报错=完成"**。
-- 脚本日志看 `Saved\Logs\CoasterSim.log`（搜 `[YARLUNG-MATERIAL]`、`Yarlung scatter instances`）。
+- **必须升到高分辨率（≥1440p）**：720p 看不出照片级；若脚本默认值不是 1440p，执行验收时必须显式传 `-ResX 2560 -ResY 1440`。低于 1440p 的图只能算 smoke test，不能算 acceptance。
+- 验收每步：跑 offscreen-shot → **用 Read 工具把 PNG 当图片看** → 对照 §"目标"和参考照片。**禁止"脚本没报错=完成"**。
+- 脚本日志看 `Saved\Logs\offscreen-shot.log`；导入/材质日志仍看 `Saved\Logs\CoasterSim.log`（搜 `[YARLUNG-MATERIAL]`、`Yarlung scatter instances`）。
 
 ---
 
@@ -101,7 +101,7 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 ## 4. TODO（英雄段纵切优先；阶段 0 跑通全链后再横向铺开）
 
 ### 阶段 0 — 选英雄段 + 钉死参照（先做，半天内出第一张对照）
-- **0.1 选英雄段**：在轨道样条上选一段**最如画**的弧——理想是一个**临江高弯**，同一帧能看到：脚下/侧下方江水、对岸崖壁、远处雪山+云带。用 `SampleFrame` 在若干 `TrackRatio` 上打印相机位置/朝向，挑出取景最好的 2–3 个 `WaitSeconds` 时间点固定下来（之后 visual-check 只看这几个时间点）。
+- **0.1 选英雄段**：在轨道样条上选一段**最如画**的弧——理想是一个**临江高弯**，同一帧能看到：脚下/侧下方江水、对岸崖壁、远处雪山+云带。用 `SampleFrame` 在若干 `TrackRatio` 上打印相机位置/朝向，挑出取景最好的 2–3 个 `WaitSeconds` 时间点固定下来（之后 offscreen-shot 只看这几个时间点）。
 - **0.2 钉参照图**：收集 3–5 张雅鲁藏布大峡谷/南迦巴瓦/林芝的真实照片，放 `docs/refs/`，作为所有验收的对照基准与"如画"定义。
 - **0.3 基线截图**：当前状态在英雄段时间点出一张 1440p FP 截图存档 `Saved\hero-baseline.png`，作为 before。
 
@@ -157,7 +157,7 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 
 ## 5. 整体验收标准
 - 英雄段及整条走廊的**第一人称帧**对照 `docs/refs/` 参照照片达到"像真实照片/电影画面"。
-- 性能（`docs/specs/architecture.md`）：桌面 60 FPS / 高画质，为 VR 90 FPS 留头寸；每步看 `stat unit`（经 `-ExecCmds` 注入）。
+- 性能（`docs/specs/architecture.md`）：桌面 60 FPS / 高画质，为 VR 90 FPS 留头寸；关键阶段单独跑 `stat unit`/CSV，不和截图脚本绑定。
 - 每阶段归档 `Saved\hero-<阶段>.png` 对照演进。
 
 ## 6. 风险与坑
@@ -167,7 +167,7 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 - **moire 回归**：C1 接法线务必尺度分离。
 - **曝光放开后**早期截图可能过曝/欠曝，属预期，按物理量级标定后再判。
 - **DEM 对齐**：A2 真实 DEM 的世界尺度/朝向要和现有轨道走廊对齐，否则轨道飞出地形或穿山。
-- **TSR vs 截图**：visual-check 的窗口抓图需确认能反映 TSR 后的画面（必要时改用 UE 自带 `HighResShot` / `shot` 命令经 `-ExecCmds` 出图）。
+- **TSR vs 截图**：offscreen-shot 使用 UE 渲染输出路径，仍需确认能反映 TSR 后的画面（必要时切换脚本的 `-Mode ImmediateHighResShot` 或经 `-ExecCmds` 出图）。
 
 ## 7. 参考文件清单
 - 仿真+环境主体：`Source/CoasterSim/CoasterRideActor.cpp` / `.h`
@@ -178,7 +178,7 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 - 高度图/macro 生成：`scripts/generate-yarlung-landscape-assets.py`
 - 模型导入：`scripts/import-polyhaven-models.py`
 - 管线编排：`scripts/import-yarlung-landscape.ps1`
-- 画面验证：`scripts/visual-check.ps1`
+- 画面验证：`scripts/offscreen-shot.ps1`
 - 渲染设置：`Config/DefaultEngine.ini`
 - 视觉规范/锚点：`docs/specs/visual.md`、`CONTEXT.md`
 - 既往 bug 教训：`docs/bugs/2026-06-18-visual-pipeline-bugs.md`

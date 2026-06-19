@@ -1,7 +1,7 @@
 # 照片级验收 Spec（Definition of Done + 打分量规）
 
 > 配套：流程见 `docs/plans/photoreal-overhaul.md`，操作见 `AGENTS.md`，进度见 `docs/plans/photoreal-progress.md`。
-> 一切验收基于**真实第一人称帧**（visual-check @ ≥1440p，固定英雄段时间点），对照 `docs/refs/` 参照照片或授权明确的外部参考链接。
+> 一切验收基于**真实第一人称帧**（offscreen-shot @ ≥1440p，固定英雄段时间点），对照 `docs/refs/` 参照照片或授权明确的外部参考链接。
 
 ## 1. "到位"的定义
 在英雄段和整条轨道走廊的任意第一人称时间点截图，满足全部：
@@ -27,7 +27,7 @@
 打分记录格式（写进进度文件）：`iterN @t12s: D1=4 D2=3 D3=2 ... 均值=3.1，短板=D3 江水折射缺失`。
 
 ## 3. 每阶段出口标准（对应 plan 阶段；全过才进下一阶段）
-- **阶段 0（英雄段+参照）**：英雄段时间点选定并写入 `visual-check` 调用；`docs/refs/` 有 3–5 张参照；`Saved\hero-baseline.png` 存档。
+- **阶段 0（英雄段+参照）**：英雄段时间点选定并写入 `offscreen-shot` 调用；`docs/refs/` 有 3–5 张参照；`Saved\hero-baseline.png` 存档。
 - **阶段 A（地形单一真相源+DEM）**：① 截图无假天穹/方块云/平面远山；② 真实 DEM 导入且轨道不穿山；③ 植被/巨石经射线贴合地表无浮空；④ D1 ≥4。
 - **阶段 B（物理天空+光照）**：① 单一物理天空+体积云+大气透视；② 曝光放开、按物理量级标定、ACES 重调；③ D2 ≥4 且 D5 ≥3。
 - **阶段 C（分层 Nanite 地表）**：① 崖壁/坡面有高频岩石细节与法线、无 moire；② 颜色冷灰绿非橙；③ D1 保持 ≥4、D5 ≥4。
@@ -36,10 +36,10 @@
 - **阶段 F（沿轨道铺开）**：整圈多个时间点截图均值 ≥4、无单维 <3、60 FPS。
 
 ## 4. 验证流程（每轮）
-1. `.\scripts\visual-check.ps1 -Build -Name iterN -ResX 2560 -ResY 1440 -WaitSeconds <英雄段时间点>`。低于 1440p 的截图只能做 smoke test，不能写成验收通过。
-2. 用 Read 打开每张 `Saved\iterN-*.png`，按 §2 量规逐维打分。
+1. `.\scripts\offscreen-shot.ps1 -Build -Name iterN -ResX 2560 -ResY 1440 -WaitSeconds <英雄段时间点>`。低于 1440p 的截图只能做 smoke test，不能写成验收通过。
+2. 用 Read 打开 `Saved\OffscreenShots\iterN.png`，按 §2 量规逐维打分。
 3. 与 `docs/refs/` 参照照片并排比对 D1/D2/D3。
-4. 注入 `stat unit`（visual-check 的 `-ExecCmds`）确认帧率。
+4. 需要性能验收时，用 UE `stat unit`/CSV 单独确认帧率；offscreen 截图本身只负责画面帧。
 5. 把分数、短板、根因、下一步写进 `docs/plans/photoreal-progress.md`。
 
 ## 5. 反作弊提醒

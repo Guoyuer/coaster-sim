@@ -37,7 +37,7 @@
 （顺序：生成高度图/macro → 建材质 → 导模型 → commandlet 重建 .umap。**.umap 是生成物，关卡 actor 改动必须改 `YarlungLandscapeImportCommandlet.cpp` 再重跑，手摆会被覆盖。**）
 **画面验收（高分辨率第一人称截图）：**
 ```powershell
-.\scripts\visual-check.ps1 -Build -Name "iterN" -ResX 2560 -ResY 1440 -WaitSeconds <英雄段时间点>
+.\scripts\offscreen-shot.ps1 -Build -Name "iterN" -ResX 2560 -ResY 1440 -WaitSeconds <英雄段时间点>
 ```
 
 ## 3. 迭代循环（每一轮严格照做）
@@ -45,7 +45,7 @@
 2. **取任务**：从 `photoreal-overhaul.md` 取该任务的目标/改动/验收。
 3. **改一处**：只做这一个任务的最小改动（high-ceiling 方法，见 §4 禁令）。
 4. **构建**：编译 C++ / 跑相关管线步骤；失败先修构建。
-5. **出图**：跑 `visual-check.ps1` @1440p，在**固定英雄段时间点**截图到 `Saved\iterN-*.png`。
+5. **出图**：跑 `offscreen-shot.ps1` @1440p，在**固定英雄段时间点**低打扰截图到 `Saved\OffscreenShots\iterN.png`。
 6. **看图（强制）**：用 **Read 工具把每张 PNG 当图片打开**，按 `photoreal-acceptance.md` 的量规逐维打分，并和 `docs/refs/` 参照图对比。**只跑脚本不看图 = 没做验收，不允许。**
 7. **判定**：
    - 达到该任务/阶段出口标准 → 标记完成。
