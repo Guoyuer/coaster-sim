@@ -17,6 +17,7 @@
 | `docs/plans/photoreal-overhaul.md` | 顺序计划：阶段 0→F，每步目标/改动/验收 |
 | `docs/specs/photoreal-acceptance.md` | 验收 spec：到位定义 + 打分量规 + 每阶段出口标准 |
 | `docs/plans/photoreal-progress.md` | 进度状态（**你每轮都要更新它**，断点续跑靠它） |
+| `docs/reviews/README.md` / `docs/reviews/*.md` | 独立外审入口、模板与原文归档；reviewer 意见不混进打分记录 |
 | `docs/refs/README.md` | 参照照片收集说明 + 评分锚点 |
 | `CONTEXT.md` / `docs/specs/visual.md` | 视觉锚点与规范 |
 | `docs/bugs/2026-06-18-visual-pipeline-bugs.md` | 既往坑（moire/暖色/雾回归/headless 假成功） |
@@ -42,17 +43,25 @@
 
 ## 3. 迭代循环（每一轮严格照做）
 1. **读状态**：读 `photoreal-progress.md`，确定当前阶段与下一个未完成任务。
-2. **取任务**：从 `photoreal-overhaul.md` 取该任务的目标/改动/验收。
-3. **改一处**：只做这一个任务的最小改动（high-ceiling 方法，见 §4 禁令）。
-4. **构建**：编译 C++ / 跑相关管线步骤；失败先修构建。
-5. **出图**：跑 `offscreen-shot.ps1` @1440p，在**固定英雄段时间点**低打扰截图到 `Saved\OffscreenShots\iterN.png`。
-6. **看图（强制）**：用 **Read 工具把每张 PNG 当图片打开**，按 `photoreal-acceptance.md` 的量规逐维打分，并和 `docs/refs/` 参照图对比。**只跑脚本不看图 = 没做验收，不允许。**
-7. **判定**：
+2. **读外审**：若 `photoreal-progress.md` 的“独立外审 / Reviewer Notes”有未处理或 FAIL/NEEDS-HUMAN 裁决，先读对应 `docs/reviews/*.md`，外审阻断项优先于继续迭代。
+3. **取任务**：从 `photoreal-overhaul.md` 取该任务的目标/改动/验收。
+4. **改一处**：只做这一个任务的最小改动（high-ceiling 方法，见 §4 禁令）。
+5. **构建**：编译 C++ / 跑相关管线步骤；失败先修构建。
+6. **出图**：跑 `offscreen-shot.ps1` @1440p，在**固定英雄段时间点**低打扰截图到 `Saved\OffscreenShots\iterN.png`。
+7. **看图（强制）**：用 **Read 工具把每张 PNG 当图片打开**，按 `photoreal-acceptance.md` 的量规逐维打分，并和 `docs/refs/` 参照图对比。**只跑脚本不看图 = 没做验收，不允许。**
+8. **判定**：
    - 达到该任务/阶段出口标准 → 标记完成。
    - 出现回归或不达标 → 用 systematic-debugging 找**根因**（材质图错误、光照量级、时序、moire 等），**不许用临时覆盖几何/调色掩盖**。
-8. **提交**：一个任务一个 commit，message 末尾加 `Co-Authored-By: Claude <noreply@anthropic.com>` 行（按仓库约定）。
-9. **写状态**：更新 `photoreal-progress.md`（当前阶段、分数、截图名、根因/决策、下一步）。
-10. **回到 1**，直到 §5 的"到位"全部满足。
+9. **提交**：一个任务一个 commit，message 末尾加 `Co-Authored-By: Claude <noreply@anthropic.com>` 行（按仓库约定）。
+10. **写状态**：更新 `photoreal-progress.md`（当前阶段、分数、截图名、根因/决策、下一步；若外审项被处理，也更新外审索引/待办）。
+11. **回到 1**，直到 §5 的"到位"全部满足。
+
+## 3.1 独立外审机制
+- reviewer 的完整意见写入 `docs/reviews/YYYY-MM-DD-<target>.md`，按 `docs/reviews/README.md` 模板追加；不要把长篇外审原文塞进 `打分记录`。
+- `photoreal-progress.md` 只保留外审索引、裁决、阻断摘要，并把可执行项同步到 `NEEDS-HUMAN / Blocked 待办`。
+- `打分记录` 只记录真实截图/诊断的评分与结果；外审不等同于截图打分，除非 reviewer 明确按量规给分。
+- 外审原文不得被 agent 改写为“更好听”的版本；需要回应时，在对应 review 文件的 `Agent disposition` 或 `Follow-up` 下追加。
+- `Verdict: FAIL` 或 `NEEDS-HUMAN` 的阻断项没有处理前，不允许把对应阶段标 Done。
 
 ## 4. 硬禁令（违反即视为失败）
 - ❌ "脚本没报错就当完成"——必须 Read 截图肉眼核对。

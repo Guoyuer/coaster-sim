@@ -27,6 +27,13 @@
 
 状态图例：⬜ TODO ／ 🟦 进行中 ／ ✅ Done ／ ⛔ NEEDS-HUMAN ／ ❌ Blocked
 
+## 独立外审 / Reviewer Notes
+> 外审原文归档在 `docs/reviews/*.md`；这里仅保留索引、裁决、阻断摘要。Agent 处理外审时必须把阻断项同步到 `NEEDS-HUMAN / Blocked 待办`，把采纳的流程级决定同步到 `决策记录`。`打分记录` 只放截图/诊断评分，不放长篇外审原文。
+
+| 日期 | Review | Verdict | 状态 | 阻断摘要 |
+|---|---|---|---|---|
+| 2026-06-19 | [`a2-track-adapts-v1`](../reviews/2026-06-19-a2-track-adapts-v1.md) | FAIL | Open | A2 不予放行；必须先补全环轨道 vs 地形 clearance 诊断，证明不穿山；考虑恢复很小的 clearance safety fallback |
+
 ## 打分记录（每轮追加，最新在上）
 > 格式：`iterN @t<秒>: D1=.. D2=.. ... 均值=.. 短板=.. 根因/下一步=..`
 - `a2-track-adapts-v1 @t12s`: D1=2.5 D2=3.5 D3=1 D4=0 D5=2 D6=1 D7=2 D8=2.5，均值=1.81。验证图：`Saved\OffscreenShots\a2-track-adapts-v1.png`。改动：`ApplyTrackClearanceCut` 默认关闭，控制点 Z 改为 naturalized 地形 + 约 22m。结果：轨道下方/近处由硬挖槽变成连续坡面，证明“轨道适配地形”方向对；但左上近景崖壁仍是规则 heightfield 货架，尚未照片自然。下一步=轨道 XY/英雄段构图避开近墙，或在走廊内对可见崖壁做作者化重塑/mesh 接管。
@@ -75,7 +82,8 @@
 - [x] **下一步①：剖面诊断**：`scripts\dump-yarlung-height-profile.py` 已完成；结论=无硬平台量化，存在 bilinear 分段坡度/C1 断点，继续 bicubic。
 - [x] **下一步②：bicubic/B-spline 上采样**：已改 `generate-yarlung-landscape-assets.py:sample_cm` bilinear→cubic B-spline，重出 `.r16` 并重导入。数据剖面改善，视觉近景陡崖仍不达标；2017 不再作为默认路线。
 - [ ] **下一步③：轨道适配自然地形**：撤掉/最小化 `ApplyTrackClearanceCut`，不要再硬挖山；基于 naturalized heightmap 重新计算/调整 `YarlungCoasterProfile.h` 控制点 Z/必要 XY，使轨道不穿山、离地合理、第一人称近景读成自然坡面。
-- [ ] **A2 Done（新口径）**：用 hero `WaitSeconds 12` 或补充中远景取景验**中远景峡谷轮廓/尺度正确、不穿山、轨道贴地**即可标 Done；近景若仍有材质细节不足 deferred 到 C，但**人工货架墙/硬切槽不能放行**。
+- [ ] **【硬门槛 / 独立审阅 2026-06-19】A2 放行前必做：全环不穿山诊断**：clearance cut 已设半径=0 完全关闭，且轨道仅 8 控制点段间线性 lerp、运行时无贴地/clamp，单机位英雄帧无法证明整圈不穿山。须沿样条密采样地形 vs 轨道 Z（仿 `dump-yarlung-height-profile.py`）或多机位绕圈截图，证明全程轨道在地形之上且离地合理。建议同时保留一个很小的 inner clearance 半径作微小安全兜底（决策记录原意），而非完全=0。
+- [ ] **A2 Done（新口径）**：用 hero `WaitSeconds 12` 或补充中远景取景验**中远景峡谷轮廓/尺度正确、不穿山、轨道贴地**即可标 Done；近景若仍有材质细节不足 deferred 到 C，但**人工货架墙/硬切槽不能放行**。**追加（独立审阅）：必须先过上一条全环穿山诊断；单机位截图不算数。**
 - [x] **低打扰截图实测**：已成功。推荐命令：`powershell -ExecutionPolicy Bypass -File scripts\offscreen-shot.ps1 -Name <name> -WaitSeconds <seconds> -ResX 2560 -ResY 1440`。注意这是 offscreen/低打扰 smoke path，最终验收仍需确认画面有效并按量规打分。
 - [ ] **英雄段人工确认**（阶段 0）：已先选 `WaitSeconds 12` 作为最佳努力默认；如用户想换英雄段，再重新截图并更新本文件。
 
