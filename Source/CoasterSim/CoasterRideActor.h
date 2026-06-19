@@ -121,15 +121,6 @@ protected:
     UPROPERTY(VisibleAnywhere, Category = "Environment")
     TObjectPtr<UProceduralMeshComponent> FoamRibbonMesh;
 
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UProceduralMeshComponent> DistantRidgeMesh;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UProceduralMeshComponent> SkyDomeMesh;
-
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UProceduralMeshComponent> CloudLayerMesh;
-
     UPROPERTY(EditAnywhere, Category = "Track")
     TArray<FVector> ControlPoints;
 
@@ -151,9 +142,6 @@ private:
     void RebuildVisuals();
     void RebuildEnvironment();
     void ClearEnvironmentVisuals();
-    void BuildSkyDome();
-    void BuildCloudLayer();
-    void BuildDistantRidges();
     void BuildBoulderOutcrops();
     void BuildRiverEffects();
     void BuildRiverSamples(TArray<FEnvironmentRiverSample>& OutSamples, int32 SampleCount) const;

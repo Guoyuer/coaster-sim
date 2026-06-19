@@ -195,24 +195,12 @@ ACoasterRideActor::ACoasterRideActor()
     FoamRibbonMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("FoamRibbonMesh"));
     FoamRibbonMesh->SetupAttachment(SceneRoot);
     FoamRibbonMesh->bUseAsyncCooking = true;
-    DistantRidgeMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("DistantRidgeMesh"));
-    DistantRidgeMesh->SetupAttachment(SceneRoot);
-    DistantRidgeMesh->bUseAsyncCooking = true;
-    SkyDomeMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("SkyDomeMesh"));
-    SkyDomeMesh->SetupAttachment(SceneRoot);
-    SkyDomeMesh->bUseAsyncCooking = true;
-    CloudLayerMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("CloudLayerMesh"));
-    CloudLayerMesh->SetupAttachment(SceneRoot);
-    CloudLayerMesh->bUseAsyncCooking = true;
     RiverSurface->SetCastShadow(false);
     Rapids->SetCastShadow(false);
     MistBands->SetCastShadow(false);
     BoulderOutcrops->SetCastShadow(true);
     RiverRibbonMesh->SetCastShadow(false);
     FoamRibbonMesh->SetCastShadow(false);
-    DistantRidgeMesh->SetCastShadow(false);
-    SkyDomeMesh->SetCastShadow(false);
-    CloudLayerMesh->SetCastShadow(false);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
     if (CubeMesh.Succeeded())
@@ -247,17 +235,6 @@ ACoasterRideActor::ACoasterRideActor()
         BoulderOutcrops->SetMaterial(0, BasicMaterial.Object);
         RiverRibbonMesh->SetMaterial(0, BasicMaterial.Object);
         FoamRibbonMesh->SetMaterial(0, BasicMaterial.Object);
-        DistantRidgeMesh->SetMaterial(0, BasicMaterial.Object);
-        SkyDomeMesh->SetMaterial(0, BasicMaterial.Object);
-        CloudLayerMesh->SetMaterial(0, BasicMaterial.Object);
-    }
-
-    static ConstructorHelpers::FObjectFinder<UMaterialInterface> VertexColorMaterial(TEXT("/Engine/EngineDebugMaterials/VertexColorMaterial.VertexColorMaterial"));
-    if (VertexColorMaterial.Succeeded())
-    {
-        DistantRidgeMesh->SetMaterial(0, VertexColorMaterial.Object);
-        SkyDomeMesh->SetMaterial(0, VertexColorMaterial.Object);
-        CloudLayerMesh->SetMaterial(0, VertexColorMaterial.Object);
     }
 
     CurrentSpeedCms = 450.0f;
@@ -422,9 +399,6 @@ void ACoasterRideActor::RebuildVisuals()
 void ACoasterRideActor::RebuildEnvironment()
 {
     ClearEnvironmentVisuals();
-    BuildSkyDome();
-    BuildCloudLayer();
-    BuildDistantRidges();
     BuildBoulderOutcrops();
     BuildRiverEffects();
 }
@@ -437,177 +411,6 @@ void ACoasterRideActor::ClearEnvironmentVisuals()
     BoulderOutcrops->ClearInstances();
     RiverRibbonMesh->ClearAllMeshSections();
     FoamRibbonMesh->ClearAllMeshSections();
-    DistantRidgeMesh->ClearAllMeshSections();
-    SkyDomeMesh->ClearAllMeshSections();
-    CloudLayerMesh->ClearAllMeshSections();
-}
-
-void ACoasterRideActor::BuildSkyDome()
-{
-    TArray<FVector> SkyVertices;
-    TArray<int32> SkyTriangles;
-    TArray<FVector> SkyNormals;
-    TArray<FVector2D> SkyUVs;
-    TArray<FLinearColor> SkyColors;
-    TArray<FProcMeshTangent> SkyTangents;
-    constexpr int32 RingCount = 9;
-    constexpr int32 SegmentCount = 56;
-    constexpr float SkyRadius = 92000.0f;
-    SkyVertices.Reserve(RingCount * SegmentCount);
-
-    for (int32 Ring = 0; Ring < RingCount; ++Ring)
-    {
-        const float V = static_cast<float>(Ring) / static_cast<float>(RingCount - 1);
-        const float Theta = V * UE_HALF_PI;
-        const float RadiusAtRing = FMath::Cos(Theta) * SkyRadius;
-        const float Z = FMath::Sin(Theta) * SkyRadius - 2200.0f;
-        const FLinearColor HorizonColor(0.38f, 0.70f, 1.0f, 1.0f);
-        const FLinearColor ZenithColor(0.015f, 0.29f, 0.92f, 1.0f);
-        const FLinearColor RingColor = FMath::Lerp(HorizonColor, ZenithColor, Smooth01(V));
-
-        for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
-        {
-            const float U = static_cast<float>(Segment) / static_cast<float>(SegmentCount);
-            const float Angle = U * UE_TWO_PI;
-            SkyVertices.Add(FVector(FMath::Cos(Angle) * RadiusAtRing, FMath::Sin(Angle) * RadiusAtRing, Z));
-            SkyNormals.Add(-SkyVertices.Last().GetSafeNormal());
-            SkyUVs.Add(FVector2D(U, V));
-            SkyColors.Add(RingColor);
-            SkyTangents.Add(FProcMeshTangent(FVector::ForwardVector, false));
-        }
-    }
-
-    for (int32 Ring = 0; Ring < RingCount - 1; ++Ring)
-    {
-        for (int32 Segment = 0; Segment < SegmentCount; ++Segment)
-        {
-            const int32 NextSegment = (Segment + 1) % SegmentCount;
-            const int32 A = Ring * SegmentCount + Segment;
-            const int32 B = (Ring + 1) * SegmentCount + Segment;
-            const int32 C = Ring * SegmentCount + NextSegment;
-            const int32 D = (Ring + 1) * SegmentCount + NextSegment;
-            AddDoubleSidedQuad(SkyTriangles, A, B, C, D);
-        }
-    }
-
-    SkyDomeMesh->CreateMeshSection_LinearColor(0, SkyVertices, SkyTriangles, SkyNormals, SkyUVs, SkyColors, SkyTangents, false);
-}
-
-void ACoasterRideActor::BuildCloudLayer()
-{
-    TArray<FVector> CloudVertices;
-    TArray<int32> CloudTriangles;
-    TArray<FVector> CloudNormals;
-    TArray<FVector2D> CloudUVs;
-    TArray<FLinearColor> CloudColors;
-    TArray<FProcMeshTangent> CloudTangents;
-    constexpr int32 CloudPatchCount = 12;
-    constexpr int32 CloudSegments = 18;
-    for (int32 Patch = 0; Patch < CloudPatchCount; ++Patch)
-    {
-        const float Row = static_cast<float>(Patch / 6);
-        const float Column = static_cast<float>(Patch % 6);
-        const float X = FMath::Lerp(-43000.0f, 46000.0f, Column / 5.0f) + 3200.0f * FMath::Sin(Patch * 1.7f);
-        const float Y = FMath::Lerp(-24500.0f, 21000.0f, Row / 2.0f) + 2600.0f * FMath::Cos(Patch * 0.9f);
-        const float Z = 21400.0f + 1700.0f * FMath::Sin(Patch * 0.47f);
-        const float RadiusX = 1750.0f + 860.0f * Hash01(Patch * 1.3f, 2.1f);
-        const float RadiusY = 420.0f + 300.0f * Hash01(3.4f, Patch * 2.2f);
-        const float Yaw = Hash01(Patch * 4.1f, Patch * 0.6f) * UE_TWO_PI;
-        const FVector Center(X, Y, Z);
-        const FVector AxisX(FMath::Cos(Yaw), FMath::Sin(Yaw), 0.0f);
-        const FVector AxisY(-FMath::Sin(Yaw), FMath::Cos(Yaw), 0.0f);
-        const int32 BaseIndex = CloudVertices.Num();
-
-        CloudVertices.Add(Center);
-        CloudNormals.Add(FVector::DownVector);
-        CloudUVs.Add(FVector2D(0.5f, 0.5f));
-        CloudColors.Add(FLinearColor(0.92f, 0.95f, 0.98f, 1.0f));
-        CloudTangents.Add(FProcMeshTangent(AxisX, false));
-
-        for (int32 Segment = 0; Segment < CloudSegments; ++Segment)
-        {
-            const float Angle = (static_cast<float>(Segment) / static_cast<float>(CloudSegments)) * UE_TWO_PI;
-            const float EdgeJitter = 0.84f + 0.20f * Hash01(Patch * 11.0f, Segment * 5.0f);
-            const FVector Edge = Center
-                + AxisX * (FMath::Cos(Angle) * RadiusX * EdgeJitter)
-                + AxisY * (FMath::Sin(Angle) * RadiusY * EdgeJitter);
-            CloudVertices.Add(Edge);
-            CloudNormals.Add(FVector::DownVector);
-            CloudUVs.Add(FVector2D(FMath::Cos(Angle) * 0.5f + 0.5f, FMath::Sin(Angle) * 0.5f + 0.5f));
-            const float Bright = 0.86f + 0.08f * Hash01(Segment * 0.7f, Patch * 1.9f);
-            CloudColors.Add(FLinearColor(Bright, FMath::Min(Bright + 0.03f, 1.0f), FMath::Min(Bright + 0.05f, 1.0f), 1.0f));
-            CloudTangents.Add(FProcMeshTangent(AxisX, false));
-        }
-
-        for (int32 Segment = 0; Segment < CloudSegments; ++Segment)
-        {
-            const int32 Next = (Segment + 1) % CloudSegments;
-            CloudTriangles.Append({ BaseIndex, BaseIndex + 1 + Segment, BaseIndex + 1 + Next });
-            CloudTriangles.Append({ BaseIndex, BaseIndex + 1 + Next, BaseIndex + 1 + Segment });
-        }
-    }
-
-    CloudLayerMesh->CreateMeshSection_LinearColor(0, CloudVertices, CloudTriangles, CloudNormals, CloudUVs, CloudColors, CloudTangents, false);
-}
-
-void ACoasterRideActor::BuildDistantRidges()
-{
-    TArray<FVector> RidgeVertices;
-    TArray<int32> RidgeTriangles;
-    TArray<FVector> RidgeNormals;
-    TArray<FVector2D> RidgeUVs;
-    TArray<FLinearColor> RidgeColors;
-    TArray<FProcMeshTangent> RidgeTangents;
-    constexpr int32 RidgeSamples = 42;
-    const TArray<float> RidgeYValues = { -23200.0f, 21400.0f };
-
-    for (int32 RidgeIndex = 0; RidgeIndex < RidgeYValues.Num(); ++RidgeIndex)
-    {
-        const float RidgeY = RidgeYValues[RidgeIndex];
-        const int32 BaseIndex = RidgeVertices.Num();
-        for (int32 Sample = 0; Sample < RidgeSamples; ++Sample)
-        {
-            const float T = static_cast<float>(Sample) / static_cast<float>(RidgeSamples - 1);
-            const float X = FMath::Lerp(-11200.0f, 18400.0f, T);
-            const float RidgeNoise = 0.45f * FMath::Sin(T * UE_TWO_PI * 2.4f + RidgeIndex)
-                + 0.32f * FMath::Sin(T * UE_TWO_PI * 5.7f + 0.6f);
-            const float BaseZ = 420.0f + 260.0f * FMath::Sin(T * UE_TWO_PI * 1.2f + RidgeIndex);
-            const float MidZ = 2440.0f + 360.0f * RidgeIndex + RidgeNoise * 520.0f;
-            const float PeakZ = 4860.0f + RidgeNoise * 880.0f + 540.0f * Hash01(Sample * 1.7f, RidgeIndex);
-
-            RidgeVertices.Append({
-                FVector(X, RidgeY, BaseZ),
-                FVector(X, RidgeY, MidZ),
-                FVector(X, RidgeY, PeakZ)
-            });
-            RidgeNormals.Append({ FVector::ForwardVector, FVector::ForwardVector, FVector::ForwardVector });
-            RidgeUVs.Append({ FVector2D(T, 0.0f), FVector2D(T, 0.55f), FVector2D(T, 1.0f) });
-            RidgeColors.Append({
-                FLinearColor(0.10f, 0.13f, 0.13f, 1.0f),
-                FLinearColor(0.20f, 0.24f, 0.24f, 1.0f),
-                FLinearColor(0.38f, 0.45f, 0.46f, 1.0f)
-            });
-            RidgeTangents.Append({
-                FProcMeshTangent(FVector::ForwardVector, false),
-                FProcMeshTangent(FVector::ForwardVector, false),
-                FProcMeshTangent(FVector::ForwardVector, false)
-            });
-        }
-
-        for (int32 Sample = 0; Sample < RidgeSamples - 1; ++Sample)
-        {
-            const int32 A = BaseIndex + Sample * 3;
-            const int32 B = BaseIndex + (Sample + 1) * 3;
-            const int32 C = BaseIndex + Sample * 3 + 1;
-            const int32 D = BaseIndex + (Sample + 1) * 3 + 1;
-            const int32 E = BaseIndex + Sample * 3 + 2;
-            const int32 F = BaseIndex + (Sample + 1) * 3 + 2;
-            AddDoubleSidedQuad(RidgeTriangles, A, B, C, D);
-            AddDoubleSidedQuad(RidgeTriangles, C, D, E, F);
-        }
-    }
-
-    DistantRidgeMesh->CreateMeshSection_LinearColor(0, RidgeVertices, RidgeTriangles, RidgeNormals, RidgeUVs, RidgeColors, RidgeTangents, false);
 }
 
 void ACoasterRideActor::BuildBoulderOutcrops()
