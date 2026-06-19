@@ -37,7 +37,20 @@
       "enabled": true,
       "purpose": "Preserve broad Yarlung canyon shapes while reshaping near-vertical 30m DEM cliffs into ride-scale natural slopes for first-person photorealism.",
       "broad_blur": "box blur radius=18, passes=3, steep-relief weighted blend",
-      "slope_relaxation": "max_slope=0.78, passes=8"
+      "slope_relaxation": "max_slope=0.78, passes=8",
+      "outbound_cliff_softening": {
+        "enabled": true,
+        "track_guide": "Content\\Generated\\YarlungLandscape\\YarlungTrack.csv",
+        "source": "previous generated Outbound track guide; track CSV is regenerated after terrain generation",
+        "inner_cm": 5000.0,
+        "outer_cm": 112000.0,
+        "max_slope_rise_per_run": 0.45,
+        "base_lift_cm": 2400.0,
+        "affected_samples": 45764,
+        "max_lowered_cm": 30811.652,
+        "mean_lowered_cm": 7824.012,
+        "purpose": "Replace the grazing-angle heightfield cliff wall with a heightfield-friendly natural slope instead of a fascia mesh."
+      }
     },
     "river_mask": {
       "centerline": "DEM thalweg extracted from the naturalized height grid",

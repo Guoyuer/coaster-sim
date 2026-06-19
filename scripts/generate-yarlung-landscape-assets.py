@@ -10,11 +10,11 @@ sanity checks for shape, river width, forest massing, snow, and rock zones.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import math
 import struct
 import urllib.request
-import csv
 from pathlib import Path
 
 from PIL import Image
@@ -37,6 +37,7 @@ DEM_EAST_LON = 95.015
 DEM_SOUTH_LAT = 29.745
 DEM_NORTH_LAT = 29.820
 DEM_CACHE_DIR = Path("SourceAssets/DEM/CopernicusGLO30")
+DEFAULT_TRACK_GUIDE_PATH = Path("Content/Generated/YarlungLandscape/YarlungTrack.csv")
 DEM_TILE_URL = (
     "https://copernicus-dem-30m.s3.amazonaws.com/"
     "Copernicus_DSM_COG_10_{lat_prefix}{lat:02d}_00_{lon_prefix}{lon:03d}_00_DEM/"
@@ -437,11 +438,170 @@ def naturalize_height_grid(heights: list[float]) -> list[float]:
     return relax_height_slopes(conditioned, max_slope=0.78, passes=8)
 
 
+def read_outbound_softening_polyline(path: Path) -> list[tuple[float, float]]:
+    if not path.exists():
+        return []
+
+    points: list[tuple[float, float]] = []
+    with path.open("r", newline="", encoding="ascii") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            if row.get("section") == "Outbound":
+                points.append((float(row["x"]), float(row["y"])))
+    return points
+
+
+def build_softening_segments(points: list[tuple[float, float]]):
+    segments = []
+    for start, end in zip(points, points[1:]):
+        ax, ay = start
+        bx, by = end
+        vx = bx - ax
+        vy = by - ay
+        length_sq = vx * vx + vy * vy
+        if length_sq < 1.0:
+            continue
+        length = math.sqrt(length_sq)
+        segments.append(
+            {
+                "ax": ax,
+                "ay": ay,
+                "vx": vx,
+                "vy": vy,
+                "length_sq": length_sq,
+                "nx": -vy / length,
+                "ny": vx / length,
+                "min_x": min(ax, bx),
+                "max_x": max(ax, bx),
+                "min_y": min(ay, by),
+                "max_y": max(ay, by),
+            }
+        )
+    return segments
+
+
+def nearest_softening_frame(x: float, y: float, segments, search_radius_cm: float):
+    best = None
+    best_distance_sq = search_radius_cm * search_radius_cm
+    for segment in segments:
+        if (
+            x < segment["min_x"] - search_radius_cm
+            or x > segment["max_x"] + search_radius_cm
+            or y < segment["min_y"] - search_radius_cm
+            or y > segment["max_y"] + search_radius_cm
+        ):
+            continue
+
+        rel_x = x - segment["ax"]
+        rel_y = y - segment["ay"]
+        t = max(0.0, min(1.0, (rel_x * segment["vx"] + rel_y * segment["vy"]) / segment["length_sq"]))
+        px = segment["ax"] + segment["vx"] * t
+        py = segment["ay"] + segment["vy"] * t
+        dx = x - px
+        dy = y - py
+        distance_sq = dx * dx + dy * dy
+        if distance_sq < best_distance_sq:
+            signed_lateral = dx * segment["nx"] + dy * segment["ny"]
+            best_distance_sq = distance_sq
+            best = (px, py, signed_lateral, math.sqrt(distance_sq))
+    return best
+
+
+def soften_outbound_cliff_slope(
+    heights: list[float],
+    track_path: Path,
+) -> tuple[list[float], dict[str, object]]:
+    points = read_outbound_softening_polyline(track_path)
+    if len(points) < 3:
+        return heights, {
+            "enabled": False,
+            "reason": f"missing or insufficient Outbound track guide: {track_path}",
+        }
+
+    segments = build_softening_segments(points)
+    if not segments:
+        return heights, {"enabled": False, "reason": "no valid Outbound softening segments"}
+
+    inner_cm = 5000.0
+    outer_cm = 112000.0
+    fade_out_start_cm = 88000.0
+    max_slope = 0.45
+    base_lift_cm = 2400.0
+    next_heights = list(heights)
+    affected_weights = [0.0] * len(heights)
+    affected_count = 0
+    total_lowered = 0.0
+    max_lowered = 0.0
+
+    for y_index in range(SIZE):
+        y = grid_y_to_world(float(y_index))
+        for x_index in range(SIZE):
+            x = grid_x_to_world(float(x_index))
+            frame = nearest_softening_frame(x, y, segments, outer_cm)
+            if frame is None:
+                continue
+
+            px, py, _signed_lateral, distance_cm = frame
+            if distance_cm < inner_cm or distance_cm > outer_cm:
+                continue
+
+            index = y_index * SIZE + x_index
+            base_height = sample_height_from_grid(heights, px, py)
+            target_height = base_height + base_lift_cm + max(0.0, distance_cm - inner_cm) * max_slope
+            original_height = heights[index]
+            if original_height <= target_height:
+                continue
+
+            side_weight = smooth01((distance_cm - inner_cm) / 36000.0)
+            side_weight *= 1.0 - smooth01((distance_cm - fade_out_start_cm) / (outer_cm - fade_out_start_cm))
+            if side_weight <= 0.0:
+                continue
+
+            lowered_height = lerp(original_height, target_height, side_weight)
+            lowered = original_height - lowered_height
+            next_heights[index] = lowered_height
+            affected_weights[index] = side_weight
+            affected_count += 1
+            total_lowered += lowered
+            max_lowered = max(max_lowered, lowered)
+
+    smoothed = next_heights
+    for _ in range(2):
+        current = list(smoothed)
+        for y_index in range(1, SIZE - 1):
+            for x_index in range(1, SIZE - 1):
+                index = y_index * SIZE + x_index
+                weight = affected_weights[index] * 0.22
+                if weight <= 0.0:
+                    continue
+                neighbor_average = (
+                    current[index - 1]
+                    + current[index + 1]
+                    + current[index - SIZE]
+                    + current[index + SIZE]
+                ) * 0.25
+                smoothed[index] = lerp(current[index], neighbor_average, weight)
+
+    return smoothed, {
+        "enabled": True,
+        "track_guide": str(track_path),
+        "source": "previous generated Outbound track guide; track CSV is regenerated after terrain generation",
+        "inner_cm": inner_cm,
+        "outer_cm": outer_cm,
+        "max_slope_rise_per_run": max_slope,
+        "base_lift_cm": base_lift_cm,
+        "affected_samples": affected_count,
+        "max_lowered_cm": round(max_lowered, 3),
+        "mean_lowered_cm": round(total_lowered / max(1, affected_count), 3),
+        "purpose": "Replace the grazing-angle heightfield cliff wall with a heightfield-friendly natural slope instead of a fascia mesh.",
+    }
+
+
 def forest_amount(x: float, y: float, height: float, river_y: float | None = None) -> float:
     center_y = river_center_y(x) if river_y is None else river_y
     lateral = abs(y - center_y)
     range_cm = HEIGHT_MAX - HEIGHT_MIN
-    forest_band = smooth01((lateral - 90000.0) / 90000.0) * (1.0 - smooth01((lateral - 520000.0) / 130000.0))
+    forest_band = smooth01((lateral - 26000.0) / 65000.0) * (1.0 - smooth01((lateral - 520000.0) / 130000.0))
     forest_height = 1.0 - smooth01((height - (HEIGHT_MIN + range_cm * 0.45)) / (range_cm * 0.20))
     patch_noise = 0.58 * value_noise(x, y, 1650.0, 2) + 0.42 * value_noise(x, y, 760.0, 7)
     return max(0.0, min(1.0, forest_band * forest_height * smooth01((patch_noise - 0.18) / 0.42)))
@@ -578,6 +738,7 @@ def main() -> None:
     parser.add_argument("--texture-out", default="SourceAssets/Generated/YarlungLandscape")
     parser.add_argument("--source", choices=("copernicus", "synthetic"), default="copernicus")
     parser.add_argument("--dem-cache", default=str(DEM_CACHE_DIR))
+    parser.add_argument("--track-guide", default=str(DEFAULT_TRACK_GUIDE_PATH))
     args = parser.parse_args()
 
     out_dir = Path(args.out)
@@ -590,11 +751,13 @@ def main() -> None:
     if args.source == "copernicus":
         source_heights, source_metadata = build_copernicus_height_grid(Path(args.dem_cache))
         source_heights = naturalize_height_grid(source_heights)
+        source_heights, outbound_softening = soften_outbound_cliff_slope(source_heights, Path(args.track_guide))
         source_metadata["naturalization"] = {
             "enabled": NATURALIZE_STEEP_TERRAIN,
             "purpose": "Preserve broad Yarlung canyon shapes while reshaping near-vertical 30m DEM cliffs into ride-scale natural slopes for first-person photorealism.",
             "broad_blur": "box blur radius=18, passes=3, steep-relief weighted blend",
             "slope_relaxation": "max_slope=0.78, passes=8",
+            "outbound_cliff_softening": outbound_softening,
         }
     else:
         source_heights, source_metadata = [], {"source": "synthetic procedural fallback"}

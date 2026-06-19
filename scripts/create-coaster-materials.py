@@ -9,7 +9,6 @@ TINT_MATERIAL_NAME = "M_CoasterTint"
 RIVER_WATER_MATERIAL_NAME = "M_YarlungRiverWater"
 RIVER_FOAM_MATERIAL_NAME = "M_YarlungRiverFoam"
 LANDSCAPE_MATERIAL_NAME = "M_YarlungLandscapeGround"
-CLIFF_MATERIAL_NAME = "M_YarlungCliffRock"
 SUCCESS_MARKER = "material-generation-ok.txt"
 LEAFY_GRASS_SOURCE_DIR = "SourceAssets/PolyHaven/leafy_grass"
 LEAFY_GRASS_TEXTURES = {
@@ -538,53 +537,6 @@ def create_landscape_material(rock_textures, grass_textures, macro_textures):
     finalize_material(material)
 
 
-def create_cliff_material(rock_textures):
-    material = create_material_asset(CLIFF_MATERIAL_NAME, PACKAGE_PATH)
-    unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
-    material.set_editor_property("two_sided", True)
-
-    vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
-        material,
-        unreal.MaterialExpressionVertexColor,
-        -720,
-        -280,
-    )
-    if not unreal.MaterialEditingLibrary.connect_material_property(
-        vertex_color,
-        "",
-        unreal.MaterialProperty.MP_BASE_COLOR,
-    ):
-        raise RuntimeError("Unable to connect cliff vertex BaseColor")
-    connect_material_property(
-        material,
-        create_texture_sample(material, rock_textures["T_AerialGrassRock_Normal"], -720, 20),
-        unreal.MaterialProperty.MP_NORMAL,
-        "cliff Normal",
-    )
-    roughness = create_texture_sample(material, rock_textures["T_AerialGrassRock_Rough"], -720, 300)
-    if not unreal.MaterialEditingLibrary.connect_material_property(
-        roughness,
-        "R",
-        unreal.MaterialProperty.MP_ROUGHNESS,
-    ):
-        raise RuntimeError("Unable to connect cliff Roughness")
-    ambient_occlusion = create_texture_sample(material, rock_textures["T_AerialGrassRock_AO"], -720, 560)
-    if not unreal.MaterialEditingLibrary.connect_material_property(
-        ambient_occlusion,
-        "R",
-        unreal.MaterialProperty.MP_AMBIENT_OCCLUSION,
-    ):
-        raise RuntimeError("Unable to connect cliff Ambient Occlusion")
-    connect_material_property(
-        material,
-        create_constant(material, 0.08, -360, 760),
-        unreal.MaterialProperty.MP_SPECULAR,
-        "cliff Specular",
-    )
-    set_optional_material_usage(material, "MATUSAGE_PROCEDURAL_MESHES")
-    finalize_material(material)
-
-
 def main():
     ensure_folder(PACKAGE_PATH)
     ensure_folder(LEAFY_GRASS_PACKAGE_PATH)
@@ -604,7 +556,6 @@ def main():
         YARLUNG_MACRO_TEXTURES,
     )
     create_landscape_material(aerial_grass_rock_textures, leafy_grass_textures, yarlung_macro_textures)
-    create_cliff_material(aerial_grass_rock_textures)
     marker_path = unreal.Paths.convert_relative_path_to_full(
         unreal.Paths.project_saved_dir() + SUCCESS_MARKER
     )
