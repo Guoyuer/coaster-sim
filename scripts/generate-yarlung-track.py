@@ -42,6 +42,20 @@ def smoothstep(edge0: float, edge1: float, value: float) -> float:
     return t * t * (3.0 - 2.0 * t)
 
 
+def raised_cosine_bump(distance_m: float, center_m: float, half_width_m: float, amplitude_cm: float) -> float:
+    delta = abs(distance_m - center_m)
+    if delta >= half_width_m:
+        return 0.0
+    return amplitude_cm * 0.5 * (1.0 + math.cos(math.pi * delta / half_width_m))
+
+
+def cumulative_distances(points: list[tuple[float, float, float]]) -> list[float]:
+    distances = [0.0]
+    for a, b in zip(points, points[1:]):
+        distances.append(distances[-1] + math.dist(a, b))
+    return distances
+
+
 def extract_thalweg(heightfield: Heightfield, step_x: int = 5, search_radius: int = 70) -> list[tuple[float, float, float]]:
     width = heightfield.width
     height = heightfield.height
@@ -140,10 +154,12 @@ def build_out_and_back(
 
     points: list[TrackPoint] = []
     station_z = None
-    station_extra_cm = 15000.0
-    outbound_descent_cm = 22500.0
+    station_extra_cm = 30000.0
+    outbound_descent_cm = 30000.0
+    outbound_distances_cm = cumulative_distances(outbound_center)
     for index, center in enumerate(outbound_center):
         ratio = index / max(1, len(outbound_center) - 1)
+        distance_m = outbound_distances_cm[index] / 100.0
         nx, ny = tangent_normal(outbound_center, index)
         offset_cm = outbound_offset_m * 100.0
         x = center[0] + nx * offset_cm
@@ -151,10 +167,13 @@ def build_out_and_back(
         terrain_z = heightfield.sample_cm(x, y)
         if station_z is None:
             station_z = terrain_z + clearance_m * 100.0 + station_extra_cm
-        descent_drop = outbound_descent_cm * ratio
-        airtime_envelope = smoothstep(0.16, 0.26, ratio) * (1.0 - smoothstep(0.88, 0.96, ratio))
-        airtime = math.sin(ratio * math.pi * 30.0 + 0.4) * 1900.0 * airtime_envelope
-        design_z = station_z - descent_drop + airtime
+        descent_drop = outbound_descent_cm * smoothstep(0.08, 0.36, ratio)
+        camelbacks = (
+            raised_cosine_bump(distance_m, 900.0, 76.0, 1700.0)
+            + raised_cosine_bump(distance_m, 1210.0, 66.0, 2000.0)
+            + raised_cosine_bump(distance_m, 1535.0, 68.0, 1900.0)
+        )
+        design_z = station_z - descent_drop + camelbacks
         z = max(terrain_z + clearance_m * 100.0, design_z)
         section = section_for("outbound", ratio)
         roll = 0.0
@@ -182,6 +201,7 @@ def build_out_and_back(
         points.append(TrackPoint(len(points), x, y, z, roll, section, terrain_z))
 
     smooth_z(points, radius=1, passes=1, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
+    smooth_closed_xy(points, radius=2, passes=1, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
     apply_curvature_banking(points, design_speed_mps=design_speed_mps, max_bank_deg=max_bank_deg)
     smooth_roll(points, radius=2, passes=2)
     for idx, point in enumerate(points):
@@ -231,16 +251,14 @@ def smooth_closed_xy(
         for index, point in enumerate(points):
             xs = []
             ys = []
-            zs = []
             for offset in range(-radius, radius + 1):
                 sample = old[(index + offset) % count]
                 xs.append(sample[0])
                 ys.append(sample[1])
-                zs.append(sample[2])
             point.x = sum(xs) / len(xs)
             point.y = sum(ys) / len(ys)
             point.terrain_z = heightfield.sample_cm(point.x, point.y)
-            point.z = max(point.terrain_z + clearance_cm, sum(zs) / len(zs))
+            point.z = max(point.terrain_z + clearance_cm, point.z)
 
 
 def signed_curvature_xy(points: list[TrackPoint], index: int) -> float:
@@ -350,11 +368,11 @@ def write_overlay(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--target-length-m", type=float, default=5000.0)
-    parser.add_argument("--spacing-m", type=float, default=35.0)
+    parser.add_argument("--spacing-m", type=float, default=25.0)
     parser.add_argument("--clearance-m", type=float, default=24.0)
     parser.add_argument("--outbound-offset-m", type=float, default=72.0)
     parser.add_argument("--return-offset-m", type=float, default=148.0)
-    parser.add_argument("--return-extra-height-m", type=float, default=32.0)
+    parser.add_argument("--return-extra-height-m", type=float, default=12.0)
     parser.add_argument("--design-speed-mps", type=float, default=22.0)
     parser.add_argument("--max-bank-deg", type=float, default=70.0)
     parser.add_argument("--out", default="Content/Generated/YarlungLandscape/YarlungTrack.csv")

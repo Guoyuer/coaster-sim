@@ -279,6 +279,8 @@ def main() -> None:
     parser.add_argument("--max-vert-g", type=float, default=5.5)
     parser.add_argument("--max-long-g", type=float, default=2.5)
     parser.add_argument("--max-grade-pct", type=float, default=65.0)
+    parser.add_argument("--airtime-target-g", type=float, default=-0.3)
+    parser.add_argument("--min-airtime-samples", type=int, default=2)
     args = parser.parse_args()
 
     root = Path.cwd()
@@ -301,6 +303,7 @@ def main() -> None:
     max_long_g = 0.0
     min_speed = 1.0e9
     max_speed = 0.0
+    airtime_samples = 0
     speed_mps = clamp(args.initial_speed_mps, args.min_speed_mps, args.max_speed_mps)
 
     for index, sample in enumerate(samples):
@@ -331,6 +334,8 @@ def main() -> None:
             violation_reasons.append("vert_g")
         if abs(long_g) > args.max_long_g:
             violation_reasons.append("long_g")
+        if sample.section == "Outbound" and vert_g <= args.airtime_target_g:
+            airtime_samples += 1
 
         min_clearance = min(min_clearance, clearance_m)
         min_radius = min(min_radius, radius_m)
@@ -383,8 +388,16 @@ def main() -> None:
         f"min_radius={min_radius:.1f}m max_grade={max_grade:.1f}% "
         f"speed_range={min_speed:.1f}-{max_speed:.1f}mps "
         f"est_max_lat_g={max_lat_g:.2f} est_vert_g={min_vert_g:.2f}/{max_vert_g:.2f} est_max_long_g={max_long_g:.2f} "
+        f"airtime_samples={airtime_samples}@<={args.airtime_target_g:.2f}G "
         f"violations={violations} csv={args.out_csv} plot={args.out_png}"
     )
+    if airtime_samples < args.min_airtime_samples:
+        print(
+            f"airtime gate failed: samples={airtime_samples} target={args.airtime_target_g:.2f}G "
+            f"required={args.min_airtime_samples}",
+            file=sys.stderr,
+        )
+        violations += 1
     if violations:
         sys.exit(1)
 

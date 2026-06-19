@@ -70,18 +70,18 @@
   },
   "track": {
     "path": "Content/Generated/YarlungLandscape/YarlungTrack.csv",
-    "length_m": 5230.25,
-    "control_point_count": 144,
-    "out_back_split_m": 2615.13,
-    "min_clearance_m": 24.12,
+    "length_m": 5053.78,
+    "control_point_count": 198,
+    "out_back_split_m": 2526.89,
+    "min_clearance_m": 42.48,
     "section_distances_m": {
-      "Station": 249.0,
-      "Lift": 314.11,
-      "Outbound": 1981.02,
-      "Turnaround": 606.83,
-      "Return": 1476.22,
-      "Launch": 363.98,
-      "Brake": 239.08
+      "Station": 175.18,
+      "Lift": 310.71,
+      "Outbound": 2000.88,
+      "Turnaround": 493.39,
+      "Return": 1459.5,
+      "Launch": 368.51,
+      "Brake": 245.6
     },
     "banking": {
       "roll_source": "curvature-derived",
