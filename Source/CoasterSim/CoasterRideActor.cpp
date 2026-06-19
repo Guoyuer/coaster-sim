@@ -149,8 +149,8 @@ ACoasterRideActor::ACoasterRideActor()
     SunLight->SetupAttachment(SceneRoot);
     SunLight->SetRelativeRotation(FRotator(-42.0f, -18.0f, 0.0f));
     SunLight->SetIntensity(32.0f);
-    SunLight->SetTemperature(5600.0f);
-    SunLight->SetLightColor(FLinearColor(1.0f, 0.98f, 0.90f));
+    SunLight->SetTemperature(6500.0f);
+    SunLight->SetLightColor(FLinearColor(1.0f, 1.0f, 1.0f));
     SunLight->SetAtmosphereSunLight(true);
     SunLight->SetAtmosphereSunLightIndex(0);
 
@@ -826,11 +826,11 @@ void ACoasterRideActor::ApplyVisualMaterials()
         Material->SetScalarParameterValue(TEXT("Specular"), 0.10f);
     };
 
-    TintComponent(TrainBody, FLinearColor(0.12f, 0.10f, 0.085f));
-    TintComponent(LeftRail, FLinearColor(0.55f, 0.57f, 0.56f));
-    TintComponent(RightRail, FLinearColor(0.55f, 0.57f, 0.56f));
-    TintComponent(Ties, FLinearColor(0.22f, 0.18f, 0.13f));
-    TintComponent(Supports, FLinearColor(0.38f, 0.42f, 0.44f));
+    TintComponent(TrainBody, FLinearColor(0.09f, 0.10f, 0.11f));
+    TintComponent(LeftRail, FLinearColor(0.22f, 0.25f, 0.27f));
+    TintComponent(RightRail, FLinearColor(0.22f, 0.25f, 0.27f));
+    TintComponent(Ties, FLinearColor(0.13f, 0.12f, 0.105f));
+    TintComponent(Supports, FLinearColor(0.20f, 0.24f, 0.27f));
     TintComponent(RiverSurface, FLinearColor(0.035f, 0.24f, 0.27f));
     TintComponent(Rapids, FLinearColor(0.44f, 0.56f, 0.50f));
     TintComponent(MistBands, FLinearColor(0.50f, 0.56f, 0.52f));

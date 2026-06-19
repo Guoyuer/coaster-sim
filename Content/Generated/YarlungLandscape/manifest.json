@@ -1,11 +1,14 @@
 {
   "name": "Yarlung Tsangpo cinematic canyon landscape",
-  "heightmap": "YarlungTsangpo_505.r16",
+  "heightmap": "YarlungTsangpo_1009.r16",
   "preview": "YarlungTsangpo_preview.ppm",
   "masks_preview": "YarlungTsangpo_masks.ppm",
+  "macro_albedo": "SourceAssets\\Generated\\YarlungLandscape\\YarlungTsangpo_macro_albedo.tga",
+  "macro_masks": "SourceAssets\\Generated\\YarlungLandscape\\YarlungTsangpo_macro_masks.tga",
+  "macro_roughness": "SourceAssets\\Generated\\YarlungLandscape\\YarlungTsangpo_macro_roughness.tga",
   "resolution": [
-    505,
-    505
+    1009,
+    1009
   ],
   "format": "little-endian uint16 raw",
   "world_bounds_cm": {
@@ -18,13 +21,13 @@
     "encoded_min": -360.0,
     "encoded_max": 3900.0,
     "min_cm": -325.5481721789654,
-    "max_cm": 3400.4496318162455
+    "max_cm": 3400.5129609716564
   },
   "unreal_import": {
     "landscape_section_size": 63,
     "sections_per_component": 1,
-    "component_count": "8 x 8",
-    "xy_scale_cm": 32.54,
+    "component_count": "16 x 16",
+    "xy_scale_cm": 16.27,
     "z_scale_note": "Set Z scale so the encoded 3950 cm range maps to the desired mountain relief.",
     "material_layers": [
       "River",

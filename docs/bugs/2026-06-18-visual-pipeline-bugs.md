@@ -4,14 +4,20 @@ This records the visual/asset bugs found during the Yarlung Tsangpo canyon itera
 
 ## Open
 
+### Visual target still below photo-real / 3A bar
+
+- Symptom: `Saved/VisualCheck-aaa-cool-steel-t10s.png` and `Saved/VisualCheck-aaa-cool-steel-t15s.png` are now green/daylight, but still read as stylized procedural terrain rather than photo-real Yarlung/Nyingchi scenery.
+- Current diagnosis: the pipeline now imports the intended landscape material, but the project still needs higher-frequency terrain displacement/detail, real vegetation scatter, cooler wet rock layering, and less primitive coaster/support geometry.
+- Next action: continue with a higher-ceiling asset route: Nanite rock clusters, instanced vegetation, better river shader/foam, and camera validation shots outside the first-person coaster path.
+
 ### Landscape macro albedo renders warm/orange in game
 
 - Symptom: `Saved/VisualCheck-aaa-1009-cool-t10s.png` still shows brown/orange slopes, even though the generated source macro albedo is cool gray-green.
 - Evidence: pixel sampling on the screenshot averaged warm brown values around `(139, 124, 101)`, while the source macro albedo preview is visually cool gray-green.
 - Evidence: `scripts/inspect-yarlung-material.py` confirmed `M_YarlungLandscapeGround` BaseColor is connected to `/Game/Generated/Materials/YarlungMacro/T_YarlungMacroAlbedo`.
-- Current diagnosis: not just a monitor/HDR issue. Windows HDR or video enhancement may affect perceived display, but the saved PNG is already warm. The likely root is Unreal texture import/color handling, texture source format handling, or material sampling.
-- Current mitigation: changed generated macro texture sources from BMP to uncompressed TGA in `scripts/generate-yarlung-landscape-assets.py` and `scripts/create-coaster-materials.py`.
-- Next action: re-import from TGA, inspect the imported `T_YarlungMacroAlbedo` asset pixel/color settings, then re-run multi-position screenshots before committing the visual change.
+- Current diagnosis: not just a monitor/HDR issue. Windows HDR or video enhancement may affect perceived display, but the saved PNG is already warm. The root cause found afterward was pipeline-level: UE Python reported a material graph error while still returning process exit code 0, and `YarlungLandscapeImportCommandlet.cpp` then silently fell back to `M_CoasterTint`.
+- Fix: `scripts/create-coaster-materials.py` now writes a success marker only after the landscape material graph is rebuilt; `scripts/import-yarlung-landscape.ps1` checks that marker and the generated material/model assets; `YarlungLandscapeImportCommandlet.cpp` now fails if `M_YarlungLandscapeGround` is missing instead of using fallback materials.
+- Follow-up: generated macro texture sources are now uncompressed TGA, the source albedo average is green-dominant, and the latest validation shots show wet green slopes instead of the earlier red canyon look. Residual warm sun bands remain a visual tuning issue, not the original hidden fallback bug.
 
 ### Terrain surface still exposes grid/contour artifacts
 
@@ -28,6 +34,13 @@ This records the visual/asset bugs found during the Yarlung Tsangpo canyon itera
 - Next action: if needed, capture a reference screenshot with Windows HDR off and compare raw image pixel averages. Treat HDR as a validation variable, not the main fix.
 
 ## Fixed Or Removed
+
+### Hidden landscape material fallback
+
+- Symptom: the landscape import appeared to succeed while screenshots still showed the wrong warm/brown material.
+- Root cause: `scripts/create-coaster-materials.py` could fail inside UE Python, but `UnrealEditor-Cmd.exe -ExecutePythonScript=...` still returned 0. The import commandlet then loaded `M_CoasterTint` or engine default material as a fallback.
+- Fix: added material-generation success marker checks in `scripts/import-yarlung-landscape.ps1` and removed fallback material loading from `YarlungLandscapeImportCommandlet.cpp`.
+- Lesson: headless UE scripts need explicit artifact/sentinel validation; process exit code alone is not enough.
 
 ### Bad low-ceiling procedural forest/rock overlay
 
@@ -62,3 +75,4 @@ This records the visual/asset bugs found during the Yarlung Tsangpo canyon itera
 - `scripts/visual-check.ps1` is still the fastest useful validation path for this project: build if needed, run game, capture multiple time offsets.
 - UE Python stdout is not always visible in terminal; inspect `Saved/Logs/CoasterSim.log` for script output such as `[YARLUNG-MATERIAL]`.
 - `scripts/inspect-yarlung-material.py` was added as a small read-only material introspection helper while debugging the orange landscape issue.
+- `scripts/export-yarlung-macro-texture.py` exports the imported UE macro albedo texture so source TGA, UE asset, and final PNG pixels can be compared separately.

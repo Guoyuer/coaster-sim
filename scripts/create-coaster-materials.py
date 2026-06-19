@@ -4,8 +4,10 @@ import unreal
 PACKAGE_PATH = "/Game/Generated/Materials"
 LEAFY_GRASS_PACKAGE_PATH = f"{PACKAGE_PATH}/PolyHaven/LeafyGrass"
 AERIAL_GRASS_ROCK_PACKAGE_PATH = f"{PACKAGE_PATH}/PolyHaven/AerialGrassRock"
+YARLUNG_MACRO_PACKAGE_PATH = f"{PACKAGE_PATH}/YarlungMacro"
 TINT_MATERIAL_NAME = "M_CoasterTint"
 LANDSCAPE_MATERIAL_NAME = "M_YarlungLandscapeGround"
+SUCCESS_MARKER = "material-generation-ok.txt"
 LEAFY_GRASS_SOURCE_DIR = "SourceAssets/PolyHaven/leafy_grass"
 LEAFY_GRASS_TEXTURES = {
     "T_LeafyGrass_Diffuse": ("leafy_grass_diff_4k.jpg", True, unreal.TextureCompressionSettings.TC_DEFAULT),
@@ -19,6 +21,12 @@ AERIAL_GRASS_ROCK_TEXTURES = {
     "T_AerialGrassRock_Normal": ("aerial_grass_rock_nor_gl_2k.jpg", False, unreal.TextureCompressionSettings.TC_NORMALMAP),
     "T_AerialGrassRock_Rough": ("aerial_grass_rock_rough_2k.jpg", False, unreal.TextureCompressionSettings.TC_DEFAULT),
     "T_AerialGrassRock_AO": ("aerial_grass_rock_ao_2k.jpg", False, unreal.TextureCompressionSettings.TC_DEFAULT),
+}
+YARLUNG_MACRO_SOURCE_DIR = "SourceAssets/Generated/YarlungLandscape"
+YARLUNG_MACRO_TEXTURES = {
+    "T_YarlungMacroAlbedo": ("YarlungTsangpo_macro_albedo.tga", True, unreal.TextureCompressionSettings.TC_DEFAULT),
+    "T_YarlungMacroMasks": ("YarlungTsangpo_macro_masks.tga", False, unreal.TextureCompressionSettings.TC_DEFAULT),
+    "T_YarlungMacroRoughness": ("YarlungTsangpo_macro_roughness.tga", False, unreal.TextureCompressionSettings.TC_DEFAULT),
 }
 
 
@@ -104,7 +112,7 @@ def create_constant(material, value, x, y):
     return expression
 
 
-def create_texture_sample(material, texture, x, y):
+def create_texture_sample(material, texture, x, y, coordinates=None):
     expression = unreal.MaterialEditingLibrary.create_material_expression(
         material,
         unreal.MaterialExpressionTextureSample,
@@ -112,6 +120,35 @@ def create_texture_sample(material, texture, x, y):
         y,
     )
     expression.set_editor_property("texture", texture)
+    if coordinates is not None:
+        connected = False
+        for input_name in ("Coordinates", "UVs"):
+            connected = unreal.MaterialEditingLibrary.connect_material_expressions(
+                coordinates,
+                "",
+                expression,
+                input_name,
+            )
+            if connected:
+                break
+        if not connected:
+            raise RuntimeError(f"Unable to connect texture coordinates for {texture.get_name()}")
+    return expression
+
+
+def create_landscape_coords(material, x, y):
+    expression = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionLandscapeLayerCoords,
+        x,
+        y,
+    )
+    expression.set_editor_property("mapping_type", unreal.TerrainCoordMappingType.TCMT_XY)
+    expression.set_editor_property("custom_uv_type", unreal.LandscapeCustomizedCoordType.LCCT_NONE)
+    expression.set_editor_property("mapping_scale", 1009.0)
+    expression.set_editor_property("mapping_rotation", 0.0)
+    expression.set_editor_property("mapping_pan_u", 0.0)
+    expression.set_editor_property("mapping_pan_v", 0.0)
     return expression
 
 
@@ -186,22 +223,18 @@ def create_tint_material():
     finalize_material(material)
 
 
-def create_landscape_material(textures):
-    material = create_material_asset(LANDSCAPE_MATERIAL_NAME, PACKAGE_PATH, replace_existing=True)
+def create_landscape_material(detail_textures, macro_textures):
+    material = create_material_asset(LANDSCAPE_MATERIAL_NAME, PACKAGE_PATH)
+    unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
+    macro_coordinates = create_landscape_coords(material, -1240, -40)
 
     connect_material_property(
         material,
-        create_constant3(material, unreal.LinearColor(0.038, 0.26, 0.082, 1.0), -760, -260),
+        create_texture_sample(material, macro_textures["T_YarlungMacroAlbedo"], -980, -320, macro_coordinates),
         unreal.MaterialProperty.MP_BASE_COLOR,
         "landscape BaseColor",
     )
-    connect_material_property(
-        material,
-        create_texture_sample(material, textures["T_AerialGrassRock_Normal"], -760, -20),
-        unreal.MaterialProperty.MP_NORMAL,
-        "landscape Normal",
-    )
-    roughness = create_texture_sample(material, textures["T_AerialGrassRock_Rough"], -760, 220)
+    roughness = create_texture_sample(material, macro_textures["T_YarlungMacroRoughness"], -980, 220, macro_coordinates)
     connected = unreal.MaterialEditingLibrary.connect_material_property(
         roughness,
         "R",
@@ -209,7 +242,7 @@ def create_landscape_material(textures):
     )
     if not connected:
         raise RuntimeError("Unable to connect landscape Roughness")
-    ambient_occlusion = create_texture_sample(material, textures["T_AerialGrassRock_AO"], -760, 460)
+    ambient_occlusion = create_texture_sample(material, detail_textures["T_AerialGrassRock_AO"], -980, 460)
     connected = unreal.MaterialEditingLibrary.connect_material_property(
         ambient_occlusion,
         "R",
@@ -231,6 +264,7 @@ def main():
     ensure_folder(PACKAGE_PATH)
     ensure_folder(LEAFY_GRASS_PACKAGE_PATH)
     ensure_folder(AERIAL_GRASS_ROCK_PACKAGE_PATH)
+    ensure_folder(YARLUNG_MACRO_PACKAGE_PATH)
     create_tint_material()
     import_textures(LEAFY_GRASS_PACKAGE_PATH, LEAFY_GRASS_SOURCE_DIR, LEAFY_GRASS_TEXTURES)
     aerial_grass_rock_textures = import_textures(
@@ -238,7 +272,17 @@ def main():
         AERIAL_GRASS_ROCK_SOURCE_DIR,
         AERIAL_GRASS_ROCK_TEXTURES,
     )
-    create_landscape_material(aerial_grass_rock_textures)
+    yarlung_macro_textures = import_textures(
+        YARLUNG_MACRO_PACKAGE_PATH,
+        YARLUNG_MACRO_SOURCE_DIR,
+        YARLUNG_MACRO_TEXTURES,
+    )
+    create_landscape_material(aerial_grass_rock_textures, yarlung_macro_textures)
+    marker_path = unreal.Paths.convert_relative_path_to_full(
+        unreal.Paths.project_saved_dir() + SUCCESS_MARKER
+    )
+    with open(marker_path, "w", encoding="utf-8") as marker:
+        marker.write("ok\n")
 
 
 main()

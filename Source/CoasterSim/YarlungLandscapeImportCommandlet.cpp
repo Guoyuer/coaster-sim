@@ -24,7 +24,7 @@ UYarlungLandscapeImportCommandlet::UYarlungLandscapeImportCommandlet()
 int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
 {
 #if WITH_EDITOR
-    constexpr int32 HeightmapSize = 505;
+    constexpr int32 HeightmapSize = 1009;
     constexpr float MinX = -4200.0f;
     constexpr float MaxX = 12200.0f;
     constexpr float MinY = -10500.0f;
@@ -36,7 +36,7 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
 
     const FString HeightmapPath = FPaths::ConvertRelativePathToFull(FPaths::Combine(
         FPaths::ProjectContentDir(),
-        TEXT("Generated/YarlungLandscape/YarlungTsangpo_505.r16")));
+        TEXT("Generated/YarlungLandscape/YarlungTsangpo_1009.r16")));
     const FString MapPackagePath = TEXT("/Game/Generated/YarlungLandscape/YarlungLandscape_Level");
 
     TArray<uint8> RawBytes;
@@ -125,18 +125,12 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
     UMaterialInterface* LandscapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_YarlungLandscapeGround.M_YarlungLandscapeGround"));
     if (!LandscapeMaterial)
     {
-        LandscapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
+        UE_LOG(LogTemp, Error, TEXT("Missing required Yarlung landscape material: /Game/Generated/Materials/M_YarlungLandscapeGround.M_YarlungLandscapeGround"));
+        return 1;
     }
-    if (!LandscapeMaterial)
-    {
-        LandscapeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
-    }
-    if (LandscapeMaterial)
-    {
-        Landscape->LandscapeMaterial = LandscapeMaterial;
-        Landscape->UpdateAllComponentMaterialInstances(true);
-        UE_LOG(LogTemp, Display, TEXT("Assigned Yarlung landscape material: %s"), *LandscapeMaterial->GetPathName());
-    }
+    Landscape->LandscapeMaterial = LandscapeMaterial;
+    Landscape->UpdateAllComponentMaterialInstances(true);
+    UE_LOG(LogTemp, Display, TEXT("Assigned Yarlung landscape material: %s"), *LandscapeMaterial->GetPathName());
 
     Landscape->PostEditChange();
 
