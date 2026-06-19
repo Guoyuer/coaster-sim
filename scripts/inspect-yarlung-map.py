@@ -79,10 +79,19 @@ def main():
             if component.get_name() in FORBIDDEN_RIDE_COMPONENTS:
                 raise RuntimeError(f"Forbidden legacy component is still present: {component.get_name()}")
             material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
+            instance_suffix = ""
+            if hasattr(component, "get_instance_count"):
+                instance_suffix = f" instances={component.get_instance_count()}"
             emit(
                 f"[YARLUNG-INSPECT] ride_component={component.get_name()} "
                 f"class={component.get_class().get_name()} hidden={component.get_editor_property('hidden_in_game')} "
-                f"materials={material_names}"
+                f"materials={material_names}{instance_suffix}"
+            )
+        for component in actor.get_components_by_class(unreal.ExponentialHeightFogComponent):
+            location = component.get_editor_property("relative_location")
+            emit(
+                f"[YARLUNG-INSPECT] fog_component={component.get_name()} "
+                f"relative_z_cm={location.z:.1f}"
             )
 
     river_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungRiverActor")]

@@ -16,6 +16,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/CommandLine.h"
+#include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/Parse.h"
 #include "UObject/ConstructorHelpers.h"
@@ -25,6 +26,7 @@ namespace
 constexpr float CmPerMeter = 100.0f;
 constexpr float GravityCms2 = 980.665f;
 constexpr float RiverZCm = 265200.0f;
+constexpr float FallbackGeneratedRiverSurfaceZCm = 267655.0f;
 constexpr float YarlungRiverAnchorXCm = 95543.0f;
 constexpr float YarlungRiverAnchorYCm = -142330.0f;
 
@@ -42,6 +44,39 @@ using YarlungCoaster::Smooth01;
 float Hash01(float A, float B)
 {
     return FMath::Frac(FMath::Sin(A * 12.9898f + B * 78.233f) * 43758.5453f);
+}
+
+bool LoadGeneratedRiverAverageZCm(float& OutZCm)
+{
+    const FString Path = FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungRiver.csv");
+    TArray<FString> Lines;
+    if (!FFileHelper::LoadFileToStringArray(Lines, *Path))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Unable to read Yarlung river CSV for fog anchor: %s"), *Path);
+        return false;
+    }
+
+    double SumZ = 0.0;
+    int32 Count = 0;
+    for (int32 LineIndex = 1; LineIndex < Lines.Num(); ++LineIndex)
+    {
+        TArray<FString> Columns;
+        Lines[LineIndex].ParseIntoArray(Columns, TEXT(","), true);
+        if (Columns.Num() >= 4)
+        {
+            SumZ += FCString::Atod(*Columns[3]);
+            ++Count;
+        }
+    }
+
+    if (Count == 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Yarlung river CSV has no usable fog-anchor samples: %s"), *Path);
+        return false;
+    }
+
+    OutZCm = static_cast<float>(SumZ / static_cast<double>(Count));
+    return true;
 }
 
 float YarlungRiverCenterY(float X)
@@ -167,7 +202,7 @@ ACoasterRideActor::ACoasterRideActor()
 
     ValleyFog = CreateDefaultSubobject<UExponentialHeightFogComponent>(TEXT("ValleyFog"));
     ValleyFog->SetupAttachment(SceneRoot);
-    ValleyFog->SetRelativeLocation(FVector(0.0f, 0.0f, RiverZCm + 70.0f));
+    ValleyFog->SetRelativeLocation(FVector(0.0f, 0.0f, FallbackGeneratedRiverSurfaceZCm + 70.0f));
     ValleyFog->SetFogDensity(0.000020f);
     ValleyFog->SetFogHeightFalloff(0.40f);
     ValleyFog->SetFogMaxOpacity(0.035f);
@@ -322,6 +357,13 @@ void ACoasterRideActor::RebuildSpline()
     }
 
     TrackLengthCm = TrackSpline->GetTrackLengthCm();
+
+    float RiverSurfaceZCm = FallbackGeneratedRiverSurfaceZCm;
+    if (LoadGeneratedRiverAverageZCm(RiverSurfaceZCm))
+    {
+        UE_LOG(LogTemp, Display, TEXT("Anchored valley fog to generated Yarlung river average Z: %.1fcm"), RiverSurfaceZCm);
+    }
+    ValleyFog->SetRelativeLocation(FVector(0.0f, 0.0f, RiverSurfaceZCm + 70.0f));
 }
 
 void ACoasterRideActor::RebuildVisuals()
@@ -387,8 +429,9 @@ void ACoasterRideActor::RebuildVisuals()
             const FVector YokeCenter = Location - Up * 62.0f;
             const FVector YokeLeft = YokeCenter - Right * (RailHalfGauge + 34.0f);
             const FVector YokeRight = YokeCenter + Right * (RailHalfGauge + 34.0f);
-            const FVector LeftFoot = FVector(YokeLeft.X, YokeLeft.Y, RiverZCm - 35.0f);
-            const FVector RightFoot = FVector(YokeRight.X, YokeRight.Y, RiverZCm - 35.0f);
+            const float TerrainFootZ = TrackSpline->GetGeneratedTerrainZAtDistance(Distance) - 35.0f;
+            const FVector LeftFoot = FVector(YokeLeft.X, YokeLeft.Y, TerrainFootZ);
+            const FVector RightFoot = FVector(YokeRight.X, YokeRight.Y, TerrainFootZ);
 
             Supports->AddInstance(MakeSegmentTransform(YokeLeft, YokeRight, FVector(RailGaugeCm + 68.0f, 10.0f, 10.0f)));
             Supports->AddInstance(MakeSegmentTransform(LeftFoot, YokeLeft, FVector(YokeLeft.Z, 9.0f, 9.0f)));

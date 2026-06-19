@@ -13,6 +13,7 @@ bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
         SectionRanges.Reset();
         GeneratedRollSampleDistancesCm.Reset();
         GeneratedRollDegrees.Reset();
+        GeneratedTerrainZCm.Reset();
         UpdateSpline();
         return false;
     }
@@ -20,6 +21,7 @@ bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
     TArray<FVector> Points;
     TArray<ECoasterSection> Sections;
     TArray<float> RollDegrees;
+    TArray<float> TerrainZCm;
 
     for (int32 LineIndex = 1; LineIndex < Lines.Num(); ++LineIndex)
     {
@@ -38,6 +40,7 @@ bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
             SectionRanges.Reset();
             GeneratedRollSampleDistancesCm.Reset();
             GeneratedRollDegrees.Reset();
+            GeneratedTerrainZCm.Reset();
             UpdateSpline();
             return false;
         }
@@ -48,6 +51,7 @@ bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
             FCString::Atof(*Columns[3])));
         RollDegrees.Add(FCString::Atof(*Columns[4]));
         Sections.Add(ParseSectionName(Columns[5]));
+        TerrainZCm.Add(FCString::Atof(*Columns[6]));
     }
 
     if (Points.Num() < 4)
@@ -57,12 +61,14 @@ bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
         SectionRanges.Reset();
         GeneratedRollSampleDistancesCm.Reset();
         GeneratedRollDegrees.Reset();
+        GeneratedTerrainZCm.Reset();
         UpdateSpline();
         return false;
     }
 
     RebuildFromControlPoints(Points);
     GeneratedRollDegrees = MoveTemp(RollDegrees);
+    GeneratedTerrainZCm = MoveTemp(TerrainZCm);
     BuildSectionRanges(Points, Sections);
 
     UE_LOG(LogTemp, Display, TEXT("Loaded generated coaster track: %s (%d points, %.1fm)"),
@@ -78,6 +84,7 @@ void UCoasterTrackComponent::RebuildFromControlPoints(const TArray<FVector>& Con
     SectionRanges.Reset();
     GeneratedRollSampleDistancesCm.Reset();
     GeneratedRollDegrees.Reset();
+    GeneratedTerrainZCm.Reset();
 
     for (int32 Index = 0; Index < ControlPoints.Num(); ++Index)
     {
@@ -205,6 +212,39 @@ float UCoasterTrackComponent::GetGeneratedBankRadiansAtDistance(float DistanceCm
     }
 
     return FMath::DegreesToRadians(GeneratedRollDegrees.Last());
+}
+
+float UCoasterTrackComponent::GetGeneratedTerrainZAtDistance(float DistanceCm) const
+{
+    if (GeneratedTerrainZCm.Num() < 2 || GeneratedRollSampleDistancesCm.Num() != GeneratedTerrainZCm.Num() + 1)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Generated coaster terrain samples are unavailable; using zero terrain height."));
+        return 0.0f;
+    }
+
+    const float TrackLengthCm = GetTrackLengthCm();
+    float WrappedDistance = FMath::Fmod(DistanceCm, TrackLengthCm);
+    if (WrappedDistance < 0.0f)
+    {
+        WrappedDistance += TrackLengthCm;
+    }
+
+    for (int32 Index = 0; Index < GeneratedTerrainZCm.Num(); ++Index)
+    {
+        const float StartDistance = GeneratedRollSampleDistancesCm[Index];
+        const float EndDistance = GeneratedRollSampleDistancesCm[Index + 1];
+        if (WrappedDistance >= StartDistance && WrappedDistance < EndDistance)
+        {
+            const float Alpha = (EndDistance > StartDistance)
+                ? (WrappedDistance - StartDistance) / (EndDistance - StartDistance)
+                : 0.0f;
+            const float StartZ = GeneratedTerrainZCm[Index];
+            const float EndZ = GeneratedTerrainZCm[(Index + 1) % GeneratedTerrainZCm.Num()];
+            return FMath::Lerp(StartZ, EndZ, Alpha);
+        }
+    }
+
+    return GeneratedTerrainZCm.Last();
 }
 
 FName UCoasterTrackComponent::SectionName(ECoasterSection Section)

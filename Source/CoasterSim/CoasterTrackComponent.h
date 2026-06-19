@@ -45,6 +45,7 @@ public:
     ECoasterSection GetSectionAtDistance(float DistanceCm) const;
     FName GetSectionNameAtDistance(float DistanceCm) const;
     float GetGeneratedBankRadiansAtDistance(float DistanceCm) const;
+    float GetGeneratedTerrainZAtDistance(float DistanceCm) const;
 
     static FName SectionName(ECoasterSection Section);
 
@@ -55,4 +56,5 @@ private:
     TArray<FCoasterSectionRange> SectionRanges;
     TArray<float> GeneratedRollSampleDistancesCm;
     TArray<float> GeneratedRollDegrees;
+    TArray<float> GeneratedTerrainZCm;
 };
