@@ -44,6 +44,7 @@ public:
     FName GetLegacySectionName(float TrackRatio) const;
     ECoasterSection GetSectionAtDistance(float DistanceCm) const;
     FName GetSectionNameAtDistance(float DistanceCm) const;
+    float GetGeneratedBankRadiansAtDistance(float DistanceCm) const;
 
     static FName SectionName(ECoasterSection Section);
 
@@ -52,5 +53,6 @@ private:
     void BuildSectionRanges(const TArray<FVector>& Points, const TArray<ECoasterSection>& Sections);
 
     TArray<FCoasterSectionRange> SectionRanges;
+    TArray<float> GeneratedRollSampleDistancesCm;
     TArray<float> GeneratedRollDegrees;
 };

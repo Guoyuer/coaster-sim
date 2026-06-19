@@ -32,6 +32,8 @@ SECTION_COLORS = {
     "Brake": (255, 50, 50),
 }
 
+GRAVITY_MPS2 = 9.80665
+
 
 def extract_thalweg(heightfield: Heightfield, step_x: int = 5, search_radius: int = 70) -> list[tuple[float, float, float]]:
     width = heightfield.width
@@ -119,6 +121,8 @@ def build_out_and_back(
     outbound_offset_m: float,
     return_offset_m: float,
     return_extra_height_m: float,
+    design_speed_mps: float,
+    max_bank_deg: float,
 ) -> list[TrackPoint]:
     thalweg_resampled = resample_polyline(thalweg, spacing_m * 100.0)
     outbound_length_cm = target_length_m * 100.0 * 0.5
@@ -143,7 +147,7 @@ def build_out_and_back(
         design_z = station_z - descent_drop + airtime
         z = max(terrain_z + clearance_m * 100.0, design_z)
         section = section_for("outbound", ratio)
-        roll = 18.0 * math.sin(ratio * math.pi * 5.0)
+        roll = 0.0
         points.append(TrackPoint(len(points), x, y, z, roll, section, terrain_z))
 
     return_center = list(reversed(outbound_center))
@@ -162,10 +166,12 @@ def build_out_and_back(
             design_z = design_z * (1.0 - blend) + station_z * blend
         z = max(terrain_z + (clearance_m + 6.0) * 100.0, design_z)
         section = section_for("return", ratio)
-        roll = -16.0 * math.sin(ratio * math.pi * 5.0)
+        roll = 0.0
         points.append(TrackPoint(len(points), x, y, z, roll, section, terrain_z))
 
     smooth_z(points, radius=2, passes=2, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
+    apply_curvature_banking(points, design_speed_mps=design_speed_mps, max_bank_deg=max_bank_deg)
+    smooth_roll(points, radius=2, passes=2)
     for idx, point in enumerate(points):
         point.idx = idx
     return points
@@ -225,7 +231,53 @@ def smooth_closed_xy(
             point.z = max(point.terrain_z + clearance_cm, sum(zs) / len(zs))
 
 
-def update_manifest(root: Path, track_path: Path, points: list[TrackPoint]) -> dict[str, object]:
+def signed_curvature_xy(points: list[TrackPoint], index: int) -> float:
+    count = len(points)
+    previous = points[(index - 1) % count]
+    current = points[index]
+    next_point = points[(index + 1) % count]
+    ax, ay = current.x - previous.x, current.y - previous.y
+    bx, by = next_point.x - current.x, next_point.y - current.y
+    len_a = math.hypot(ax, ay)
+    len_b = math.hypot(bx, by)
+    if len_a < 1.0 or len_b < 1.0:
+        return 0.0
+    ux, uy = ax / len_a, ay / len_a
+    vx, vy = bx / len_b, by / len_b
+    dot = max(-1.0, min(1.0, ux * vx + uy * vy))
+    angle = math.acos(dot)
+    cross = ux * vy - uy * vx
+    average_length_m = (len_a + len_b) * 0.5 / 100.0
+    if average_length_m <= 0.01:
+        return 0.0
+    return math.copysign(angle / average_length_m, cross)
+
+
+def apply_curvature_banking(points: list[TrackPoint], design_speed_mps: float, max_bank_deg: float) -> None:
+    max_bank_rad = math.radians(max_bank_deg)
+    for index, point in enumerate(points):
+        curvature = signed_curvature_xy(points, index)
+        bank_rad = math.atan((design_speed_mps * design_speed_mps * curvature) / GRAVITY_MPS2)
+        bank_rad = max(-max_bank_rad, min(max_bank_rad, bank_rad))
+        point.roll_deg = math.degrees(bank_rad)
+
+
+def smooth_roll(points: list[TrackPoint], radius: int, passes: int) -> None:
+    count = len(points)
+    for _ in range(passes):
+        old = [point.roll_deg for point in points]
+        for index, point in enumerate(points):
+            values = [old[(index + offset) % count] for offset in range(-radius, radius + 1)]
+            point.roll_deg = sum(values) / len(values)
+
+
+def update_manifest(
+    root: Path,
+    track_path: Path,
+    points: list[TrackPoint],
+    design_speed_mps: float,
+    max_bank_deg: float,
+) -> dict[str, object]:
     manifest_path = root / "Content/Generated/YarlungLandscape/manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     xyz = [(point.x, point.y, point.z) for point in points]
@@ -244,8 +296,13 @@ def update_manifest(root: Path, track_path: Path, points: list[TrackPoint]) -> d
         "out_back_split_m": round(length_cm / 200.0, 2),
         "min_clearance_m": round(min(clearances), 2),
         "section_distances_m": {key: round(value, 2) for key, value in section_distances.items()},
+        "banking": {
+            "roll_source": "curvature-derived",
+            "design_speed_mps": design_speed_mps,
+            "max_bank_deg": max_bank_deg,
+        },
         "generator": "scripts/generate-yarlung-track.py",
-        "note": "Generated scenic out-and-back track; runtime CSV integration begins in P2.",
+        "note": "Generated scenic out-and-back track with curvature-derived roll_deg for P3 comfort validation.",
     }
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest
@@ -286,6 +343,8 @@ def main() -> None:
     parser.add_argument("--outbound-offset-m", type=float, default=72.0)
     parser.add_argument("--return-offset-m", type=float, default=148.0)
     parser.add_argument("--return-extra-height-m", type=float, default=32.0)
+    parser.add_argument("--design-speed-mps", type=float, default=22.0)
+    parser.add_argument("--max-bank-deg", type=float, default=70.0)
     parser.add_argument("--out", default="Content/Generated/YarlungLandscape/YarlungTrack.csv")
     parser.add_argument("--overlay", default="Saved/Diagnostics/yarlung-track-overlay.png")
     args = parser.parse_args()
@@ -302,10 +361,12 @@ def main() -> None:
         outbound_offset_m=args.outbound_offset_m,
         return_offset_m=args.return_offset_m,
         return_extra_height_m=args.return_extra_height_m,
+        design_speed_mps=args.design_speed_mps,
+        max_bank_deg=args.max_bank_deg,
     )
     track_path = Path(args.out)
     write_track_csv(track_path, points)
-    manifest = update_manifest(root, track_path, points)
+    manifest = update_manifest(root, track_path, points, args.design_speed_mps, args.max_bank_deg)
     overlay = Path(args.overlay)
     write_overlay(root, heightfield, thalweg, points, overlay)
     track = manifest["track"]

@@ -11,6 +11,7 @@ bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
         UE_LOG(LogTemp, Error, TEXT("Generated coaster track CSV is required but missing: %s"), *CsvPath);
         ClearSplinePoints(false);
         SectionRanges.Reset();
+        GeneratedRollSampleDistancesCm.Reset();
         GeneratedRollDegrees.Reset();
         UpdateSpline();
         return false;
@@ -35,6 +36,7 @@ bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
             UE_LOG(LogTemp, Error, TEXT("Invalid YarlungTrack.csv row %d: expected 7 columns, got %d"), LineIndex + 1, Columns.Num());
             ClearSplinePoints(false);
             SectionRanges.Reset();
+            GeneratedRollSampleDistancesCm.Reset();
             GeneratedRollDegrees.Reset();
             UpdateSpline();
             return false;
@@ -53,6 +55,7 @@ bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
         UE_LOG(LogTemp, Error, TEXT("Generated coaster track CSV must contain at least 4 points: %s"), *CsvPath);
         ClearSplinePoints(false);
         SectionRanges.Reset();
+        GeneratedRollSampleDistancesCm.Reset();
         GeneratedRollDegrees.Reset();
         UpdateSpline();
         return false;
@@ -73,6 +76,7 @@ void UCoasterTrackComponent::RebuildFromControlPoints(const TArray<FVector>& Con
 {
     ClearSplinePoints(false);
     SectionRanges.Reset();
+    GeneratedRollSampleDistancesCm.Reset();
     GeneratedRollDegrees.Reset();
 
     for (int32 Index = 0; Index < ControlPoints.Num(); ++Index)
@@ -170,6 +174,39 @@ FName UCoasterTrackComponent::GetSectionNameAtDistance(float DistanceCm) const
     return SectionName(GetSectionAtDistance(DistanceCm));
 }
 
+float UCoasterTrackComponent::GetGeneratedBankRadiansAtDistance(float DistanceCm) const
+{
+    if (GeneratedRollDegrees.Num() < 2 || GeneratedRollSampleDistancesCm.Num() != GeneratedRollDegrees.Num() + 1)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Generated coaster roll samples are unavailable; using zero bank."));
+        return 0.0f;
+    }
+
+    const float TrackLengthCm = GetTrackLengthCm();
+    float WrappedDistance = FMath::Fmod(DistanceCm, TrackLengthCm);
+    if (WrappedDistance < 0.0f)
+    {
+        WrappedDistance += TrackLengthCm;
+    }
+
+    for (int32 Index = 0; Index < GeneratedRollDegrees.Num(); ++Index)
+    {
+        const float StartDistance = GeneratedRollSampleDistancesCm[Index];
+        const float EndDistance = GeneratedRollSampleDistancesCm[Index + 1];
+        if (WrappedDistance >= StartDistance && WrappedDistance < EndDistance)
+        {
+            const float Alpha = (EndDistance > StartDistance)
+                ? (WrappedDistance - StartDistance) / (EndDistance - StartDistance)
+                : 0.0f;
+            const float StartRoll = GeneratedRollDegrees[Index];
+            const float EndRoll = GeneratedRollDegrees[(Index + 1) % GeneratedRollDegrees.Num()];
+            return FMath::DegreesToRadians(FMath::Lerp(StartRoll, EndRoll, Alpha));
+        }
+    }
+
+    return FMath::DegreesToRadians(GeneratedRollDegrees.Last());
+}
+
 FName UCoasterTrackComponent::SectionName(ECoasterSection Section)
 {
     switch (Section)
@@ -254,8 +291,12 @@ void UCoasterTrackComponent::BuildSectionRanges(const TArray<FVector>& Points, c
     }
 
     const float SplineLengthCm = GetTrackLengthCm();
+    GeneratedRollSampleDistancesCm.Reset();
+    GeneratedRollSampleDistancesCm.Reserve(Points.Num() + 1);
     for (int32 Index = 0; Index < Points.Num(); ++Index)
     {
+        GeneratedRollSampleDistancesCm.Add(CumulativeChordDistances[Index] / TotalChordDistance * SplineLengthCm);
+
         FCoasterSectionRange Range;
         Range.StartDistanceCm = CumulativeChordDistances[Index] / TotalChordDistance * SplineLengthCm;
         Range.EndDistanceCm = CumulativeChordDistances[Index + 1] / TotalChordDistance * SplineLengthCm;
@@ -272,4 +313,5 @@ void UCoasterTrackComponent::BuildSectionRanges(const TArray<FVector>& Points, c
             SectionRanges.Add(Range);
         }
     }
+    GeneratedRollSampleDistancesCm.Add(SplineLengthCm);
 }

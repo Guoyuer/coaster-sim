@@ -760,8 +760,7 @@ void ACoasterRideActor::SampleFrame(float DistanceCm, FVector& OutLocation, FRot
 {
     const float WrappedDistance = FMath::Fmod(FMath::Max(DistanceCm, 0.0f), TrackLengthCm);
     TrackSpline->SampleBaseFrame(WrappedDistance, OutLocation, OutRotation, OutForward, OutRight, OutUp);
-    const float TrackRatio = WrappedDistance / TrackLengthCm;
-    CoasterBanking::ApplyBank(CoasterBanking::LegacyBankRadians(TrackRatio), OutForward, OutRight, OutUp);
+    CoasterBanking::ApplyBank(TrackSpline->GetGeneratedBankRadiansAtDistance(WrappedDistance), OutForward, OutRight, OutUp);
 
     OutRotation = FRotationMatrix::MakeFromXZ(OutForward, OutUp).Rotator();
 }

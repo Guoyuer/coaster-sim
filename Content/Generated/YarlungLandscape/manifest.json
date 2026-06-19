@@ -83,7 +83,12 @@
       "Launch": 343.98,
       "Brake": 269.11
     },
+    "banking": {
+      "roll_source": "curvature-derived",
+      "design_speed_mps": 22.0,
+      "max_bank_deg": 70.0
+    },
     "generator": "scripts/generate-yarlung-track.py",
-    "note": "Generated scenic out-and-back track; runtime CSV integration begins in P2."
+    "note": "Generated scenic out-and-back track with curvature-derived roll_deg for P3 comfort validation."
   }
 }
