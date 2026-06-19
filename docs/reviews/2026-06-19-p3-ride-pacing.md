@@ -55,3 +55,49 @@ The airtime is a uniform sinusoid along the whole outbound: `sin(ratio·π·30)�
 - Status: Open — comfort-gate condition closed; D9 airtime FAIL, P3 not Done on ride axis.
 - Progress link: `docs/plans/photoreal-progress.md`
 - Follow-up evidence: pending (re-run verifier showing ≥1 designed crest in the ejector envelope; turnaround radius ≥ draft floor).
+
+---
+
+# Re-review (redo: commit `9715049` "Resolve P3 airtime pacing")
+
+- Re-review date: 2026-06-19
+- Trigger: Codex redid airtime per the prior review's fix direction and marked the index row "SPLIT→RESOLVED / Closed". Independently re-verified (fresh `python scripts/verify-track-clearance.py`, CSV inspection).
+- Re-review verdict: **NOT RESOLVED. Still FAIL for marking P3 Done — for a deeper reason than before.** The narrow airtime question is genuinely fixed, but the redo surfaced (did not cause) a physics-feasibility failure: **the train stalls ~2 km in and is held up only by the 1.8 m/s min-speed clamp.**
+
+## What the redo genuinely fixed (credit where due)
+
+1. **Real ejector airtime now exists.** The uniform sine wash was replaced with 3 localized raised-cosine camelbacks (900/1210/1535 m) and the descent was concentrated early (`30000cm · smoothstep(0.08,0.36)`) so the train builds speed (peak 49.7 m/s) *before* the first crest. **Camelback #1 produces clean, smooth ejector airtime: vert_g −0.89G at ~979 m, radius ≈2400 m (large = smooth crest, NOT a clamp/kink spike), speed 40–43 m/s, lat ≈0.** This is real, not an artifact. The mechanism critique from the first review was correctly applied.
+2. **Real bug fixed in `smooth_closed_xy`** — it used to average Z (flattening crests); now it smooths XY only and preserves `point.z`. Finer 25 m spacing resolves the ~150 m-wide bumps. Both correct.
+3. **The new `airtime_samples` gate is a real hard gate** (`violations += 1` → `sys.exit(1)` if Outbound has <2 samples ≤ −0.30G). A legitimate lower-bound-on-excitement, addressing the prior "a flat ride trivially passes" gap.
+
+## Why it is still FAIL (the deeper blocker)
+
+**The ride is energy-infeasible; ~half the speed profile is non-physical clamp fiction.**
+
+Fresh run: `samples=1584 ... speed_range=1.8-49.7mps ... airtime_samples=6 violations=0`. CSV analysis:
+- **780 of 1584 samples (49%) are pinned at exactly the 1.8 m/s minimum-speed clamp**, continuously from 1585 m to 4974 m — the entire back-half Outbound + Turnaround + Return + into Brake.
+- Speed bleeds monotonically after camelback #1: 49.7 (820 m) → 40.9 → 21.1 → 8.7 (1570 m) → 3.9 (2005 m) → **1.8 (≈2160 m onward)**. **Physically the train valleys (stops) around 2000 m — it lacks the energy to reach the 2615 m turnaround.**
+- **355 samples are unpowered uphill climbs (grade >10%, not Lift/Launch) while pinned at 1.8 m/s** — incl. 20–26% grades in the Turnaround/Return. A train at walking pace cannot climb a 26% grade with no power; it would roll back. These segments are impossible.
+- The ride only "completes" because (a) both the verifier and the runtime `Clamp(180..5600 cm/s)` floor the speed at 1.8 m/s instead of letting it stall, and (b) the **Launch** at ~4350 m re-accelerates it from the floor to 34 m/s to get home.
+
+**Consequences:**
+1. **In the actual runtime (same 1.8 m/s clamp), the 1585–4350 m stretch is traversed at walking pace — ≈22.6 min of crawl** (integrated `Σ ds/v`). The real ride is ~45 s of drop+airtime, then ~20 min crawling the canyon, then a launch home. That is not "Done"; it is a broken ride.
+2. **All back-half comfort numbers are computed at the fictional 1.8 m/s**, where `v²·κ ≈ 0`, so lat/vert G are trivially ~1.0 and "0 violations" on the Return is **meaningless**. The comfort gate does not actually constrain the back half.
+3. **`min_radius` "improved" 8.7 → 19.7 m is illusory** — it is at the Turnaround where speed is the 1.8 m/s floor; the geometry is still a ~20–25 m-radius turnaround that only passes lat_g because the train (fictionally) crawls. The fragility flagged in the first review is now confirmed as non-physical.
+4. **This violates the explicit "real physics dynamics" requirement** — half the track's motion is clamp output, not simulated energy.
+
+**Scope honesty:** this energy-infeasibility is **pre-existing** (the prior `p3-airtime-final` also showed `speed_range=1.8-…`), not introduced by the redo. The redo did not cause it, but it also did not resolve it, and the "RESOLVED / Closed / P3 可标 Done" claim ignores it. The new airtime gate cannot catch it because it only inspects the front-half Outbound where speed still exists.
+
+**Minor:** "3 camelbacks" over-claims — only camelback #1 delivers airtime; #2 (vert_g +0.77 @ 31.8 m/s) and #3 (+0.89 @ **9.6 m/s**) are decorative because the energy is already gone — a direct symptom of the same stall.
+
+## Required next action (re-review)
+
+- **Do not mark P3 Done; revert the index row from "RESOLVED/Closed".** Airtime existence is closed; ride feasibility is not.
+- **Fix the energy budget so the train reaches the turnaround under gravity** (or make the out-and-back honestly launch-assisted with the Launch positioned where the train still has real speed, and prove no segment relies on the 1.8 m/s clamp). Acceptance must include: **no sustained pinning at the min-speed clamp** (e.g., assert min coasting speed stays above the floor by a margin on all unpowered sections), so the comfort numbers are computed at real speed.
+- Re-tune camelbacks #2/#3 to where speed actually supports airtime, or drop them.
+- The Turnaround geometry (20–25 m radius) still needs reshaping once it is evaluated at real (non-clamped) speed.
+
+## Agent Disposition (re-review)
+
+- Status: Open — airtime existence closed; **ride physical feasibility FAIL** (clamp-masked stall). P3 not Done.
+- Follow-up evidence: pending (speed profile with no min-clamp pinning on unpowered sections; back-half comfort recomputed at real speed; train reaches turnaround under gravity or honest launch).
