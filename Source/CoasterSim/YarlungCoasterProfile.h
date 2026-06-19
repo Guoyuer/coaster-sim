@@ -5,8 +5,8 @@
 namespace YarlungCoaster
 {
 constexpr float TrackClearanceOffsetCm = 1580.0f;
-constexpr float TrackClearanceOuterRadiusCm = 3300.0f;
-constexpr float TrackClearanceInnerRadiusCm = 1450.0f;
+constexpr float TrackClearanceOuterRadiusCm = 0.0f;
+constexpr float TrackClearanceInnerRadiusCm = 0.0f;
 
 inline float Smooth01(float Value)
 {
@@ -17,14 +17,14 @@ inline float Smooth01(float Value)
 inline const TArray<FVector>& DefaultTrackControlPoints()
 {
     static const TArray<FVector> Points = {
-        FVector(87043.0f, -147129.7f, 266910.5f),
-        FVector(92343.0f, -148529.7f, 267500.0f),
-        FVector(99743.0f, -146629.7f, 269200.0f),
-        FVector(105343.0f, -141129.7f, 273405.1f),
-        FVector(103143.0f, -135229.7f, 273898.5f),
-        FVector(96443.0f, -133129.7f, 271391.0f),
-        FVector(87943.0f, -135629.7f, 271904.3f),
-        FVector(83743.0f, -141429.7f, 274685.5f)
+        FVector(87043.0f, -147129.7f, 267902.2f),
+        FVector(92343.0f, -148529.7f, 267833.2f),
+        FVector(99743.0f, -146629.7f, 267762.3f),
+        FVector(105343.0f, -141129.7f, 268404.9f),
+        FVector(103143.0f, -135229.7f, 271151.6f),
+        FVector(96443.0f, -133129.7f, 271300.8f),
+        FVector(87943.0f, -135629.7f, 270336.4f),
+        FVector(83743.0f, -141429.7f, 269249.6f)
     };
     return Points;
 }
@@ -66,6 +66,11 @@ inline float DistanceToTrack2D(float X, float Y, float* OutTrackZ = nullptr)
 
 inline float ApplyTrackClearanceCut(float X, float Y, float Height)
 {
+    if (TrackClearanceOuterRadiusCm <= 0.0f)
+    {
+        return Height;
+    }
+
     float TrackZ = Height;
     const float Distance = DistanceToTrack2D(X, Y, &TrackZ);
     if (Distance > TrackClearanceOuterRadiusCm)

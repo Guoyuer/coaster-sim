@@ -29,6 +29,7 @@ RIVER_ANCHOR_X = 95543.0
 RIVER_ANCHOR_Y = -142330.0
 HEIGHT_MIN = 260000.0
 HEIGHT_MAX = 730000.0
+NATURALIZE_STEEP_TERRAIN = True
 DEM_WEST_LON = 94.945
 DEM_EAST_LON = 95.015
 DEM_SOUTH_LAT = 29.745
@@ -111,6 +112,15 @@ def copernicus_tile_name(lon: int, lat: int) -> str:
     return f"Copernicus_DSM_COG_10_{lat_prefix}{abs(lat):02d}_00_{lon_prefix}{abs(lon):03d}_00_DEM.tif"
 
 
+def cubic_bspline_interp(p0: float, p1: float, p2: float, p3: float, t: float) -> float:
+    one_minus_t = 1.0 - t
+    w0 = one_minus_t * one_minus_t * one_minus_t / 6.0
+    w1 = (3.0 * t * t * t - 6.0 * t * t + 4.0) / 6.0
+    w2 = (-3.0 * t * t * t + 3.0 * t * t + 3.0 * t + 1.0) / 6.0
+    w3 = t * t * t / 6.0
+    return p0 * w0 + p1 * w1 + p2 * w2 + p3 * w3
+
+
 class CopernicusDem:
     def __init__(self, cache_dir: Path) -> None:
         self.cache_dir = cache_dir
@@ -150,21 +160,24 @@ class CopernicusDem:
         width, height = image.size
         x = (lon - tile_lon) * (width - 1)
         y = (tile_lat + 1.0 - lat) * (height - 1)
-        x0 = max(0, min(width - 1, math.floor(x)))
-        y0 = max(0, min(height - 1, math.floor(y)))
-        x1 = max(0, min(width - 1, x0 + 1))
-        y1 = max(0, min(height - 1, y0 + 1))
-        tx = x - x0
-        ty = y - y0
+        base_x = math.floor(x)
+        base_y = math.floor(y)
+        tx = x - base_x
+        ty = y - base_y
 
         def pixel(px: int, py: int) -> float:
-            return float(image.getpixel((px, py)))
+            clamped_x = max(0, min(width - 1, px))
+            clamped_y = max(0, min(height - 1, py))
+            return float(image.getpixel((clamped_x, clamped_y)))
 
-        a = pixel(x0, y0)
-        b = pixel(x1, y0)
-        c = pixel(x0, y1)
-        d = pixel(x1, y1)
-        meters = lerp(lerp(a, b, tx), lerp(c, d, tx), ty)
+        rows = []
+        neighborhood = []
+        for row_offset in (-1, 0, 1, 2):
+            row = [pixel(base_x + col_offset, base_y + row_offset) for col_offset in (-1, 0, 1, 2)]
+            neighborhood.extend(row)
+            rows.append(cubic_bspline_interp(row[0], row[1], row[2], row[3], tx))
+        meters = cubic_bspline_interp(rows[0], rows[1], rows[2], rows[3], ty)
+        meters = max(min(neighborhood), min(max(neighborhood), meters))
         return meters * 100.0
 
 
@@ -212,6 +225,109 @@ def build_copernicus_height_grid(cache_dir: Path) -> tuple[list[float], dict[str
         "note": "Heights are kept in real-world centimeters and clipped only at encode time.",
     }
     return values, metadata
+
+
+def box_blur_height_grid(values: list[float], radius: int, passes: int) -> list[float]:
+    current = list(values)
+    width = SIZE
+    height = SIZE
+    window = radius * 2 + 1
+
+    for _ in range(passes):
+        horizontal = [0.0] * len(current)
+        for y in range(height):
+            row = y * width
+            total = 0.0
+            for offset in range(-radius, radius + 1):
+                total += current[row + min(width - 1, max(0, offset))]
+            for x in range(width):
+                horizontal[row + x] = total / window
+                remove_x = max(0, x - radius)
+                add_x = min(width - 1, x + radius + 1)
+                total += current[row + add_x] - current[row + remove_x]
+
+        vertical = [0.0] * len(current)
+        for x in range(width):
+            total = 0.0
+            for offset in range(-radius, radius + 1):
+                sample_y = min(height - 1, max(0, offset))
+                total += horizontal[sample_y * width + x]
+            for y in range(height):
+                vertical[y * width + x] = total / window
+                remove_y = max(0, y - radius)
+                add_y = min(height - 1, y + radius + 1)
+                total += horizontal[add_y * width + x] - horizontal[remove_y * width + x]
+
+        current = vertical
+
+    return current
+
+
+def relax_height_slopes(values: list[float], max_slope: float, passes: int) -> list[float]:
+    current = list(values)
+    dx_cm = (MAX_X - MIN_X) / (SIZE - 1)
+    dy_cm = (MAX_Y - MIN_Y) / (SIZE - 1)
+    max_x_delta = dx_cm * max_slope
+    max_y_delta = dy_cm * max_slope
+
+    for _ in range(passes):
+        next_values = list(current)
+        for y in range(SIZE):
+            row = y * SIZE
+            for x in range(SIZE):
+                index = row + x
+                if x + 1 < SIZE:
+                    relax_pair(next_values, current[index], current[index + 1], index, index + 1, max_x_delta)
+                if y + 1 < SIZE:
+                    relax_pair(next_values, current[index], current[index + SIZE], index, index + SIZE, max_y_delta)
+        current = [max(HEIGHT_MIN, min(HEIGHT_MAX, height)) for height in next_values]
+
+    return current
+
+
+def relax_pair(
+    target: list[float],
+    height_a: float,
+    height_b: float,
+    index_a: int,
+    index_b: int,
+    max_delta: float,
+) -> None:
+    diff = height_b - height_a
+    excess = abs(diff) - max_delta
+    if excess <= 0.0:
+        return
+
+    direction = 1.0 if diff > 0.0 else -1.0
+    correction = excess * 0.32
+    target[index_a] += direction * correction
+    target[index_b] -= direction * correction
+
+
+def naturalize_height_grid(heights: list[float]) -> list[float]:
+    if not NATURALIZE_STEEP_TERRAIN:
+        return heights
+
+    broad = box_blur_height_grid(heights, radius=18, passes=3)
+    conditioned: list[float] = []
+    for index, height in enumerate(heights):
+        x = index % SIZE
+        y = index // SIZE
+        neighbor_relief = 0.0
+        if x > 0:
+            neighbor_relief = max(neighbor_relief, abs(height - heights[index - 1]))
+        if x < SIZE - 1:
+            neighbor_relief = max(neighbor_relief, abs(height - heights[index + 1]))
+        if y > 0:
+            neighbor_relief = max(neighbor_relief, abs(height - heights[index - SIZE]))
+        if y < SIZE - 1:
+            neighbor_relief = max(neighbor_relief, abs(height - heights[index + SIZE]))
+
+        steep_weight = smooth01((neighbor_relief - 420.0) / 1800.0)
+        blend = 0.18 + 0.62 * steep_weight
+        conditioned.append(lerp(height, broad[index], blend))
+
+    return relax_height_slopes(conditioned, max_slope=0.78, passes=8)
 
 
 def forest_amount(x: float, y: float, height: float) -> float:
@@ -359,6 +475,13 @@ def main() -> None:
 
     if args.source == "copernicus":
         source_heights, source_metadata = build_copernicus_height_grid(Path(args.dem_cache))
+        source_heights = naturalize_height_grid(source_heights)
+        source_metadata["naturalization"] = {
+            "enabled": NATURALIZE_STEEP_TERRAIN,
+            "purpose": "Preserve broad Yarlung canyon shapes while reshaping near-vertical 30m DEM cliffs into ride-scale natural slopes for first-person photorealism.",
+            "broad_blur": "box blur radius=18, passes=3, steep-relief weighted blend",
+            "slope_relaxation": "max_slope=0.78, passes=8",
+        }
     else:
         source_heights, source_metadata = [], {"source": "synthetic procedural fallback"}
 

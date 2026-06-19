@@ -10,8 +10,8 @@
 - **参考锚点**：`docs/refs/references.md`（外链，不下载入库；逐文件 license 验证后才可提交图片）
 - **下一步动作（按顺序，便宜→根治；先打便宜牌，别先做 Nanite mesh）**：
   1. ✅ **决定性诊断完成**：`python scripts\dump-yarlung-height-profile.py` 已沿陡崖自动 dump `.r16` 剖面到 `Saved\Diagnostics\yarlung-height-profile-*.csv/.png`。最陡 profile：`x=21-116, y=636`，96 点全唯一、636m relief、仅 3 对 `<15cm` 近平台段，**不是 8-bit/posterize 那种硬平台阶梯**；但相邻高度差呈分段重复/坡度拐点（`mean_abs_d2≈0.55m`），符合 **bilinear C0 连续、C1 不连续导致法线折痕**。
-  2. **bicubic 上采样（下一步）**：把 `generate-yarlung-landscape-assets.py:sample_cm` 的 bilinear `lerp` 改成 bicubic/样条 → C1 连续 → 消法线折痕 → 中远景台阶应明显减轻。重出 `.r16` 重导入截图对比。**先维持 1009**；2017 可作为对照实验，但之前实测未明显改善，不作为默认路线。
-  3. **据结果验 A2（新 D1 口径，见决策记录）**：A2-Done 只要求**中远景峡谷轮廓/尺度正确、不穿山、轨道贴地**；**近景陡崖面的高频细节明确 deferred 到 stage C**（detail normal 材质 + 必要时 Nanite cliff mesh）。中远景达标即可放行，进入 B 阶段未覆盖项（体积云/大气透视/作者化天空）与 stage C。
+  2. ✅ **B-spline 上采样完成并验证**：`generate-yarlung-landscape-assets.py:sample_cm` 已从 bilinear 改为 cubic B-spline（比 Catmull-Rom 更稳，不追求过点，优先 C2 平滑）。同一剖面 `x=21-116,y=636`：`kinks_gt_1_5m 10→2`、`mean_abs_d2 0.552→0.423`、`flat_pairs 3→0`。数据层 cheap fix 有效。
+  3. **关键转向 / 下一步**：照片自然性优先于 GIS 忠实。`a2-naturalized-v1` 证明仅 naturalize `.r16` 仍不够，英雄帧近景左侧货架墙主要来自导入时 `ApplyTrackClearanceCut` 为轨道硬挖净空槽。**新方向：不要挖山适配轨道；要让轨道高度/路径适配自然地形**。下一步撤掉/最小化 clearance cut，按自然地形重新抬高/平移轨道控制点，确保不穿山且画面像自然峡谷。
 - **禁区**：① 不要再调 SkyAtmosphere 散射；② 不要用调色/几何遮盖去"掩盖"台阶；③ **不要现在就推倒重来做 Nanite cliff mesh**——它是正确答案但属于 stage C，先打完便宜牌再说（理由见决策记录）。
 
 ## 阶段状态表
@@ -29,6 +29,9 @@
 
 ## 打分记录（每轮追加，最新在上）
 > 格式：`iterN @t<秒>: D1=.. D2=.. ... 均值=.. 短板=.. 根因/下一步=..`
+- `a2-track-adapts-v1 @t12s`: D1=2.5 D2=3.5 D3=1 D4=0 D5=2 D6=1 D7=2 D8=2.5，均值=1.81。验证图：`Saved\OffscreenShots\a2-track-adapts-v1.png`。改动：`ApplyTrackClearanceCut` 默认关闭，控制点 Z 改为 naturalized 地形 + 约 22m。结果：轨道下方/近处由硬挖槽变成连续坡面，证明“轨道适配地形”方向对；但左上近景崖壁仍是规则 heightfield 货架，尚未照片自然。下一步=轨道 XY/英雄段构图避开近墙，或在走廊内对可见崖壁做作者化重塑/mesh 接管。
+- `a2-naturalized-v1 @t12s`: D1=2 D2=3.5 D3=1 D4=0 D5=2 D6=1 D7=2 D8=2.5，均值=1.75。验证图：`Saved\OffscreenShots\a2-naturalized-v1.png`。改动：在 `.r16` 生成后增加照片向 naturalization（宽半径平滑 + 坡度 relaxation）。数据剖面改善：同线 `max_delta 16.5m→11.0m`、`kinks 10→1`、`mean_abs_d2 0.552→0.249`。但画面几乎不变，说明主要可见货架不只是 raw `.r16`，而是轨道净空/构图与 heightfield 近墙共同造成。结论：不能只 naturalize 数据，必须轨道适配地形。
+- `a2-bicubic-bspline-v1 @t12s`: D1=2 D2=3.5 D3=1 D4=0 D5=2 D6=1 D7=2 D8=2.5，均值=1.75。验证图：`Saved\OffscreenShots\a2-bicubic-bspline-v1.png`。改动：`sample_cm` bilinear → cubic B-spline；重生 `YarlungTsangpo_1009.r16`、macro、`.umap`。数据剖面改善明确：同线 `kinks_gt_1_5m 10→2`、`mean_abs_d2 0.552→0.423`。但视觉英雄帧左侧近景陡崖仍呈大面积水平货架/台阶，D1 不能上修。判定：cheap DEM 插值牌已打完，继续 2017/插值收益低；近景墙转 stage C 材质法线/Nanite，A2 是否放行只看新 D1 口径下的中远景尺度/不穿山/贴地。
 - `a2-height-profile-diagnostic @no-render`: 诊断工具：`scripts\dump-yarlung-height-profile.py`；输出：`Saved\Diagnostics\yarlung-height-profile-1.csv/.png`。结果：最陡剖面 `x=21-116, y=636`，96 点全唯一、636m relief、`flat_pairs_lt_15cm=3`、`big_pairs_gt_3m=80`、`kinks_gt_1_5m=10`、`mean_abs_d2=0.552`。判定：**高度数据本身不是硬阶梯/量化平台**，但 bilinear 上采样留下明显分段斜率，足以在陡崖+掠射第一人称下形成法线折痕/横向台阶感。下一步=实现 bicubic/样条采样并重导入 1009 对比；2017 仅作必要时对照。
 - **【独立验收 / 人类判官 2026-06-18 第三次】台阶根因审阅：撤回 8-bit 假设，定性为 heightfield 固有上限**：审阅 `generate-yarlung-landscape-assets.py` 采样链确认——`main` 当前上采样是 bilinear 四点 `lerp`(`sample_cm`)，`.r16` 真 16-bit ~62k unique；conditioning/box blur 属于前一轮实验排查语境，**未合入 main**。**我上一轮的 8-bit/量化假设证伪、撤回**；Codex 排除工作（LOD0/2017/conditioning/clearance/旧 boulder）全部认可。真根因=单值 heightfield 无法表达近垂直崖 + 30m 源分辨率天花板(ALOS 也 30m、无免费高精) + bilinear 只 C0 不 C1 的法线折痕 + 裸 macro 无 detail normal。**裁决（含用户拍板）：先 bicubic 上采样 + 剖面诊断这两张便宜牌；近景陡崖的真正修复（detail normal + Nanite cliff mesh）归入 stage C，现在不提前做；A2 的 D1 验收口径下调为"中远景轮廓正确、近景崖细节 deferred to C"。** 详见决策记录 2 条。
 - `b2-daylight-exposure-v1 @t12s`: D1=2 D2=3.5 D3=1 D4=0 D5=2 D6=1 D7=2 D8=2.5，均值=1.75。验证图：`Saved\OffscreenShots\b2-daylight-exposure-v1.png`（2560×1440）。改动：`AutoExposureBias 0.0 → +1.2`，保留 `ISO100 / 1/500 / f11` 物理相机参数。像素均值从上一版约 `(65.85,87.98,93.60)` 提升到 `(94.15,122.12,129.62)`；肉眼看蓝天/岩壁/轨道进入晴天可读区间，B2 曝光收尾判 PASS。未到位项清楚暴露：左侧峡谷壁硬水平台阶仍严重，江水/轨道/材质/植被仍是占位，下一步转 A2 高程台阶根因。
@@ -42,6 +45,8 @@
 
 ## 决策记录（不可逆/重要选择，最新在上）
 - 2026-06-18（A2 剖面诊断落地）：新增 `scripts\dump-yarlung-height-profile.py`，自动找 `.r16` 中最陡横向崖面剖面并输出 CSV/PNG。当前 1009 profile 显示：高度曲线连续、96/96 unique、无 8-bit/posterize 平台；但坡度有 bilinear 分段重复和 C1 断点。结论：**台阶不是高度量化 bug，而是 bilinear piecewise slope + heightfield 法线/材质暴露**。下一步仍是 bicubic/样条（直接针对 C1 断点），不是先升 2017；2017 如需只作对照。
+- 2026-06-19（B-spline cheap fix 结果）：Catmull-Rom bicubic 在陡坡有过冲，剖面 kink 指标变差；改用 cubic B-spline 后数据剖面明显更平顺（同线 `kinks 10→2`）。但 1440p 英雄帧仍有近景巨大水平台阶，确认主因已经超出 DEM 插值：单值 heightfield 不能表达近垂直崖、30m 源分辨率不足、裸 macro 无 detail normal。**结论：不要继续在 2017/插值上耗时；近景崖归 stage C，A2 只按中远景/不穿山/贴地口径验收。**
+- 2026-06-19（用户拍板，照片自然性 > 原始地形忠实；轨道适配地形）：用户明确要求“不用特别忠于原始地形，看着必须自然，像照片”。据 `a2-naturalized-v1` 观察，单纯 naturalize `.r16` 数据剖面有改善，但英雄帧近景货架墙几乎不变；结合 commandlet 逻辑，主因是 `ApplyTrackClearanceCut` 用窄半径把山体硬切到轨道净空高度，形成人工台阶峡谷。**流程级决策：DEM 只做大轮廓参考；地形生成要照片向自然化；更重要的是不要挖山适配轨道，而是让轨道高度/路径适配自然地形。** 下一步应撤掉/弱化 clearance cut，并按自然地形重新求轨道控制点 Z/XY（保证不穿山、贴近谷底/坡面、第一人称构图自然）。
 - 2026-06-18（用户拍板，D1 验收口径调整 — 流程级、不可逆）：**A2-Done 的 D1 标准从"近景崖面无台阶/高频细节足"下调为"中远景峡谷轮廓/尺度正确、不穿山、轨道贴地"**。原因：台阶是单值 heightfield + 30m 源的固有上限，Landscape 怎么调都救不了近垂直崖面的 silhouette；强求会把 A2 永久卡死在一个本就属于 stage C 的问题上。**近景陡崖的高频细节明确 deferred 到 stage C**（detail normal 材质，必要时 Nanite cliff/rock mesh 接管走廊近景崖，Landscape 只负责中远景轮廓 + 谷底）。acceptance §3 的 D1 文案需同步。
 - 2026-06-18（路径裁定：先便宜牌，不提前做 Nanite mesh）：台阶根因审阅后定序——**①剖面诊断 ②bicubic 上采样**两张便宜牌先打（成本几小时，可能让中远景"够用"）；**Nanite cliff mesh 虽是近景崖的正确答案，但不现在做**。理由：它是新工作流（找/雕岩石 mesh、沿走廊摆放、mesh↔Landscape 接缝混合、岩石材质），至少几天且不可逆；且无论如何都得先做 stage C 材质，Nanite 崖天然属于 C，不该插队。**仅当剖面诊断证明数据台阶 bicubic 也救不动、且英雄帧被近垂直墙主导时，才考虑把它拉到 C 之前。** 上采样代码在 `generate-yarlung-landscape-assets.py:sample_cm`（当前 bilinear `lerp`）。
 - 2026-06-18（截图工作流默认切换）：低打扰 `scripts\offscreen-shot.ps1` 已连续验证可用，并且直接跳到英雄帧、只保留最终 PNG。默认验收路径改为 offscreen；删除旧窗口截图路径，避免后续误用抢焦点脚本。性能验收以后单独用 `stat unit`/CSV，不再和截图脚本绑定。
@@ -68,8 +73,9 @@
 - [x] **B2 曝光收尾**：`AutoExposureBias +1.2`，截图 `Saved\OffscreenShots\b2-daylight-exposure-v1.png`；蓝天/岩壁进入晴天可读区间，像素均值提升且橙黄未回归。
 - [x] **台阶根因定性**：已排除 8-bit/posterize/nearest（`.r16` 真 16-bit ~62k unique；`main` 当前采样为 bilinear，conditioning 属于未合入实验）。定性为 heightfield + 30m 源 + 法线折痕 + 无 detail normal 的固有上限（见决策记录）。
 - [x] **下一步①：剖面诊断**：`scripts\dump-yarlung-height-profile.py` 已完成；结论=无硬平台量化，存在 bilinear 分段坡度/C1 断点，继续 bicubic。
-- [ ] **下一步②：bicubic 上采样**：改 `generate-yarlung-landscape-assets.py:sample_cm` bilinear→bicubic，重出 `.r16` 重导入对比中远景台阶。先做 1009；2017 仅在必要时作为对照。
-- [ ] **A2 Done（新口径）**：bicubic 后用 hero `WaitSeconds 12` 验**中远景峡谷轮廓/尺度正确、不穿山、轨道贴地**即可标 Done；**近景陡崖细节 deferred 到 stage C（detail normal / Nanite cliff mesh），现在不做**。
+- [x] **下一步②：bicubic/B-spline 上采样**：已改 `generate-yarlung-landscape-assets.py:sample_cm` bilinear→cubic B-spline，重出 `.r16` 并重导入。数据剖面改善，视觉近景陡崖仍不达标；2017 不再作为默认路线。
+- [ ] **下一步③：轨道适配自然地形**：撤掉/最小化 `ApplyTrackClearanceCut`，不要再硬挖山；基于 naturalized heightmap 重新计算/调整 `YarlungCoasterProfile.h` 控制点 Z/必要 XY，使轨道不穿山、离地合理、第一人称近景读成自然坡面。
+- [ ] **A2 Done（新口径）**：用 hero `WaitSeconds 12` 或补充中远景取景验**中远景峡谷轮廓/尺度正确、不穿山、轨道贴地**即可标 Done；近景若仍有材质细节不足 deferred 到 C，但**人工货架墙/硬切槽不能放行**。
 - [x] **低打扰截图实测**：已成功。推荐命令：`powershell -ExecutionPolicy Bypass -File scripts\offscreen-shot.ps1 -Name <name> -WaitSeconds <seconds> -ResX 2560 -ResY 1440`。注意这是 offscreen/低打扰 smoke path，最终验收仍需确认画面有效并按量规打分。
 - [ ] **英雄段人工确认**（阶段 0）：已先选 `WaitSeconds 12` 作为最佳努力默认；如用户想换英雄段，再重新截图并更新本文件。
 
