@@ -1,5 +1,13 @@
 # Visual Spec
 
+> Scope note: this is the base simulator/M1 visual spec. For the current
+> Yarlung Tsangpo photo-real overhaul, `AGENTS.md`,
+> `docs/plans/photoreal-overhaul.md`, `docs/specs/photoreal-acceptance.md`,
+> and `docs/plans/photoreal-progress.md` override this file whenever there is
+> a conflict. In that active workflow, acceptance is first-person on-rails
+> only; free/trackside cameras are debug tools, and sky domes/procedural
+> placeholders are historical prototype allowances, not the target path.
+
 ## Objective
 
 Create visuals that communicate realistic scale, speed, height, and material

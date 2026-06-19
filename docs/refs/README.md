@@ -1,6 +1,6 @@
 # 参照照片（验收基准）
 
-本目录放**雅鲁藏布大峡谷 / 南迦巴瓦 / 林芝**的真实参考照片，作为"风景如画 + camera-real"的评分锚点。所有画面验收（`docs/specs/photoreal-acceptance.md` 的量规）都对照这里的图打分。
+本目录放**雅鲁藏布大峡谷 / 南迦巴瓦 / 林芝**的真实参考照片或参考链接，作为"风景如画 + camera-real"的评分锚点。所有画面验收（`docs/specs/photoreal-acceptance.md` 的量规）都对照这里的图打分。
 
 ## 收集要求
 - **3–5 张**覆盖目标画意，建议各覆盖一类：
@@ -10,10 +10,11 @@
   4. 林芝湿润深绿密林坡面（植被密度/色彩参考）。
   5. 冷灰/灰绿湿岩崖壁细节（地表材质参考）。
 - 优先**晴天蓝天白云**光照（项目默认天气，`CONTEXT.md`）。
-- 文件名描述内容，如 `01_canyon_river_cliff.jpg`、`02_namchabarwa_clouds.jpg`。
+- 文件名描述内容，如 `01_canyon_river_cliff.jpg`、`02_namchabarwa_clouds.jpg`。若图片授权不适合提交到 public repo，改用 `references.md` 记录标题、来源 URL、作者、license、用途锚点，不把图片文件提交进仓库。
 
 ## 用途与边界
 - **仅用于开发期视觉比对**，不进产品、不作为可发行美术资产。
+- 仓库是 public 时，只提交授权明确且允许再分发的参考图。普通网页/旅行摄影/新闻图只保留链接和元数据，不下载入库。
 - 实际建模/材质用 CC0 / Fab-Megascans / 公开 DEM（见 `AGENTS.md` §6）。
 
 ## 评分锚点（怎么用）

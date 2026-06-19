@@ -3,6 +3,12 @@
 > 本文档供**执行用 AI agent** 使用。读者默认没有上下文，请把本文当作唯一交接材料。
 > 引擎：Unreal Engine 5.8（路径见 §0）。平台：Windows / DX12 / SM6。
 
+## 文档层级（避免拿旧 spec 走回头路）
+
+- 当前 Yarlung 照片级画质迭代以 `AGENTS.md`、本文、`docs/specs/photoreal-acceptance.md`、`docs/plans/photoreal-progress.md` 为最高优先级。
+- `docs/specs/product.md`、`architecture.md`、`physics.md`、`validation.md`、`visual.md` 是基础仿真/M1 资料。它们若提到 free camera、sky dome、procedural placeholder、灰盒美术，只能作为历史/调试语境；照片级验收只看第一人称 on-rails 帧。
+- 永久环境美术的归属是 generated level / commandlet / PCG/Foliage / asset pipeline，不是 `ACoasterRideActor`。Ride actor 只负责仿真、轨道/车、相机、HUD 所需状态，最多做临时诊断查询。
+
 ## 目标（精确定义，不要跑偏）
 
 1. **Camera-real（像相机拍的，不是像游戏）**：照片级真实度。判据是"截一帧出来像一张真实照片/电影画面"，而不是"比原型好"。
@@ -46,7 +52,7 @@
 ```powershell
 .\scripts\visual-check.ps1 -Build -Name "hero-stepN" -ResX 2560 -ResY 1440 -WaitSeconds 6,12,18
 ```
-- **必须升到高分辨率（≥1440p）**：720p 的 GDI 抓图看不出照片级；现有脚本默认 1280×720，要用 `-ResX/-ResY` 提上去。
+- **必须升到高分辨率（≥1440p）**：720p 的 GDI 抓图看不出照片级；若脚本默认值不是 1440p，执行验收时必须显式传 `-ResX 2560 -ResY 1440`。低于 1440p 的图只能算 smoke test，不能算 acceptance。
 - 验收每步：跑 visual-check → **用 Read 工具把 PNG 当图片看** → 对照 §"目标"和参考照片。**禁止"脚本没报错=完成"**。
 - 脚本日志看 `Saved\Logs\CoasterSim.log`（搜 `[YARLUNG-MATERIAL]`、`Yarlung scatter instances`）。
 
@@ -105,7 +111,7 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 - **A2 真实 DEM 地形（如画轮廓的来源）**：用免费公开 DEM（SRTM 30m / ALOS AW3D30 30m / Copernicus GLO-30）取南迦巴瓦—雅鲁藏布大峡谷区域，转成 16-bit 高度图喂给 `generate-yarlung-landscape-assets.py` / commandlet（替换程序化 `.r16`）。对齐世界尺度与现有轨道走廊（轨道控制点 X∈[-1800,10400], Y∈[-3900,1500]，`YarlungCoasterProfile.h:17`），保留 `ApplyTrackClearanceCut`。
   - 远景"画意"主要来自真实山体轮廓——这一步价值最高。
   - 验收：英雄段 FP 帧里对岸崖壁/远山轮廓接近参照照片的真实山形，不再是平滑解析坡。
-- **A3 scatter 改查真实地形**：用 `LineTraceSingleByChannel`（高空向下打 `ECC_WorldStatic`）取 Landscape 表面点+法线放置巨石/植被，替换对解析 `YarlungLandscapeHeight()` 的依赖；注意 Landscape 碰撞就绪时序（在 `BeginPlay` 后或 Landscape 注册后触发）。最终删除影子地形函数。
+- **A3 scatter 改查真实地形，并迁出 ride actor**：用 Landscape 真表面点+法线放置巨石/植被，替换对解析 `YarlungLandscapeHeight()` 的依赖。首选在 `YarlungLandscapeImportCommandlet.cpp` 或专门的 generated scenery/PCG 管线中生成关卡内容；若必须用运行时 `LineTraceSingleByChannel`（高空向下打 `ECC_WorldStatic`），也要封装到独立 scenery actor，不要继续写进 `ACoasterRideActor::RebuildEnvironment`。注意 Landscape 碰撞就绪时序（commandlet 离屏环境与 PIE/运行时都要验证）。最终删除影子地形函数。
   - 验收：植被/巨石与地表无缝贴合，无浮空/半埋；`Yarlung scatter instances` 计数 > 0。
 
 ### 阶段 B — 物理天空 + 光照标定 + 大气透视（远景画意主力）
@@ -126,7 +132,7 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
   - 验收：FP 帧里轨道是钢轨非方条，金属有方向性高光。
 
 ### 阶段 E — 密林植被 + 成像链精修（把"相机感"最后拉满）
-- **E1 植被密度 → PCG/Foliage**：按坡度/高度/河流 mask 用 Megascans 树/灌木/草散布到林芝密林量级 + LOD；关掉草投影或改接触阴影。优先英雄段视锥内。
+- **E1 植被密度 → PCG/Foliage**：按坡度/高度/河流 mask 用 Megascans/CC0 树/灌木/草散布到林芝密林量级 + LOD；关掉草投影或改接触阴影。优先英雄段视锥内。实现位置仍是 generated level/PCG/Foliage，不是 `ACoasterRideActor`。
   - 验收：英雄段中景成片可信密林，帧率达标。
 - **E2 成像链精修（camera-real 收尾）**：在光照/材质稳定后重调 `RideCamera` 后期（`:107-142`）：
   - **TSR** 设为抗锯齿方法（高速运动时序稳定，消闪烁）；

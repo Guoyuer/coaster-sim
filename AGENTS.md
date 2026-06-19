@@ -21,6 +21,8 @@
 | `CONTEXT.md` / `docs/specs/visual.md` | 视觉锚点与规范 |
 | `docs/bugs/2026-06-18-visual-pipeline-bugs.md` | 既往坑（moire/暖色/雾回归/headless 假成功） |
 
+**层级规则**：当前 Yarlung 照片级迭代以本文件、`photoreal-overhaul.md`、`photoreal-acceptance.md`、`photoreal-progress.md` 为最高优先级。旧的 `docs/specs/*.md` 是基础仿真/M1 设计资料；若它们允许 free camera、sky dome、procedural placeholder、灰盒美术等，与照片级计划冲突时，按照片级计划执行。
+
 ## 2. 环境与命令
 引擎：UE 5.8。路径：
 - 编辑器 `C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe`
@@ -56,6 +58,7 @@
 - ❌ "脚本没报错就当完成"——必须 Read 截图肉眼核对。
 - ❌ 用临时覆盖几何、顶点色色块、一次性调色掩盖资产/材质问题（`CONTEXT.md` Visual Iteration Rule）。
 - ❌ 往 `ACoasterRideActor::RebuildEnvironment` 里加新美术——造景要迁出 C++、作者化到关卡。
+- ❌ 把永久植被/岩石/天空/水体 scatter 写进 `ACoasterRideActor`。这些属于 commandlet 生成的关卡内容、PCG/Foliage、或独立 scenery actor；`ACoasterRideActor` 只保留仿真、轨道/车、相机和必要的运行时查询。
 - ❌ headless 脚本只信 exit code——保留 success-marker / 资产存在性校验。
 - ❌ 把预算花在相机看不到的走廊外、或高速近景上（违反优先级 2）。
 - ❌ 接 Landscape 近景法线不做宏观/微观尺度分离（会重现 moire）。
