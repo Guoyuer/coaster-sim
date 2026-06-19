@@ -302,12 +302,12 @@ def create_translucent_vertex_color_material(name, opacity, roughness, specular)
         unreal.MaterialProperty.MP_BASE_COLOR,
     ):
         raise RuntimeError(f"Unable to connect {name} vertex BaseColor")
-    connect_material_property(
-        material,
-        create_scalar_parameter(material, "Opacity", opacity, -620, -360),
+    if not unreal.MaterialEditingLibrary.connect_material_property(
+        vertex_color,
+        "A",
         unreal.MaterialProperty.MP_OPACITY,
-        f"{name} Opacity",
-    )
+    ):
+        raise RuntimeError(f"Unable to connect {name} vertex Opacity")
     connect_material_property(
         material,
         create_scalar_parameter(material, "Roughness", roughness, -620, 160),
