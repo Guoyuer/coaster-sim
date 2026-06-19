@@ -5,6 +5,12 @@ param(
     [int]$ResY = 1440,
     [string]$Name = "offscreen-latest",
     [int]$TimeoutSeconds = 240,
+    [int]$CaptureFps = 1,
+    [int]$CaptureSeconds = 1,
+    [double]$StartRatio = 0.34,
+    [double]$StartSpeedMps = 18.0,
+    [switch]$KeepSourceFrames,
+    [switch]$SimulateWait,
     [ValidateSet("MovieFrames", "ImmediateHighResShot")]
     [string]$Mode = "MovieFrames"
 )
@@ -53,11 +59,20 @@ $CommonArgs = @(
     "-log=$LogPath"
 )
 
+if (-not $SimulateWait) {
+    $CommonArgs += @(
+        "-CoasterStartRatio=$StartRatio",
+        "-CoasterStartSpeed=$StartSpeedMps",
+        "-CoasterStartSeconds=$WaitSeconds"
+    )
+}
+
 if ($Mode -eq "MovieFrames") {
+    $BenchmarkSeconds = if ($SimulateWait) { $WaitSeconds } else { $CaptureSeconds }
     $Args = $CommonArgs + @(
         "-BENCHMARK",
-        "-FPS=60",
-        "-BENCHMARKSECONDS=$WaitSeconds",
+        "-FPS=$CaptureFps",
+        "-BENCHMARKSECONDS=$BenchmarkSeconds",
         "-DUMPMOVIE",
         "-ExecCmds=DisableAllScreenMessages"
     )
@@ -89,5 +104,12 @@ if (-not $NewImages) {
 $Chosen = $NewImages | Select-Object -Last 1
 $Output = Join-Path $OutputDir "$Name.png"
 Copy-Item -LiteralPath $Chosen.FullName -Destination $Output -Force
+if (-not $KeepSourceFrames) {
+    foreach ($Image in $NewImages) {
+        if ($Image.FullName -ne $Output) {
+            Remove-Item -LiteralPath $Image.FullName -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
 Write-Host "Screenshot=$Output"
 Write-Host "SourceFrame=$($Chosen.FullName)"

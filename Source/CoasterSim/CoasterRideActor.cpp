@@ -13,6 +13,8 @@
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "ProceduralMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -261,7 +263,7 @@ void ACoasterRideActor::BeginPlay()
     ApplyVisualMaterials();
     RebuildEnvironment();
     RebuildVisuals();
-    StartRideAt(0.34f, 18.0f);
+    StartRideFromCommandLine(0.34f, 18.0f);
 }
 
 void ACoasterRideActor::Tick(float DeltaSeconds)
@@ -303,6 +305,34 @@ void ACoasterRideActor::StartRideAt(float TrackRatio, float SpeedMps)
     SampleFrame(CurrentDistanceCm, Location, Rotation, Forward, Right, Up);
     TrainRoot->SetRelativeLocationAndRotation(Location, Rotation);
     UpdateFirstPersonCamera();
+}
+
+void ACoasterRideActor::StartRideFromCommandLine(float DefaultTrackRatio, float DefaultSpeedMps)
+{
+    float TrackRatio = DefaultTrackRatio;
+    float SpeedMps = DefaultSpeedMps;
+    float StartSeconds = 0.0f;
+    const TCHAR* CommandLine = FCommandLine::Get();
+    FParse::Value(CommandLine, TEXT("CoasterStartRatio="), TrackRatio);
+    FParse::Value(CommandLine, TEXT("CoasterStartSpeed="), SpeedMps);
+
+    if (FParse::Value(CommandLine, TEXT("CoasterStartSeconds="), StartSeconds))
+    {
+        EnsureDefaultTrack();
+        RebuildSpline();
+        const float ClampedRatio = FMath::Clamp(TrackRatio, 0.0f, 0.999f);
+        const float StartDistanceCm = TrackLengthCm * ClampedRatio;
+        const float AdvanceCm = FMath::Max(SpeedMps, 1.8f) * CmPerMeter * StartSeconds;
+        float AdvancedRatio = FMath::Fmod((StartDistanceCm + AdvanceCm) / TrackLengthCm, 1.0f);
+        if (AdvancedRatio < 0.0f)
+        {
+            AdvancedRatio += 1.0f;
+        }
+        StartRideAt(AdvancedRatio, SpeedMps);
+        return;
+    }
+
+    StartRideAt(TrackRatio, SpeedMps);
 }
 
 void ACoasterRideActor::RebuildSpline()

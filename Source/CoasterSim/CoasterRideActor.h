@@ -62,6 +62,7 @@ public:
 
     const FCoasterTelemetry& GetTelemetry() const { return Telemetry; }
     void StartRideAt(float TrackRatio, float SpeedMps);
+    void StartRideFromCommandLine(float DefaultTrackRatio, float DefaultSpeedMps);
 
 protected:
     UPROPERTY(VisibleAnywhere, Category = "Components")
