@@ -4,18 +4,18 @@
 > 流程：`photoreal-overhaul.md` · 验收：`photoreal-acceptance.md` · 操作：`AGENTS.md`
 
 ## 当前状态
-- **当前阶段**：阶段 A（地形单一真相源 + 真实 DEM）— A1 Done，A2 真实 DEM 已导入并有 offscreen smoke 截图，视觉问题待修
+- **当前阶段**：阶段 A/B 交叉 — A1 Done；A2 **参数层已验收通过**；B2 已修掉橙黄大气根因，画面恢复蓝天/绿地但仍偏原型、偏暗且近景地形块面明显。下一步按调整后的顺序回头验 A2 视觉层。
 - **基线**：当前为原型/灰盒（顶点色假天空/假河、Cube 轨道、程序化解析地形、单张 macro 平涂地表）。基线截图：`Saved\hero-baseline.png`（2560×1440，`WaitSeconds 12`）
 - **英雄段时间点**：`WaitSeconds 12`。理由：六张候选图（3/6/9/12/15/18s）中，12s 同框包含第一人称轨道、山谷/河道走廊、对岸坡面与远处山形，最接近“临江高弯 + 远中景”验收目标。
 - **参考锚点**：`docs/refs/references.md`（外链，不下载入库；逐文件 license 验证后才可提交图片）
-- **下一步动作**：A2 需要继续修画面短板：offscreen smoke 截图已可用，但截图显示真实 DEM 导入后仍严重橙红/低曝光，且轨道附近地形/构图需要调整。下一轮优先用 `scripts\offscreen-shot.ps1` 做低打扰截图闭环，先解决 A2 导入后的轨道贴地/穿山感，再进入 B 阶段天空/曝光。
+- **下一步动作**：回到 **A2 视觉验收/修正**：用 `b2-daylight-rayleigh-default-v2` 这种蓝天可读画面判断 hero `WaitSeconds 12` 的 D1 峡谷尺度、轨道贴地/穿山、左侧近景块面/切槽问题；不要再调 SkyAtmosphere 散射，后续 B 只允许动太阳角度、曝光和作者化天空/云。
 
 ## 阶段状态表
 | 阶段 | 内容 | 状态 | 出口标准（见 acceptance §3） | 备注 |
 |---|---|---|---|---|
 | 0 | 英雄段+参照+基线 | ✅ Done | 时间点选定/refs≥3/baseline 存档 | hero=`WaitSeconds 12`; baseline=`Saved\hero-baseline.png`; refs=`docs/refs/references.md` |
 | A | 地形单一真相源+真实DEM | 🟦 进行中 | 无假几何/DEM不穿山/scatter贴地/D1≥4 | A1 Done；A2 DEM imported；offscreen smoke works；terrain/track framing still weak |
-| B | 物理天空+光照标定 | ⬜ TODO | 单一物理天空+大气透视/曝光物理化/D2≥4 D5≥3 | |
+| B | 物理天空+光照标定 | 🟦 进行中 | 单一物理天空+大气透视/曝光物理化/D2≥4 D5≥3 | B2 橙黄根因已修；仍缺云带/最终曝光与材质层次 |
 | C | 分层Nanite地表材质 | ⬜ TODO | 崖壁高频细节无moire/冷灰绿/D1≥4 D5≥4 | |
 | D | 江水→轨道/车 | ⬜ TODO | 江面折射流动D3≥4/钢轨D6≥3 | |
 | E | 密林+成像收尾 | ⬜ TODO | 密林D4≥4/TSR运动模糊D7≥4 D8≥4/60fps | |
@@ -25,11 +25,17 @@
 
 ## 打分记录（每轮追加，最新在上）
 > 格式：`iterN @t<秒>: D1=.. D2=.. ... 均值=.. 短板=.. 根因/下一步=..`
-- `offscreen-smoke @~2s`: D1=2 D2=1 D3=1 D4=0 D5=1 D6=1 D7=2 D8=1，均值=1.1。A2 smoke：`scripts\offscreen-shot.ps1` 成功生成 `Saved\OffscreenShots\offscreen-smoke.png`（2560×1440，`-RenderOffScreen` + `-DUMPMOVIE`）。真实 DEM 轮廓/峡谷尺度已进入画面，但画面严重橙红/低曝光，近处地形与轨道关系仍不可信；下一步=继续 A2 调整轨道/地形 clearance 或构图，然后 B 阶段处理物理天空/曝光。
+- `b2-daylight-rayleigh-default-v2 @t12s`: D1=2 D2=3 D3=1 D4=0 D5=2 D6=1 D7=2 D8=2，均值=1.6。验证图：`Saved\OffscreenShots\b2-daylight-rayleigh-default-v2.png`（2560×1440）。结论：外援诊断命中，移除非物理 `SkyAtmosphere` Rayleigh/Mie/AerialPerspective overrides 后，橙黄天空/红褐地形消失，画面恢复蓝天与绿地；`SkyLight` 开 realtime capture，物理相机 `ISO100 / 1/500 / f11`，体积雾临时关闭。仍不达照片级：无云带、左侧近景地形块面/切槽强、地表材质平、轨道/支撑线过乱。下一步=回到 A2 视觉层，先处理轨道走廊与地形构图/块面问题。
+- `b2-daylight-rayleigh-default-v1 @t12s`: D1=2 D2=3 D3=1 D4=0 D5=2 D6=1 D7=2 D8=2，均值=1.6。验证图：`Saved\OffscreenShots\b2-daylight-rayleigh-default-v1.png`。Rayleigh/Mie/AerialPerspective 改回默认后第一次验证：蓝天和绿色地形回归，证明橙黄不是贴图源、不是 HDR、不是截图路径，而是大气散射设置。
+- `b2-daylight-jump-v1 @t12s`: D1=2 D2=1 D3=1 D4=0 D5=1 D6=1 D7=2 D8=1，均值=1.1。验证图：`Saved\OffscreenShots\b2-daylight-jump-v1.png`（2560×1440）。工作流 PASS：`scripts\offscreen-shot.ps1` 已默认用 `-CoasterStartSeconds=<WaitSeconds>` 直接跳到英雄帧附近，只截 `CaptureSeconds=1`，临时 `MovieFrame*.png` 自动清理；不再为 `WaitSeconds 12` 生成上千帧。画面 FAIL：仍为橙色天空 + 黑色峡谷剪影，B2 v1 物理光照/曝光改动未解决欠曝；下一步=继续诊断 sun direction / exposure method / SkyAtmosphere 高海拔交互。
+- **【独立验收 / 人类判官 2026-06-18】A2 参数层 PASS，视觉层 BLOCKED**：核对 commandlet 确认世界 6.76×8.34km、垂直真实海拔 2600–7300m、分辨率 1009、样条已重定位谷底（X~216m），均符合规格；`YarlungTsangpo_hillshade.png` 经肉眼确认是真实峡谷河谷地形（非程序噪声）。但 `offscreen-smoke.png` 严重橙红欠曝，**D1 壮阔尺度无法判定**（同意 Codex 自评 D1≈2、均值~1.1，不注水）。过程认可：未作弊调色、未谎报 Done、offscreen 截图工具考虑周到。**裁决：橙黑是唯一挡路项 → 调整顺序，B2 光照提前到 A2 视觉验收之前。** 待跟进：hillshade 中部一条竖向 DEM 瓦片拼接缝，后续留意别在地表显形。 D1=2 D2=1 D3=1 D4=0 D5=1 D6=1 D7=2 D8=1，均值=1.1。A2 smoke：`scripts\offscreen-shot.ps1` 成功生成 `Saved\OffscreenShots\offscreen-smoke.png`（2560×1440，`-RenderOffScreen` + `-DUMPMOVIE`）。真实 DEM 轮廓/峡谷尺度已进入画面，但画面严重橙红/低曝光，近处地形与轨道关系仍不可信；下一步=继续 A2 调整轨道/地形 clearance 或构图，然后 B 阶段处理物理天空/曝光。
 - `hero-a1-no-fake-sky-ridges @t12s`: D1=1 D2=1 D3=1 D4=0 D5=1 D6=1 D7=2 D8=1，均值=1.0。A1 验收：无方块云、无顶点色天穹、无平面远山；仍有程序化地形、橙色非物理天空、顶点色河道、无植被、方条轨道。根因/下一步=A2 真实 DEM 建地形轮廓；橙色天空留到 B 阶段物理光照/天空标定。
 - `hero-baseline @t12s`: D1=1 D2=1 D3=1 D4=0 D5=1 D6=1 D7=2 D8=1，均值=1.0，短板=植被缺失/假天空云/顶点色河道/程序化坡面/方条轨道。根因/下一步=A1 删除假环境几何，A2 用真实 DEM 建立地形轮廓。
 
 ## 决策记录（不可逆/重要选择，最新在上）
+- 2026-06-18（B2 根因，外援诊断验证）：橙黄天空/红褐地形根因是 `SkyAtmosphere` 散射被手调离物理默认：`SetRayleighScatteringScale(1.1f)` 约等于把默认 Rayleigh 放大数十倍，叠加错误的 `SetAerialPerspectiveStartDepth(9000.0f)`，导致大气像厚黄雾/夕阳。已删除 Rayleigh/Mie/AerialPerspective overrides，保留 UE 默认物理大气；以后不要在 C++ 里手调散射/星球参数。可动项限制为太阳角度/强度、相机曝光、作者化天空/云与合理薄雾。
+- 2026-06-18（截图工作流修正）：`scripts\offscreen-shot.ps1` 默认不再按 `WaitSeconds` 全程模拟并 `-DUMPMOVIE` 每帧输出，而是把 `-CoasterStartRatio`、`-CoasterStartSpeed`、`-CoasterStartSeconds=<WaitSeconds>` 传给 runtime，直接把第一人称车推进到目标帧附近，再用 `CaptureSeconds=1` / `CaptureFps=1` 截短片段并自动删除源 `MovieFrame*.png`。如需旧行为，可显式加 `-SimulateWait`；如需保留源帧，可加 `-KeepSourceFrames`。
+- 2026-06-18（用户拍板，顺序调整）：**B2 光照/曝光提前到 A2 视觉验收之前**。原因：A2 真实 DEM 参数层已验收通过，但画面严重橙红欠曝，无法肉眼判定峡谷尺度（D1）与轨道贴地；在黑暗里继续调 A2 几何是白费。先 B2 把场景照亮成晴天物理光照，再回头验 A2 地形。A 的其余项（A3 scatter 迁出）仍在 B2 之后按原顺序。
 - 2026-06-18（低打扰截图实测）：`scripts\offscreen-shot.ps1` 可用。命令：`powershell -ExecutionPolicy Bypass -File scripts\offscreen-shot.ps1 -Name offscreen-smoke -WaitSeconds 2 -ResX 2560 -ResY 1440 -TimeoutSeconds 180`。输出：`Saved\OffscreenShots\offscreen-smoke.png`，源帧 `Saved\Screenshots\WindowsEditor\MovieFrame00843.png`。脚本修正：加 `-ForceRes` 才能稳定 2560×1440；`Start-Process` 的 `ExitCode` 可能为空，不能当失败。日志仍会出现 Slate window 生命周期记录，因此它是低打扰/offscreen 渲染路径，不等同于严格无窗口证明。
 - 2026-06-18（后台执行）：A2 资产生成已跑通：`scripts/generate-yarlung-landscape-assets.py --source copernicus` 下载/缓存 Copernicus GLO-30 N29E094/N29E095 COG 到 gitignored `SourceAssets/DEM/CopernicusGLO30/`，生成 `Content/Generated/YarlungLandscape/YarlungTsangpo_1009.r16`、macro textures、`manifest.json` 和 `YarlungTsangpo_hillshade.png`。实采高程范围约 **2613m–7144m**，编码窗口改为 **2600m–7300m**，导入 scale 为 X≈6.70m/quad、Y≈8.27m/quad、Z≈917.97。轨道控制点已重定位到 `29.769–29.771N / 94.989–94.991E` 谷底附近，控制点 clearance 约 **18m–82m**；占位河高/river mask 同步到 DEM 谷底。UE 导入与截图未执行，避免抢占用户全屏。
 - 2026-06-18（低打扰截图探索）：新增实验脚本 `scripts/offscreen-shot.ps1`，尝试用 `UnrealEditor-Cmd.exe -RenderOffScreen` + UE 自己输出 PNG/`-DUMPMOVIE`，避免现有 `visual-check.ps1` 的窗口创建 + `PrintWindow` 抓图路径。尚未实测；若成功，可用于用户全屏游戏期间的视觉 smoke test。`-NullRHI` 仍只适合 commandlet/资产导入，不能用于照片级截图。
@@ -44,7 +50,8 @@
 - [x] **尺度方案**（阶段 A2）：已定=真实尺度子区域（见决策记录）。
 - [x] **DEM 选型 + 裁哪段**（阶段 A2）：已定并已生成资产（见决策记录与 plan A2）。源=Copernicus GLO-30；bbox=`lat 29.745–29.820°N, lon 94.945–95.015°E`；分辨率维持 1009；垂直真实海拔编码 2600–7300m；轨道样条已重定位；hillshade 已检查。
 - [x] **A2 UE 导入 + smoke 截图**：`scripts\import-yarlung-landscape.ps1 -Verify` 已成功，`offscreen-shot.ps1` 已产出 smoke PNG。
-- [ ] **A2 视觉修正 + 正式截图验收**：继续调整轨道/地形关系，之后跑 `scripts\offscreen-shot.ps1 -Name a2-real-dem -WaitSeconds 12 -ResX 2560 -ResY 1440` 或 `scripts\visual-check.ps1`，把正式结果图和 D1/D2/D3 短板追加到打分记录。
+- [x] **B2 光照/曝光先行（橙黄根因修复）**：太阳物理 lux + 物理相机曝光 + 默认 SkyAtmosphere 已恢复蓝天/绿地；截图 `b2-daylight-rayleigh-default-v2`。B 阶段整体仍未 Done，因为还缺云带/最终大气透视/材质层次。
+- [ ] **A2 视觉验收（B2 之后回头做，当前首要）**：晴天画面下用 hero `WaitSeconds 12` 截图判定 D1 峡谷尺度感 + 轨道贴地/穿山，达 D1≥4 才把 A2 标 Done。
 - [x] **低打扰截图实测**：已成功。推荐命令：`powershell -ExecutionPolicy Bypass -File scripts\offscreen-shot.ps1 -Name <name> -WaitSeconds <seconds> -ResX 2560 -ResY 1440`。注意这是 offscreen/低打扰 smoke path，最终验收仍需确认画面有效并按量规打分。
 - [ ] **英雄段人工确认**（阶段 0）：已先选 `WaitSeconds 12` 作为最佳努力默认；如用户想换英雄段，再重新截图并更新本文件。
 

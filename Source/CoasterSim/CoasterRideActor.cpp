@@ -10,6 +10,7 @@
 #include "Components/SkyLightComponent.h"
 #include "Components/SplineComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/Scene.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -118,23 +119,27 @@ ACoasterRideActor::ACoasterRideActor()
     RideCamera->PostProcessSettings.bOverride_ColorContrast = true;
     RideCamera->PostProcessSettings.ColorContrast = FVector4(1.02f, 1.02f, 1.02f, 1.0f);
     RideCamera->PostProcessSettings.bOverride_ColorGamma = true;
-    RideCamera->PostProcessSettings.ColorGamma = FVector4(0.96f, 0.98f, 1.02f, 1.0f);
+    RideCamera->PostProcessSettings.ColorGamma = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
     RideCamera->PostProcessSettings.bOverride_ColorGain = true;
-    RideCamera->PostProcessSettings.ColorGain = FVector4(1.03f, 1.08f, 1.10f, 1.0f);
+    RideCamera->PostProcessSettings.ColorGain = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
     RideCamera->PostProcessSettings.bOverride_WhiteTemp = true;
-    RideCamera->PostProcessSettings.WhiteTemp = 6300.0f;
-    RideCamera->PostProcessSettings.bOverride_AutoExposureMinBrightness = true;
-    RideCamera->PostProcessSettings.AutoExposureMinBrightness = 1.0f;
-    RideCamera->PostProcessSettings.bOverride_AutoExposureMaxBrightness = true;
-    RideCamera->PostProcessSettings.AutoExposureMaxBrightness = 1.0f;
+    RideCamera->PostProcessSettings.WhiteTemp = 6500.0f;
+    RideCamera->PostProcessSettings.bOverride_AutoExposureMethod = true;
+    RideCamera->PostProcessSettings.AutoExposureMethod = AEM_Manual;
+    RideCamera->PostProcessSettings.bOverride_AutoExposureApplyPhysicalCameraExposure = true;
+    RideCamera->PostProcessSettings.AutoExposureApplyPhysicalCameraExposure = true;
+    RideCamera->PostProcessSettings.bOverride_CameraShutterSpeed = true;
+    RideCamera->PostProcessSettings.CameraShutterSpeed = 500.0f;
+    RideCamera->PostProcessSettings.bOverride_CameraISO = true;
+    RideCamera->PostProcessSettings.CameraISO = 100.0f;
     RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-    RideCamera->PostProcessSettings.AutoExposureBias = 0.50f;
+    RideCamera->PostProcessSettings.AutoExposureBias = 0.0f;
     RideCamera->PostProcessSettings.bOverride_FilmSlope = true;
-    RideCamera->PostProcessSettings.FilmSlope = 0.78f;
+    RideCamera->PostProcessSettings.FilmSlope = 0.86f;
     RideCamera->PostProcessSettings.bOverride_FilmToe = true;
-    RideCamera->PostProcessSettings.FilmToe = 0.28f;
+    RideCamera->PostProcessSettings.FilmToe = 0.22f;
     RideCamera->PostProcessSettings.bOverride_FilmShoulder = true;
-    RideCamera->PostProcessSettings.FilmShoulder = 0.28f;
+    RideCamera->PostProcessSettings.FilmShoulder = 0.42f;
     RideCamera->PostProcessSettings.bOverride_FilmGrainIntensity = true;
     RideCamera->PostProcessSettings.FilmGrainIntensity = 0.035f;
     RideCamera->PostProcessSettings.bOverride_SceneFringeIntensity = true;
@@ -142,18 +147,20 @@ ACoasterRideActor::ACoasterRideActor()
     RideCamera->PostProcessSettings.bOverride_DepthOfFieldEnabled = true;
     RideCamera->PostProcessSettings.DepthOfFieldEnabled = true;
     RideCamera->PostProcessSettings.bOverride_DepthOfFieldFstop = true;
-    RideCamera->PostProcessSettings.DepthOfFieldFstop = 7.5f;
+    RideCamera->PostProcessSettings.DepthOfFieldFstop = 11.0f;
     RideCamera->PostProcessSettings.bOverride_DepthOfFieldFocalDistance = true;
     RideCamera->PostProcessSettings.DepthOfFieldFocalDistance = 4200.0f;
 
     SkyLight = CreateDefaultSubobject<USkyLightComponent>(TEXT("SkyLight"));
     SkyLight->SetupAttachment(SceneRoot);
-    SkyLight->SetIntensity(4.2f);
+    SkyLight->SetIntensity(3.0f);
+    SkyLight->SetRealTimeCapture(true);
 
     SunLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("SunLight"));
     SunLight->SetupAttachment(SceneRoot);
-    SunLight->SetRelativeRotation(FRotator(-42.0f, -18.0f, 0.0f));
-    SunLight->SetIntensity(32.0f);
+    SunLight->SetRelativeRotation(FRotator(-55.0f, -18.0f, 0.0f));
+    SunLight->SetIntensity(120000.0f);
+    SunLight->SetUseTemperature(true);
     SunLight->SetTemperature(6500.0f);
     SunLight->SetLightColor(FLinearColor(1.0f, 1.0f, 1.0f));
     SunLight->SetAtmosphereSunLight(true);
@@ -161,9 +168,6 @@ ACoasterRideActor::ACoasterRideActor()
 
     SkyAtmosphere = CreateDefaultSubobject<USkyAtmosphereComponent>(TEXT("SkyAtmosphere"));
     SkyAtmosphere->SetupAttachment(SceneRoot);
-    SkyAtmosphere->SetRayleighScatteringScale(1.85f);
-    SkyAtmosphere->SetMieScatteringScale(0.006f);
-    SkyAtmosphere->SetAerialPerspectiveStartDepth(5200.0f);
 
     ValleyFog = CreateDefaultSubobject<UExponentialHeightFogComponent>(TEXT("ValleyFog"));
     ValleyFog->SetupAttachment(SceneRoot);
@@ -173,7 +177,7 @@ ACoasterRideActor::ACoasterRideActor()
     ValleyFog->SetFogMaxOpacity(0.035f);
     ValleyFog->SetStartDistance(12000.0f);
     ValleyFog->SetFogInscatteringColor(FLinearColor(0.78f, 0.88f, 1.0f));
-    ValleyFog->SetVolumetricFog(true);
+    ValleyFog->SetVolumetricFog(false);
     ValleyFog->SetVolumetricFogScatteringDistribution(0.28f);
     ValleyFog->SetVolumetricFogExtinctionScale(0.02f);
     ValleyFog->SetVolumetricFogDistance(22000.0f);
@@ -263,6 +267,7 @@ void ACoasterRideActor::BeginPlay()
     ApplyVisualMaterials();
     RebuildEnvironment();
     RebuildVisuals();
+    SkyLight->RecaptureSky();
     StartRideFromCommandLine(0.34f, 18.0f);
 }
 
