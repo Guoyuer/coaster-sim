@@ -191,6 +191,52 @@ def moving_average_points(
     return current
 
 
+def extract_thalweg(heightfield: Heightfield, step_x: int = 5, search_radius: int = 70) -> list[tuple[float, float, float]]:
+    width = heightfield.width
+    height = heightfield.height
+    start_x = max(4, int(width * 0.10))
+    end_x = min(width - 5, int(width * 0.90))
+
+    first_x = (start_x + end_x) // 2
+    previous_y = min(
+        range(int(height * 0.12), int(height * 0.88)),
+        key=lambda y: heightfield.heights_cm[y * width + first_x],
+    )
+
+    columns = list(range(first_x, end_x, step_x))
+    forward = trace_columns(heightfield, columns, previous_y, search_radius)
+    columns = list(range(first_x - step_x, start_x, -step_x))
+    backward = trace_columns(heightfield, columns, previous_y, search_radius)
+    grid_path = list(reversed(backward)) + forward
+    world_path = []
+    for gx, gy in grid_path:
+        x, y = heightfield.grid_to_world(gx, gy)
+        world_path.append((x, y, heightfield.sample_cm(x, y)))
+    return moving_average_points(world_path, radius=5, passes=3)
+
+
+def trace_columns(
+    heightfield: Heightfield,
+    columns: list[int],
+    start_y: int,
+    search_radius: int,
+) -> list[tuple[float, float]]:
+    width = heightfield.width
+    height = heightfield.height
+    previous_y = start_y
+    path = []
+    for x in columns:
+        y_min = max(2, previous_y - search_radius)
+        y_max = min(height - 3, previous_y + search_radius)
+        best_y = min(
+            range(y_min, y_max + 1),
+            key=lambda y: heightfield.heights_cm[y * width + x] + abs(y - previous_y) * 45.0,
+        )
+        previous_y = best_y
+        path.append((float(x), float(best_y)))
+    return path
+
+
 def catmull_rom(
     p0: tuple[float, float, float],
     p1: tuple[float, float, float],

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-from yarlung_track_lib import TrackPoint, closed_polyline_length, load_heightfield, read_track_csv
+from yarlung_track_lib import TrackPoint, closed_polyline_length, extract_thalweg, load_heightfield, read_track_csv
 
 
 SECTION_COLORS = {
@@ -200,6 +200,17 @@ def draw_track(draw: ImageDraw.ImageDraw, points: list[TrackPoint], heightfield,
         draw.polygon((tip, p1, p2), fill=(0, 0, 0))
 
 
+def draw_thalweg(draw: ImageDraw.ImageDraw, thalweg: list[tuple[float, float, float]], heightfield, scale: int) -> None:
+    pixels = []
+    for x, y, _z in thalweg:
+        gx, gy = heightfield.world_to_grid(x, y)
+        pixels.append((int(round(gx * scale)), int(round(gy * scale))))
+    if len(pixels) < 2:
+        return
+    draw.line(pixels, fill=(0, 0, 0), width=max(5, 5 * scale), joint="curve")
+    draw.line(pixels, fill=(255, 255, 255), width=max(2, 2 * scale), joint="curve")
+
+
 def track_pixel_bbox(points: list[TrackPoint], heightfield, scale: int, width: int, height: int) -> tuple[int, int, int, int]:
     pixels = [to_scaled_pixel(point, heightfield, scale) for point in points]
     margin = 110 * scale
@@ -210,9 +221,38 @@ def track_pixel_bbox(points: list[TrackPoint], heightfield, scale: int, width: i
     return left, top, right, bottom
 
 
+def point_segment_distance_xy_m(
+    point_x: float,
+    point_y: float,
+    a: tuple[float, float, float],
+    b: tuple[float, float, float],
+) -> float:
+    ax, ay = a[0], a[1]
+    bx, by = b[0], b[1]
+    dx = bx - ax
+    dy = by - ay
+    length_sq = dx * dx + dy * dy
+    if length_sq < 1.0:
+        return math.hypot(point_x - ax, point_y - ay) / 100.0
+    t = max(0.0, min(1.0, ((point_x - ax) * dx + (point_y - ay) * dy) / length_sq))
+    closest_x = ax + dx * t
+    closest_y = ay + dy * t
+    return math.hypot(point_x - closest_x, point_y - closest_y) / 100.0
+
+
+def nearest_thalweg_distance_m(point: TrackPoint, thalweg: list[tuple[float, float, float]]) -> float:
+    if len(thalweg) < 2:
+        return 0.0
+    return min(
+        point_segment_distance_xy_m(point.x, point.y, a, b)
+        for a, b in zip(thalweg, thalweg[1:])
+    )
+
+
 def point_river_rows(
     points: list[TrackPoint],
     heightfield,
+    thalweg: list[tuple[float, float, float]],
     river: list[int],
     river_centroids: list[float],
     mask_distance_px: list[float],
@@ -239,6 +279,7 @@ def point_river_rows(
                 "river_mask": river_value,
                 "centerline_offset_m": f"{centerline_offset_m:.2f}",
                 "mask_edge_distance_m": f"{mask_edge_distance_m:.2f}",
+                "dem_thalweg_offset_m": f"{nearest_thalweg_distance_m(point, thalweg):.2f}",
             }
         )
     return rows
@@ -247,11 +288,13 @@ def point_river_rows(
 def summarize(rows: list[dict[str, object]]) -> tuple[list[str], dict[str, list[float]]]:
     offsets = [float(row["centerline_offset_m"]) for row in rows]
     mask_distances = [float(row["mask_edge_distance_m"]) for row in rows]
+    thalweg_offsets = [float(row["dem_thalweg_offset_m"]) for row in rows]
     inside_count = sum(1 for row in rows if int(row["river_mask"]) > 24)
     lines = [
         f"river-mask samples: {inside_count}/{len(rows)} ({inside_count / max(1, len(rows)) * 100:.1f}%)",
-        f"centerline offset m: med {quantile(offsets, 0.50):.1f} / p90 {quantile(offsets, 0.90):.1f} / max {max(offsets):.1f}",
+        f"macro-mask center offset m: med {quantile(offsets, 0.50):.1f} / p90 {quantile(offsets, 0.90):.1f} / max {max(offsets):.1f}",
         f"river-mask edge dist m: med {quantile(mask_distances, 0.50):.1f} / p90 {quantile(mask_distances, 0.90):.1f} / max {max(mask_distances):.1f}",
+        f"DEM thalweg offset m: med {quantile(thalweg_offsets, 0.50):.1f} / p90 {quantile(thalweg_offsets, 0.90):.1f} / max {max(thalweg_offsets):.1f}",
     ]
 
     by_section: dict[str, list[float]] = defaultdict(list)
@@ -277,7 +320,7 @@ def draw_panel(
     y += 28
     draw.text((x, y), "Base: raw hillshade, autocontrast", fill=PANEL_MUTED, font=font)
     y += 18
-    draw.text((x, y), "Cyan: river-mask red channel", fill=PANEL_MUTED, font=font)
+    draw.text((x, y), "Cyan: macro river mask; white: DEM thalweg", fill=PANEL_MUTED, font=font)
     y += 18
     draw.text((x, y), "Track: YarlungTrack.csv by section", fill=PANEL_MUTED, font=font)
     y += 30
@@ -288,7 +331,7 @@ def draw_panel(
         y += 18
 
     y += 14
-    draw.text((x, y), "Section centerline offset (med/p90/max m)", fill=PANEL_FG, font=font)
+    draw.text((x, y), "Section macro-mask center offset (med/p90/max m)", fill=PANEL_FG, font=font)
     y += 22
     for section in SECTION_COLORS:
         values = by_section.get(section)
@@ -342,12 +385,13 @@ def main() -> None:
     root = Path.cwd()
     heightfield = load_heightfield(root)
     points = read_track_csv(root / args.track)
+    thalweg = extract_thalweg(heightfield)
     river, width, height = load_river_channel(root / args.masks)
     mask = [value > args.river_threshold for value in river]
     river_centroids = river_centroid_by_column(river, width, height)
     mask_distance_px = chamfer_distance_to_mask(mask, width, height)
 
-    rows = point_river_rows(points, heightfield, river, river_centroids, mask_distance_px, width, height)
+    rows = point_river_rows(points, heightfield, thalweg, river, river_centroids, mask_distance_px, width, height)
     csv_path = Path(args.csv)
     write_csv(root / csv_path, rows)
     summary_lines, by_section = summarize(rows)
@@ -357,6 +401,7 @@ def main() -> None:
     scaled = base.resize((width * args.scale, height * args.scale), resample)
     map_with_track = scaled.copy()
     map_draw = ImageDraw.Draw(map_with_track)
+    draw_thalweg(map_draw, thalweg, heightfield, args.scale)
     draw_track(map_draw, points, heightfield, args.scale, ImageFont.load_default())
 
     panel_width = 760
