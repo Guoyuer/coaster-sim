@@ -9,9 +9,19 @@ enum class ECoasterSection : uint8
 {
     Station,
     Lift,
+    Outbound,
+    Turnaround,
+    Return,
     Coast,
     Launch,
     Brake
+};
+
+struct FCoasterSectionRange
+{
+    float StartDistanceCm = 0.0f;
+    float EndDistanceCm = 0.0f;
+    ECoasterSection Section = ECoasterSection::Coast;
 };
 
 UCLASS(ClassGroup = (Coaster), meta = (BlueprintSpawnableComponent))
@@ -20,6 +30,7 @@ class COASTERSIM_API UCoasterTrackComponent : public USplineComponent
     GENERATED_BODY()
 
 public:
+    bool LoadGeneratedTrack(const FString& CsvPath);
     void RebuildFromControlPoints(const TArray<FVector>& ControlPoints);
     float GetTrackLengthCm() const;
     void SampleBaseFrame(
@@ -31,6 +42,15 @@ public:
         FVector& OutUp) const;
     ECoasterSection GetLegacySection(float TrackRatio) const;
     FName GetLegacySectionName(float TrackRatio) const;
+    ECoasterSection GetSectionAtDistance(float DistanceCm) const;
+    FName GetSectionNameAtDistance(float DistanceCm) const;
 
     static FName SectionName(ECoasterSection Section);
+
+private:
+    static ECoasterSection ParseSectionName(const FString& Value);
+    void BuildSectionRanges(const TArray<FVector>& Points, const TArray<ECoasterSection>& Sections);
+
+    TArray<FCoasterSectionRange> SectionRanges;
+    TArray<float> GeneratedRollDegrees;
 };

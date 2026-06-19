@@ -77,4 +77,5 @@ P2 starts only after P0 and P1 are both usable:
 
 - Runtime loads `YarlungTrack.csv`.
 - Section lookup switches from legacy ratios to distance ranges.
-- Existing short-loop fallback remains available if the CSV is missing.
+- The generated CSV is required for the Yarlung runtime path; missing or invalid
+  CSV is a hard error, not an automatic fallback to the legacy short loop.

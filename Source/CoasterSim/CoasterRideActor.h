@@ -153,7 +153,7 @@ private:
     void AdvanceRide(float DeltaSeconds);
     void UpdateFirstPersonCamera();
     void SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const;
-    FName GetSectionName(float TrackRatio) const;
+    FName GetSectionName(float DistanceCm) const;
 
     FCoasterTelemetry Telemetry;
     FVector LastVelocityCms = FVector::ZeroVector;

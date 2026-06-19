@@ -68,7 +68,7 @@
 
 同时生成器更新 `manifest.json` 增加 `track` 块：`{length_m, control_point_count, out_back_split_m, min_clearance_m, min_curve_radius_m, max_grade_pct, est_max_vert_g, est_max_lat_g, section_distances_m:{...}}`。
 
-> 决策 D1：**长轨道不再硬编码进 `.h`**。~5km 在合理控制点间距下约 80–160 点，且必须可从 DEM 再生。改为生成+提交的 CSV，符合现有「generated assets」模式（`.r16`/macro/manifest 都是生成提交的）。`DefaultTrackControlPoints()` 保留为 fallback/legacy。
+> 决策 D1：**长轨道不再硬编码进 `.h`**。~5km 在合理控制点间距下约 80–160 点，且必须可从 DEM 再生。改为生成+提交的 CSV，符合现有「generated assets」模式（`.r16`/macro/manifest 都是生成提交的）。Yarlung 运行时路径必须加载 `YarlungTrack.csv`；`DefaultTrackControlPoints()` 只保留为旧原型/显式测试资料，不作为自动 fallback。
 
 ---
 
@@ -151,7 +151,7 @@
 
 ### 6.1 长轨道与数据驱动（P2 起，建在 P0 干净边界上）
 
-1. **加载长轨道**：`UCoasterTrackComponent::LoadGeneratedTrack()` 读 `YarlungTrack.csv` 填控制点（+ 每点 `roll_deg/section/terrain_z`）。优先用它；CSV 缺失时回退 `DefaultTrackControlPoints()`。`RebuildSpline` 逻辑不变（已支持任意点数、闭环）。
+1. **加载长轨道**：`UCoasterTrackComponent::LoadGeneratedTrack()` 读 `YarlungTrack.csv` 填控制点（+ 每点 `roll_deg/section/terrain_z`）。CSV 缺失或解析失败必须报错并停止装载，不能回退 `DefaultTrackControlPoints()`。`RebuildSpline` 逻辑不变（已支持任意点数、闭环）。
 2. **分段按距离查表**：`GetSectionName(float TrackRatio)` 改为 `GetSectionName(float DistanceCm)`，按生成器写入的 `section_distances` 命中标签。`AdvanceRide` 调用处同步。
 3. **曲率驱动 banking**（替换 `SampleFrame:775` 正弦）：
    - 由样条在该距离的曲率 `κ`（或半径 `R=1/κ`）与当前速度 `v` 求**抵消横向 G 的倾斜** `θ = atan(v² / (g·R))`，限幅 `≤ bank_max`（如 70°），并沿弧长**限速率**（避免 banking 抖动）。

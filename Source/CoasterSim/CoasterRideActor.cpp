@@ -16,6 +16,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/CommandLine.h"
+#include "Misc/Paths.h"
 #include "Misc/Parse.h"
 #include "ProceduralMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -343,7 +344,14 @@ void ACoasterRideActor::StartRideFromCommandLine(float DefaultTrackRatio, float 
 
 void ACoasterRideActor::RebuildSpline()
 {
-    TrackSpline->RebuildFromControlPoints(ControlPoints);
+    const FString GeneratedTrackPath = FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungTrack.csv");
+    if (!TrackSpline->LoadGeneratedTrack(GeneratedTrackPath))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Unable to rebuild coaster spline because generated long-track CSV failed to load."));
+        TrackLengthCm = 1.0f;
+        return;
+    }
+
     TrackLengthCm = TrackSpline->GetTrackLengthCm();
 }
 
@@ -686,8 +694,7 @@ void ACoasterRideActor::AdvanceRide(float DeltaSeconds)
     FRotator Rotation;
     SampleFrame(CurrentDistanceCm, Location, Rotation, Forward, Right, Up);
 
-    const float TrackRatio = CurrentDistanceCm / TrackLengthCm;
-    const FName SectionName = GetSectionName(TrackRatio);
+    const FName SectionName = GetSectionName(CurrentDistanceCm);
     const float GravityAccel = FVector::DotProduct(FVector(0.0f, 0.0f, -GravityCms2), Forward);
     const float DragAccel = 0.000015f * CurrentSpeedCms * CurrentSpeedCms;
     const float RollingAccel = 18.0f;
@@ -759,7 +766,7 @@ void ACoasterRideActor::SampleFrame(float DistanceCm, FVector& OutLocation, FRot
     OutRotation = FRotationMatrix::MakeFromXZ(OutForward, OutUp).Rotator();
 }
 
-FName ACoasterRideActor::GetSectionName(float TrackRatio) const
+FName ACoasterRideActor::GetSectionName(float DistanceCm) const
 {
-    return TrackSpline->GetLegacySectionName(TrackRatio);
+    return TrackSpline->GetSectionNameAtDistance(DistanceCm);
 }
