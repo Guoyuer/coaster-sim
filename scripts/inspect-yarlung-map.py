@@ -107,6 +107,24 @@ def main():
                 f"materials={material_names}"
             )
 
+    scenery_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungSceneryActor")]
+    if len(scenery_actors) != 1:
+        raise RuntimeError(f"Expected exactly one YarlungSceneryActor, found {len(scenery_actors)}")
+    for actor in scenery_actors:
+        emit(f"[YARLUNG-INSPECT] scenery={actor.get_actor_label()} class={actor.get_class().get_name()}")
+        total_instances = 0
+        for component in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
+            material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
+            instance_count = component.get_instance_count()
+            total_instances += instance_count
+            emit(
+                f"[YARLUNG-INSPECT] scenery_component={component.get_name()} "
+                f"class={component.get_class().get_name()} hidden={component.get_editor_property('hidden_in_game')} "
+                f"materials={material_names} instances={instance_count}"
+            )
+        if total_instances < 4000:
+            raise RuntimeError(f"Yarlung scenery scatter is too sparse: {total_instances} instances")
+
     cliff_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungCliffActor")]
     if cliff_actors:
         raise RuntimeError(f"Unexpected YarlungCliffActor still present: {len(cliff_actors)}")

@@ -4,6 +4,7 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "CoasterRideActor.h"
 #include "YarlungRiverActor.h"
+#include "YarlungSceneryActor.h"
 #include "YarlungCoasterProfile.h"
 #include "Editor.h"
 #include "FileHelpers.h"
@@ -151,6 +152,15 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
     if (River)
     {
         River->SetActorLabel(TEXT("YarlungRiverScenery"));
+    }
+
+    AYarlungSceneryActor* Scenery = World->SpawnActor<AYarlungSceneryActor>(
+        AYarlungSceneryActor::StaticClass(),
+        FVector::ZeroVector,
+        FRotator::ZeroRotator);
+    if (Scenery)
+    {
+        Scenery->SetActorLabel(TEXT("YarlungForestRockScenery"));
     }
 
     if (!UEditorLoadingAndSavingUtils::SaveMap(World, MapPackagePath))
