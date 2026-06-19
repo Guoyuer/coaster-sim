@@ -129,7 +129,7 @@ protected:
     float RailGaugeCm = 170.0f;
 
     UPROPERTY(EditAnywhere, Category = "Ride", meta = (ClampMin = "0.0"))
-    float LiftTargetSpeedMps = 7.0f;
+    float LiftTargetSpeedMps = 12.0f;
 
     UPROPERTY(EditAnywhere, Category = "Ride", meta = (ClampMin = "0.0"))
     float LaunchTargetSpeedMps = 34.0f;

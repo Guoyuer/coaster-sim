@@ -168,7 +168,7 @@ def ride_accel_components(section: str, speed_mps: float, forward: tuple[float, 
     drive = 0.0
     brake = 0.0
     if section == "Lift":
-        drive = clamp((7.0 - speed_mps) * 2.0, 0.0, 9.8)
+        drive = clamp((12.0 - speed_mps) * 2.0, 0.0, 9.8)
     elif section == "Launch":
         drive = 7.2 if speed_mps < 34.0 else 0.0
     elif section == "Brake":

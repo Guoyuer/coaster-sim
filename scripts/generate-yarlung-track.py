@@ -35,6 +35,13 @@ SECTION_COLORS = {
 GRAVITY_MPS2 = 9.80665
 
 
+def smoothstep(edge0: float, edge1: float, value: float) -> float:
+    if edge0 == edge1:
+        return 1.0 if value >= edge1 else 0.0
+    t = max(0.0, min(1.0, (value - edge0) / (edge1 - edge0)))
+    return t * t * (3.0 - 2.0 * t)
+
+
 def extract_thalweg(heightfield: Heightfield, step_x: int = 5, search_radius: int = 70) -> list[tuple[float, float, float]]:
     width = heightfield.width
     height = heightfield.height
@@ -133,6 +140,8 @@ def build_out_and_back(
 
     points: list[TrackPoint] = []
     station_z = None
+    station_extra_cm = 15000.0
+    outbound_descent_cm = 22500.0
     for index, center in enumerate(outbound_center):
         ratio = index / max(1, len(outbound_center) - 1)
         nx, ny = tangent_normal(outbound_center, index)
@@ -140,10 +149,11 @@ def build_out_and_back(
         x = center[0] + nx * offset_cm
         y = center[1] + ny * offset_cm
         terrain_z = heightfield.sample_cm(x, y)
-        descent_drop = 8500.0 * ratio
-        airtime = math.sin(ratio * math.pi * 8.0) * 900.0 * (0.25 + 0.75 * ratio)
         if station_z is None:
-            station_z = terrain_z + clearance_m * 100.0 + 3200.0
+            station_z = terrain_z + clearance_m * 100.0 + station_extra_cm
+        descent_drop = outbound_descent_cm * ratio
+        airtime_envelope = smoothstep(0.16, 0.26, ratio) * (1.0 - smoothstep(0.88, 0.96, ratio))
+        airtime = math.sin(ratio * math.pi * 30.0 + 0.4) * 1900.0 * airtime_envelope
         design_z = station_z - descent_drop + airtime
         z = max(terrain_z + clearance_m * 100.0, design_z)
         section = section_for("outbound", ratio)
@@ -151,6 +161,7 @@ def build_out_and_back(
         points.append(TrackPoint(len(points), x, y, z, roll, section, terrain_z))
 
     return_center = list(reversed(outbound_center))
+    return_start_z = (station_z or return_center[0][2]) - outbound_descent_cm + return_extra_height_m * 100.0
     for index, center in enumerate(return_center):
         ratio = index / max(1, len(return_center) - 1)
         nx, ny = tangent_normal(return_center, index)
@@ -158,9 +169,10 @@ def build_out_and_back(
         x = center[0] - nx * offset_cm
         y = center[1] - ny * offset_cm
         terrain_z = heightfield.sample_cm(x, y)
-        climb = 6500.0 * ratio
-        wave = math.sin(ratio * math.pi * 5.0 + 0.3) * 520.0
-        design_z = (station_z or terrain_z) - 7600.0 + climb + wave + return_extra_height_m * 100.0
+        climb = ((station_z or terrain_z) - return_start_z) * smoothstep(0.0, 1.0, ratio)
+        return_wave_envelope = smoothstep(0.08, 0.18, ratio) * (1.0 - smoothstep(0.78, 0.90, ratio))
+        wave = math.sin(ratio * math.pi * 18.0 + 0.3) * 440.0 * return_wave_envelope
+        design_z = return_start_z + climb + wave
         if ratio > 0.82 and station_z is not None:
             blend = (ratio - 0.82) / 0.18
             design_z = design_z * (1.0 - blend) + station_z * blend
@@ -169,7 +181,7 @@ def build_out_and_back(
         roll = 0.0
         points.append(TrackPoint(len(points), x, y, z, roll, section, terrain_z))
 
-    smooth_z(points, radius=2, passes=2, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
+    smooth_z(points, radius=1, passes=1, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
     apply_curvature_banking(points, design_speed_mps=design_speed_mps, max_bank_deg=max_bank_deg)
     smooth_roll(points, radius=2, passes=2)
     for idx, point in enumerate(points):
@@ -338,7 +350,7 @@ def write_overlay(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--target-length-m", type=float, default=5000.0)
-    parser.add_argument("--spacing-m", type=float, default=55.0)
+    parser.add_argument("--spacing-m", type=float, default=35.0)
     parser.add_argument("--clearance-m", type=float, default=24.0)
     parser.add_argument("--outbound-offset-m", type=float, default=72.0)
     parser.add_argument("--return-offset-m", type=float, default=148.0)
