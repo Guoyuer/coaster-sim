@@ -34,6 +34,7 @@ constexpr float YarlungEncodedMinZ = 260000.0f;
 constexpr float YarlungEncodedMaxZ = 730000.0f;
 const TCHAR* YarlungTerrainMeshPackagePath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungMeshTerrain");
 const TCHAR* YarlungTerrainMeshAssetName = TEXT("SM_YarlungMeshTerrain");
+const TCHAR* YarlungTerrainMeshObjectPath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungMeshTerrain.SM_YarlungMeshTerrain");
 
 struct FYarlungTerrainTrackPoint
 {
@@ -511,6 +512,7 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
         FPaths::ProjectContentDir(),
         TEXT("Generated/YarlungLandscape/YarlungTsangpo_1009.r16")));
     const FString MapPackagePath = TEXT("/Game/Generated/YarlungLandscape/YarlungLandscape_Level");
+    const bool bSkipTerrainMeshBuild = Params.Contains(TEXT("SkipTerrainMeshBuild"), ESearchCase::IgnoreCase);
 
     TArray<uint8> RawBytes;
     if (!FFileHelper::LoadFileToArray(RawBytes, *HeightmapPath))
@@ -547,7 +549,21 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
         }
     }
 
-    UStaticMesh* MeshTerrainAsset = BuildYarlungTerrainStaticMesh(HeightData);
+    UStaticMesh* MeshTerrainAsset = nullptr;
+    if (bSkipTerrainMeshBuild)
+    {
+        MeshTerrainAsset = LoadObject<UStaticMesh>(nullptr, YarlungTerrainMeshObjectPath);
+        if (!MeshTerrainAsset)
+        {
+            UE_LOG(LogTemp, Error, TEXT("Unable to reuse Yarlung mesh terrain asset: %s"), YarlungTerrainMeshObjectPath);
+            return 1;
+        }
+        UE_LOG(LogTemp, Display, TEXT("Reusing existing Yarlung mesh terrain: %s"), *MeshTerrainAsset->GetPathName());
+    }
+    else
+    {
+        MeshTerrainAsset = BuildYarlungTerrainStaticMesh(HeightData);
+    }
     if (!MeshTerrainAsset)
     {
         return 1;
