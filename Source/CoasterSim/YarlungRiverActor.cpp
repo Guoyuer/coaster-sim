@@ -8,9 +8,9 @@
 
 namespace
 {
-void AddDoubleSidedQuad(TArray<int32>& Triangles, int32 A, int32 B, int32 C, int32 D)
+void AddSingleSidedQuad(TArray<int32>& Triangles, int32 A, int32 B, int32 C, int32 D)
 {
-    Triangles.Append({ A, C, B, B, C, D, A, B, C, B, D, C });
+    Triangles.Append({ A, C, B, B, C, D });
 }
 
 FVector SampleForward(const TArray<FYarlungRiverSample>& Samples, int32 Index)
@@ -43,7 +43,7 @@ bool ParseRiverRow(const FString& Line, FYarlungRiverSample& OutSample)
     OutSample.Center.X = FCString::Atof(*Columns[1]);
     OutSample.Center.Y = FCString::Atof(*Columns[2]);
     OutSample.Center.Z = FCString::Atof(*Columns[3]);
-    OutSample.HalfWidthCm = FCString::Atof(*Columns[4]);
+    OutSample.HalfWidthCm = FMath::Clamp(FCString::Atof(*Columns[4]), 4500.0f, 9000.0f);
     OutSample.Flow = FCString::Atof(*Columns[5]);
     return true;
 }
@@ -183,13 +183,13 @@ void AYarlungRiverActor::BuildWaterMesh(const TArray<FYarlungRiverSample>& Sampl
             Normals.Add((FVector::UpVector - Forward * FlowChop - Right * CrossChop).GetSafeNormal());
             UVs.Add(FVector2D(Sample.Flow * 28.0f, AcrossValue * 0.5f + 0.5f));
             const float BankFade = Saturate((EdgeWeight - 0.72f) / 0.28f);
-            const float Alpha = FMath::Lerp(0.50f, 0.12f, BankFade);
+            const float Alpha = FMath::Lerp(0.26f, 0.05f, BankFade);
             const float MilkyWater = Saturate(Energy * (0.62f + CenterWeight * 0.42f));
             Colors.Add(FLinearColor(
                 FMath::Lerp(0.12f + CenterWeight * 0.24f, 0.62f, MilkyWater),
                 FMath::Lerp(0.42f + CenterWeight * 0.22f, 0.80f, MilkyWater),
                 FMath::Lerp(0.46f + CenterWeight * 0.20f, 0.72f, MilkyWater),
-                FMath::Max(Alpha, 0.22f + MilkyWater * 0.12f)));
+                FMath::Max(Alpha, 0.06f + MilkyWater * 0.04f)));
             Tangents.Add(FProcMeshTangent(Forward, false));
         }
     }
@@ -202,7 +202,7 @@ void AYarlungRiverActor::BuildWaterMesh(const TArray<FYarlungRiverSample>& Sampl
             const int32 B = (Along + 1) * AcrossValues.Num() + Across;
             const int32 C = Along * AcrossValues.Num() + Across + 1;
             const int32 D = (Along + 1) * AcrossValues.Num() + Across + 1;
-            AddDoubleSidedQuad(Triangles, A, B, C, D);
+            AddSingleSidedQuad(Triangles, A, B, C, D);
         }
     }
 
@@ -218,7 +218,7 @@ void AYarlungRiverActor::BuildFoamMesh(const TArray<FYarlungRiverSample>& Sample
     TArray<FLinearColor> Colors;
     TArray<FProcMeshTangent> Tangents;
 
-    const TArray<float> FoamLanes = { -0.82f, -0.62f, -0.36f, -0.12f, 0.18f, 0.46f, 0.72f };
+    const TArray<float> FoamLanes = { -0.72f, -0.34f, 0.22f, 0.62f };
     for (int32 Lane = 0; Lane < FoamLanes.Num(); ++Lane)
     {
         for (int32 Along = 0; Along < Samples.Num(); ++Along)
@@ -231,9 +231,9 @@ void AYarlungRiverActor::BuildFoamMesh(const TArray<FYarlungRiverSample>& Sample
                 + 0.55f * FMath::Sin(Sample.Flow * 233.0f - Lane * 0.8f);
             const float Lateral = (FoamLanes[Lane] + LaneNoise * 0.030f) * Sample.HalfWidthCm;
             const float EdgeWeight = FMath::Abs(FoamLanes[Lane]);
-            const float HalfWidth = FMath::Lerp(72.0f, 210.0f, EdgeWeight)
-                + Energy * FMath::Lerp(36.0f, 190.0f, EdgeWeight)
-                + 44.0f * FMath::Sin(Sample.Flow * 57.0f + Lane * 0.9f);
+            const float HalfWidth = FMath::Lerp(42.0f, 135.0f, EdgeWeight)
+                + Energy * FMath::Lerp(24.0f, 110.0f, EdgeWeight)
+                + 26.0f * FMath::Sin(Sample.Flow * 57.0f + Lane * 0.9f);
             const FVector Center = Sample.Center + Right * Lateral + FVector(0.0f, 0.0f, 34.0f);
             Vertices.Add(Center - Right * HalfWidth);
             Vertices.Add(Center + Right * HalfWidth);
@@ -241,9 +241,9 @@ void AYarlungRiverActor::BuildFoamMesh(const TArray<FYarlungRiverSample>& Sample
             Normals.Add(FVector::UpVector);
             UVs.Add(FVector2D(Sample.Flow * 34.0f, 0.0f));
             UVs.Add(FVector2D(Sample.Flow * 34.0f, 1.0f));
-            const float Alpha = Saturate(FMath::Lerp(0.28f, 0.58f, EdgeWeight) + Energy * 0.18f);
-            Colors.Add(FLinearColor(0.70f, 0.82f, 0.77f, Alpha * 0.62f));
-            Colors.Add(FLinearColor(0.93f, 0.98f, 0.91f, Alpha));
+            const float Alpha = Saturate(FMath::Lerp(0.18f, 0.38f, EdgeWeight) + Energy * 0.10f);
+            Colors.Add(FLinearColor(0.70f, 0.82f, 0.77f, Alpha * 0.45f));
+            Colors.Add(FLinearColor(0.93f, 0.98f, 0.91f, Alpha * 0.72f));
             Tangents.Add(FProcMeshTangent(Forward, false));
             Tangents.Add(FProcMeshTangent(Forward, false));
         }
@@ -255,7 +255,7 @@ void AYarlungRiverActor::BuildFoamMesh(const TArray<FYarlungRiverSample>& Sample
             const int32 B = LaneBase + (Along + 1) * 2;
             const int32 C = LaneBase + Along * 2 + 1;
             const int32 D = LaneBase + (Along + 1) * 2 + 1;
-            AddDoubleSidedQuad(Triangles, A, B, C, D);
+            AddSingleSidedQuad(Triangles, A, B, C, D);
         }
     }
 
@@ -284,7 +284,7 @@ void AYarlungRiverActor::ApplyMaterials()
     if (UMaterialInstanceDynamic* WaterDynamic = WaterMesh->CreateAndSetMaterialInstanceDynamic(0))
     {
         WaterDynamic->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.16f, 0.50f, 0.54f, 0.72f));
-        WaterDynamic->SetScalarParameterValue(TEXT("Opacity"), 0.38f);
+        WaterDynamic->SetScalarParameterValue(TEXT("Opacity"), 0.14f);
         WaterDynamic->SetScalarParameterValue(TEXT("Roughness"), 0.18f);
         WaterDynamic->SetScalarParameterValue(TEXT("Specular"), 0.75f);
     }
@@ -292,7 +292,7 @@ void AYarlungRiverActor::ApplyMaterials()
     if (UMaterialInstanceDynamic* FoamDynamic = FoamMesh->CreateAndSetMaterialInstanceDynamic(0))
     {
         FoamDynamic->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.82f, 0.92f, 0.84f, 0.78f));
-        FoamDynamic->SetScalarParameterValue(TEXT("Opacity"), 0.62f);
+        FoamDynamic->SetScalarParameterValue(TEXT("Opacity"), 0.24f);
         FoamDynamic->SetScalarParameterValue(TEXT("Roughness"), 0.62f);
         FoamDynamic->SetScalarParameterValue(TEXT("Specular"), 0.20f);
     }

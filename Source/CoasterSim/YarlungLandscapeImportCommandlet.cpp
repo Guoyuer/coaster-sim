@@ -5,6 +5,7 @@
 #include "CoasterRideActor.h"
 #include "YarlungRiverActor.h"
 #include "YarlungSceneryActor.h"
+#include "YarlungCorridorProfile.h"
 #include "YarlungMeshTerrainActor.h"
 #include "YarlungTerrainProfile.h"
 #include "YarlungTerrainRelief.h"
@@ -145,35 +146,6 @@ float YarlungCorridorLandformDeltaCm(const FVector2D& Center, float SignedOffset
 
     const float Delta = Buttress * 1850.0f - Ravine * 2100.0f - Talus * 650.0f;
     return WallMask * HeightMask * Delta;
-}
-
-float YarlungAuthoredCorridorHeightCm(const FVector2D& Center, float SignedOffsetCm, float TrackBaseHeight, float BaseHeight)
-{
-    const float AbsOffset = FMath::Abs(SignedOffsetCm);
-    const float Side = SignedOffsetCm >= 0.0f ? 1.0f : -1.0f;
-    const float Along = Center.X * 0.00032f + Center.Y * 0.00027f;
-    const float Across = AbsOffset * 0.000044f;
-
-    const float Talus = YarlungTerrain::Smooth01((AbsOffset - 24000.0f) / 52000.0f);
-    const float Wall = YarlungTerrain::Smooth01((AbsOffset - 62000.0f) / 50000.0f);
-    const float Skyline = YarlungTerrain::Smooth01((AbsOffset - 104000.0f) / 24000.0f);
-    const float ProfileRise = -6200.0f + Talus * 10400.0f + Wall * 18800.0f + Skyline * 7200.0f;
-
-    const float WallMask = YarlungTerrain::Smooth01((AbsOffset - 30000.0f) / 34000.0f)
-        * (1.0f - YarlungTerrain::Smooth01((AbsOffset - 112000.0f) / 18000.0f));
-    const float Buttress =
-        0.58f * FMath::Sin(Along * 1.35f + Side * 1.1f)
-        + 0.42f * FMath::Sin(Along * 2.15f - Across * 1.15f + Side * 2.2f);
-    const float RavineSignal = 0.5f + 0.5f * FMath::Sin(Along * 2.75f + Across * 2.0f - Side * 0.7f);
-    const float Ravine = FMath::Pow(FMath::Clamp(RavineSignal, 0.0f, 1.0f), 4.0f);
-    const float WetGully = FMath::Pow(
-        FMath::Clamp(0.5f + 0.5f * FMath::Sin(Along * 4.2f - Across * 3.1f + Side * 1.8f), 0.0f, 1.0f),
-        8.0f);
-    const float MacroBreakup = WallMask * (Buttress * 3600.0f - Ravine * 6200.0f - WetGully * 2600.0f);
-
-    const float AuthoredHeight = TrackBaseHeight + ProfileRise + MacroBreakup;
-    const float DemBlend = 0.08f + 0.08f * Skyline;
-    return FMath::Lerp(AuthoredHeight, BaseHeight, DemBlend);
 }
 
 FLinearColor YarlungColorAtPosition(float X, float Y, float Height, float RockMask)
@@ -341,14 +313,14 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
                 TrackDistance,
                 ViewCorridorMask);
             const float LandformCm = YarlungCorridorLandformDeltaCm(Center, SignedOffsetCm, BaseHeight);
-            const float AuthoredProfileHeight = YarlungAuthoredCorridorHeightCm(Center, SignedOffsetCm, TrackBaseHeight, BaseHeight);
+            const float AuthoredProfileHeight = YarlungCorridorProfile::AuthoredHeightCm(Center, SignedOffsetCm, TrackBaseHeight, BaseHeight);
             const float ClosestTrackDistance = YarlungViewCorridor::DistanceToTrackCm(TrackPoints, Position2D);
             const float OverlapSuppression = YarlungTerrain::Smooth01((TrackDistance - ClosestTrackDistance - 3000.0f) / 9000.0f);
             const float AuthoredBaseHeight = FMath::Lerp(AuthoredProfileHeight, BaseHeight, OverlapSuppression);
             const float AuthoredDeltaCm = AuthoredBaseHeight - BaseHeight;
 
-            const float NearTrackBlend = 1.0f - YarlungTerrain::Smooth01((FMath::Abs(SignedOffsetCm) - InnerFlattenHalfWidthCm) / 16000.0f);
-            const float RideEnvelopeHeight = TrackBaseHeight - 9500.0f;
+            const float NearTrackBlend = YarlungCorridorProfile::NearTrackBlend(FMath::Abs(SignedOffsetCm));
+            const float RideEnvelopeHeight = YarlungCorridorProfile::RideEnvelopeHeightCm(TrackBaseHeight);
             const float Height = FMath::Lerp(AuthoredBaseHeight + DisplacementCm + LandformCm, RideEnvelopeHeight, NearTrackBlend);
             const int32 VertexIndex = RingIndex * LaneCount + LaneIndex;
             Positions[VertexIndex] = FVector(Position2D.X, Position2D.Y, Height + 25.0f);

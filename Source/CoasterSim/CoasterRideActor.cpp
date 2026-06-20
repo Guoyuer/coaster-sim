@@ -303,7 +303,7 @@ void ACoasterRideActor::RebuildVisuals()
     const float RailHalfGauge = RailGaugeCm * 0.5f;
     const float SegmentStep = 180.0f;
     const float TieStep = 360.0f;
-    const float SupportStep = 7200.0f;
+    const float SupportStep = 14400.0f;
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += SegmentStep)
     {
@@ -383,7 +383,7 @@ void ACoasterRideActor::RebuildVisuals()
             // visible span only (surface -> yoke), not the buried portion.
             const FVector LeftSurface = FVector(YokeLeft.X, YokeLeft.Y, TerrainRefZ);
             const FVector RightSurface = FVector(YokeRight.X, YokeRight.Y, TerrainRefZ);
-            const int32 BraceCount = FMath::Clamp(FMath::FloorToInt(PierHeight / 5000.0f), 0, 4);
+            const int32 BraceCount = FMath::Clamp(FMath::FloorToInt(PierHeight / 9000.0f), 0, 2);
             for (int32 BraceIndex = 1; BraceIndex <= BraceCount; ++BraceIndex)
             {
                 const float BraceT = static_cast<float>(BraceIndex) / static_cast<float>(BraceCount + 1);

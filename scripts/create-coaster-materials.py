@@ -267,7 +267,7 @@ def create_translucent_parameter_material(name, base_color, opacity, roughness, 
     material = create_material_asset(name, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
-    material.set_editor_property("two_sided", True)
+    material.set_editor_property("two_sided", False)
 
     connect_material_property(
         material,
@@ -301,7 +301,7 @@ def create_translucent_vertex_color_material(name, opacity, roughness, specular)
     material = create_material_asset(name, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
-    material.set_editor_property("two_sided", True)
+    material.set_editor_property("two_sided", False)
 
     vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
@@ -385,13 +385,13 @@ def create_opaque_vertex_color_material(name, roughness, specular):
 def create_river_materials():
     create_translucent_vertex_color_material(
         RIVER_WATER_MATERIAL_NAME,
-        0.68,
+        0.14,
         0.18,
         0.75,
     )
     create_translucent_vertex_color_material(
         RIVER_FOAM_MATERIAL_NAME,
-        0.74,
+        0.24,
         0.62,
         0.20,
     )
