@@ -1,0 +1,24 @@
+{
+  "_comment": "Single source of truth for Yarlung terrain georeferencing + river layout. Read by BOTH the Python asset pipeline (scripts/yarlung_config.py) and C++ (YarlungTerrain::Config). Do not hardcode these values anywhere else; the CoasterSim.Yarlung.TerrainConfigParity automation test and scripts/test_yarlung_parity.py enforce that code matches this file.",
+  "grid_size": 1009,
+  "world_bounds_cm": {
+    "min_x": -337778.4313411617,
+    "max_x": 337778.4313411617,
+    "min_y": -416981.55087574443,
+    "max_y": 416981.55087574443
+  },
+  "encoded_height_cm": {
+    "min": 260000.0,
+    "max": 730000.0
+  },
+  "river": {
+    "anchor_x_cm": 95543.0,
+    "anchor_y_cm": -142330.0,
+    "z_cm": 265200.0,
+    "mask_half_width_cm": 26000.0,
+    "centerline_terms": [
+      { "amp_cm": 9000.0, "freq": 0.00009, "phase": 0.25 },
+      { "amp_cm": 4200.0, "freq": 0.00021, "phase": -0.6 }
+    ]
+  }
+}

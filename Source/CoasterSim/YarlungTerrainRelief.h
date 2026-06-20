@@ -7,8 +7,8 @@ namespace YarlungTerrainRelief
 {
 struct FReliefConfig
 {
-    float EncodedMinZ = YarlungTerrain::EncodedMinZCm;
-    float EncodedMaxZ = YarlungTerrain::EncodedMaxZCm;
+    float EncodedMinZ = YarlungTerrain::Config().EncodedMinZCm;
+    float EncodedMaxZ = YarlungTerrain::Config().EncodedMaxZCm;
 
     float SlopeGateStart = 0.0f;
     float SlopeGateRange = 0.10f;

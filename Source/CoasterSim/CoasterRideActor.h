@@ -126,6 +126,16 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Ride", meta = (ClampMin = "0.0"))
     float NumericalStallFloorMps = 0.2f;
 
+    // Resistance / limit knobs for tuning ride feel (were hardcoded in AdvanceRide).
+    UPROPERTY(EditAnywhere, Category = "Ride|Resistance", meta = (ClampMin = "0.0"))
+    float AeroDragCoefficient = 0.000015f;
+
+    UPROPERTY(EditAnywhere, Category = "Ride|Resistance", meta = (ClampMin = "0.0"))
+    float RollingResistanceCms2 = 18.0f;
+
+    UPROPERTY(EditAnywhere, Category = "Ride|Resistance", meta = (ClampMin = "0.0"))
+    float MaxSpeedMps = 56.0f;
+
 private:
     void RebuildSpline();
     void RebuildVisuals();
@@ -133,7 +143,6 @@ private:
     void AdvanceRide(float DeltaSeconds);
     void UpdateFirstPersonCamera();
     void SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const;
-    FName GetSectionName(float DistanceCm) const;
 
     FCoasterTelemetry Telemetry;
     FVector LastVelocityCms = FVector::ZeroVector;

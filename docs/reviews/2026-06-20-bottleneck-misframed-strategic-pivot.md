@@ -79,3 +79,29 @@
 - Status: **战略 PIVOT（建议）** —— 基建与诚实度 PASS；但优先级需要重排。
 - Next（接棒 agent 按此顺序，不要先碰地形）：① 天空+大气（松禁区①）→ ② 整体调色脱白 → ③ 砍支撑幕 → ④ 水体不透明化 → ⑤ 才回到近崖几何，且只针对英雄段局部、用真实资产，不重烤整张 mesh。
 - 不得：继续在台阶上烧轮次直到 1~4 修好；继续用"全轨道无折面"硬 gate 阻塞整体推进。
+
+---
+
+## 追评 · 第一刀（天空+大气，commit `28b141c`）— 2026-06-20
+
+- Reviewed: `git show 28b141c`（`CoasterRideActor.cpp` +79）；截图 `pivot-clouds-atmosphere-v1/v2/v3`、`diag-hide-clouds-v1`（均已 Read）。
+- Verdict: **部分 PASS（诚实）。** 真体积云组件落地（`UVolumetricCloudComponent` + `/Engine/EngineSky/.../m_SimpleVolumetricCloud_Inst`，coverage 0.46/density 0.14），`diag-hide-clouds-v1` 证其可开关=真几何非贴图。大气透视那一半也做了：`ValleyFog` opacity 0.035→0.16、start 12000→5000cm、inscatter 转蓝灰。**比预期完整，无注水。**
+- 但**杠杆未吃满**：① 云读成顶部一块平灰阴天盖子，非参考的分层白色积云带（engine simple cloud + 均匀 coverage 所致）；② `FogMaxOpacity=0.16` + 近山 + **地形纯白反照率** → 薄雾被顶穿，远山几乎不褪色，"泡沫塑料山"仍在；③ 云偏灰发闷。
+- **关键耦合**：第一刀与第二刀绑定——"泡沫塑料山" = 白反照率(②) + 无空气透视(①) 叠加。**地形反照率还是纯白时无法公正判断云/大气**。→ 不回头死调云，直接打第二刀脱白，会顺带让大气透视显形。回头再微调云时：albedo 提到 ~0.9 亮白、降 coverage 或加 scale 变化做出云带、必要时开 `SkyAtmosphere` aerial perspective。
+
+---
+
+## 通读项目 · 结构性"不合理"清扫 — 2026-06-20（已实施 + 截图验证）
+
+用户指令：通读项目，把挡着照片/电影级的不合理设定通通改掉。逐文件读 `CoasterRideActor.cpp`（相机/后处理/光照）、`DefaultEngine.ini`、`create-coaster-materials.py`、`YarlungRiverActor.cpp`、`YarlungSceneryActor.cpp` 后，定位并修复 6 处硬伤（全部 build + offscreen 验证，截图 `pivot-sweep-v1`/`pivot-sweep-hero-v2` 已 Read，无回退）：
+
+1. **过山车 = 哑光塑料**：`ApplyVisualMaterials()` 用 `M_CoasterTint`（Roughness 0.88、Metallic 0）把钢轨/支撑/枕木渲成非金属哑光灰。→ 给 `M_CoasterTint` 加 `Metallic` 参数（默认 0，岩石不受影响），钢轨设 Metallic 1.0/Rough 0.24 抛光钢、支撑 0.9/0.45 喷漆钢、枕木 0.85/0.55 镀锌、车厢深红。**这是过山车本体从不像真车的头号原因。**
+2. **景深 DoF 对焦 42m 把山景模糊掉**：`DepthOfFieldFocalDistance=4200cm` + 开启 → 与史诗远景相反。改为关闭 DoF，全画面锐利。
+3. **FOV 92° 过广畸变**：放大近景杆子、偏游戏感。→ 78°，更电影、近景畸变小。
+4. **江水 Opacity 0.14 = 玻璃板**（86% 透明）。→ Opacity 0.92 近不透明、奶绿松石色、Rough 0.34 乳浊不镜面。
+5. **曝光偏热 + scenery 岩石反照率过高**：诊断证明白不在地形顶点色（已是暗绿）。`RockOutcrops/CliffFaces` 用 `M_CoasterTint` 平涂、albedo 0.23~0.28 ≈ 地形 3 倍 → 过曝爆白。→ 岩石 albedo 降到 ~0.10 湿岩范围；曝光 bias +0.95→-0.25。
+6. **SkyLight=3.0 环境光过抬、阴影发平**。→ 1.1，恢复电影级阴影对比。
+
+**诊断工具留存**：`CoasterRideActor.cpp` BeginPlay 新增命令行旋钮 `-YarlungExposureBias=` / `-YarlungSkyLightIntensity=` / `-YarlungSunIntensity=`，可不重 build 快速 A/B 定位光照问题（本次用它定位了"白来自曝光/材质而非反照率"）。
+
+**裁定**：6 项都是真·结构性不合理、修复无回退、画面更干净（金属轨道/不透明水/稳构图/平衡曝光）。但**这是"便于照片级"的清障，不是达成照片级**——剩余主短板仍是：山体几何/材质（低模折面 + 偏白）、支撑立柱密度（cut #3 未做）、水仍是平面无 flow、云偏平。下一步按 pivot 顺序继续 cut #3（砍支撑）→ 山体真实资产/几何。

@@ -1,14 +1,12 @@
 #include "CoasterTrackComponent.h"
 
-#include "Misc/FileHelper.h"
+#include "YarlungTrackCsv.h"
 #include "Misc/Paths.h"
 
 bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
 {
-    TArray<FString> Lines;
-    if (!FFileHelper::LoadFileToStringArray(Lines, *CsvPath))
+    auto ResetToEmpty = [this]() -> bool
     {
-        UE_LOG(LogTemp, Error, TEXT("Generated coaster track CSV is required but missing: %s"), *CsvPath);
         ClearSplinePoints(false);
         SectionRanges.Reset();
         GeneratedRollSampleDistancesCm.Reset();
@@ -16,54 +14,37 @@ bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
         GeneratedTerrainZCm.Reset();
         UpdateSpline();
         return false;
+    };
+
+    TArray<FYarlungTrackRow> Rows;
+    FString Error;
+    if (!YarlungTrackCsv::Load(CsvPath, Rows, &Error))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Generated coaster track CSV unusable: %s"), *Error);
+        return ResetToEmpty();
     }
 
     TArray<FVector> Points;
     TArray<ECoasterSection> Sections;
     TArray<float> RollDegrees;
     TArray<float> TerrainZCm;
+    Points.Reserve(Rows.Num());
+    Sections.Reserve(Rows.Num());
+    RollDegrees.Reserve(Rows.Num());
+    TerrainZCm.Reserve(Rows.Num());
 
-    for (int32 LineIndex = 1; LineIndex < Lines.Num(); ++LineIndex)
+    for (const FYarlungTrackRow& Row : Rows)
     {
-        const FString Line = Lines[LineIndex].TrimStartAndEnd();
-        if (Line.IsEmpty())
-        {
-            continue;
-        }
-
-        TArray<FString> Columns;
-        Line.ParseIntoArray(Columns, TEXT(","), true);
-        if (Columns.Num() < 7)
-        {
-            UE_LOG(LogTemp, Error, TEXT("Invalid YarlungTrack.csv row %d: expected 7 columns, got %d"), LineIndex + 1, Columns.Num());
-            ClearSplinePoints(false);
-            SectionRanges.Reset();
-            GeneratedRollSampleDistancesCm.Reset();
-            GeneratedRollDegrees.Reset();
-            GeneratedTerrainZCm.Reset();
-            UpdateSpline();
-            return false;
-        }
-
-        Points.Add(FVector(
-            FCString::Atof(*Columns[1]),
-            FCString::Atof(*Columns[2]),
-            FCString::Atof(*Columns[3])));
-        RollDegrees.Add(FCString::Atof(*Columns[4]));
-        Sections.Add(ParseSectionName(Columns[5]));
-        TerrainZCm.Add(FCString::Atof(*Columns[6]));
+        Points.Add(Row.PositionCm);
+        RollDegrees.Add(Row.RollDegrees);
+        Sections.Add(ParseSectionName(Row.Section));
+        TerrainZCm.Add(Row.TerrainZCm);
     }
 
     if (Points.Num() < 4)
     {
         UE_LOG(LogTemp, Error, TEXT("Generated coaster track CSV must contain at least 4 points: %s"), *CsvPath);
-        ClearSplinePoints(false);
-        SectionRanges.Reset();
-        GeneratedRollSampleDistancesCm.Reset();
-        GeneratedRollDegrees.Reset();
-        GeneratedTerrainZCm.Reset();
-        UpdateSpline();
-        return false;
+        return ResetToEmpty();
     }
 
     RebuildFromControlPoints(Points);

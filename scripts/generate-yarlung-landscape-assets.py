@@ -19,18 +19,24 @@ from pathlib import Path
 
 from PIL import Image
 
+from yarlung_config import (
+    HEIGHT_MAX,
+    HEIGHT_MIN,
+    MAX_X,
+    MAX_Y,
+    MIN_X,
+    MIN_Y,
+    RIVER_MASK_HALF_WIDTH_CM,
+    RIVER_Z,
+    SIZE,
+    river_center_y,
+    smooth01,
+)
 
-SIZE = 1009
-MIN_X = -337778.4313411617
-MAX_X = 337778.4313411617
-MIN_Y = -416981.55087574443
-MAX_Y = 416981.55087574443
-RIVER_Z = 265200.0
-RIVER_ANCHOR_X = 95543.0
-RIVER_ANCHOR_Y = -142330.0
-RIVER_MASK_HALF_WIDTH_CM = 26000.0
-HEIGHT_MIN = 260000.0
-HEIGHT_MAX = 730000.0
+
+# World georeferencing, encoded height range, and river anchors/mask now come
+# from Config/yarlung-terrain.json via yarlung_config (imported above) so the C++
+# mesh builder and this asset pipeline share one source of truth.
 NATURALIZE_STEEP_TERRAIN = True
 DEM_WEST_LON = 94.945
 DEM_EAST_LON = 95.015
@@ -43,11 +49,6 @@ DEM_TILE_URL = (
     "Copernicus_DSM_COG_10_{lat_prefix}{lat:02d}_00_{lon_prefix}{lon:03d}_00_DEM/"
     "Copernicus_DSM_COG_10_{lat_prefix}{lat:02d}_00_{lon_prefix}{lon:03d}_00_DEM.tif"
 )
-
-
-def smooth01(value: float) -> float:
-    t = min(1.0, max(0.0, value))
-    return t * t * (3.0 - 2.0 * t)
 
 
 def hash2(ix: int, iy: int, salt: int = 0) -> float:
@@ -67,15 +68,6 @@ def value_noise(x: float, y: float, cell_size: float, salt: int = 0) -> float:
     c = hash2(x0, y0 + 1, salt)
     d = hash2(x0 + 1, y0 + 1, salt)
     return lerp(lerp(a, b, tx), lerp(c, d, tx), ty)
-
-
-def river_center_y(x: float) -> float:
-    offset_x = x - RIVER_ANCHOR_X
-    return (
-        RIVER_ANCHOR_Y
-        + 9000.0 * math.sin(offset_x * 0.00009 + 0.25)
-        + 4200.0 * math.sin(offset_x * 0.00021 - 0.6)
-    )
 
 
 def grid_x_to_world(x_index: float) -> float:

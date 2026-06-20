@@ -1,5 +1,7 @@
 #include "CoasterRideActor.h"
 
+#include "YarlungRiverCsv.h"
+
 #include "CoasterBanking.h"
 #include "CoasterTrackComponent.h"
 
@@ -39,33 +41,26 @@ FTransform MakeSegmentTransform(const FVector& Start, const FVector& End, const 
 bool LoadGeneratedRiverAverageZCm(float& OutZCm)
 {
     const FString Path = FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungRiver.csv");
-    TArray<FString> Lines;
-    if (!FFileHelper::LoadFileToStringArray(Lines, *Path))
+    TArray<FYarlungRiverRow> Rows;
+    FString Error;
+    if (!YarlungRiverCsv::Load(Path, Rows, &Error))
     {
-        UE_LOG(LogTemp, Error, TEXT("Unable to read Yarlung river CSV for fog anchor: %s"), *Path);
+        UE_LOG(LogTemp, Error, TEXT("Unable to read Yarlung river CSV for fog anchor: %s"), *Error);
         return false;
     }
 
-    double SumZ = 0.0;
-    int32 Count = 0;
-    for (int32 LineIndex = 1; LineIndex < Lines.Num(); ++LineIndex)
-    {
-        TArray<FString> Columns;
-        Lines[LineIndex].ParseIntoArray(Columns, TEXT(","), true);
-        if (Columns.Num() >= 4)
-        {
-            SumZ += FCString::Atod(*Columns[3]);
-            ++Count;
-        }
-    }
-
-    if (Count == 0)
+    if (Rows.Num() == 0)
     {
         UE_LOG(LogTemp, Error, TEXT("Yarlung river CSV has no usable fog-anchor samples: %s"), *Path);
         return false;
     }
 
-    OutZCm = static_cast<float>(SumZ / static_cast<double>(Count));
+    double SumZ = 0.0;
+    for (const FYarlungRiverRow& Row : Rows)
+    {
+        SumZ += Row.PositionCm.Z;
+    }
+    OutZCm = static_cast<float>(SumZ / static_cast<double>(Rows.Num()));
     return true;
 }
 
@@ -135,7 +130,7 @@ ACoasterRideActor::ACoasterRideActor()
     RideCamera->SetupAttachment(TrainRoot);
     RideCamera->SetRelativeLocation(FVector(-104.0f, 0.0f, 286.0f));
     RideCamera->SetRelativeRotation(FRotator(-4.0f, 0.0f, 0.0f));
-    RideCamera->SetFieldOfView(92.0f);
+    RideCamera->SetFieldOfView(78.0f);
     RideCamera->bUsePawnControlRotation = false;
     RideCamera->PostProcessSettings.bOverride_MotionBlurAmount = true;
     RideCamera->PostProcessSettings.MotionBlurAmount = 0.025f;
@@ -160,7 +155,10 @@ ACoasterRideActor::ACoasterRideActor()
     RideCamera->PostProcessSettings.bOverride_CameraISO = true;
     RideCamera->PostProcessSettings.CameraISO = 100.0f;
     RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-    RideCamera->PostProcessSettings.AutoExposureBias = 0.95f;
+    // Pivot cut #2: the previous +0.95 bias left the 120000-lux daylight scene
+    // ~1 stop hot, blowing dark rock/terrain toward white and washing out the
+    // new atmospheric perspective. Calibrate down toward physical daylight.
+    RideCamera->PostProcessSettings.AutoExposureBias = -0.25f;
     RideCamera->PostProcessSettings.bOverride_FilmSlope = true;
     RideCamera->PostProcessSettings.FilmSlope = 0.86f;
     RideCamera->PostProcessSettings.bOverride_FilmToe = true;
@@ -171,16 +169,18 @@ ACoasterRideActor::ACoasterRideActor()
     RideCamera->PostProcessSettings.FilmGrainIntensity = 0.035f;
     RideCamera->PostProcessSettings.bOverride_SceneFringeIntensity = true;
     RideCamera->PostProcessSettings.SceneFringeIntensity = 0.05f;
+    // A landscape coaster's hero subject is the km-distant canyon, not anything
+    // 42m away. The old DoF focused at 4200cm actively blurred the vista — the
+    // opposite of an epic cinematic wide shot. Keep the whole frame sharp.
     RideCamera->PostProcessSettings.bOverride_DepthOfFieldEnabled = true;
-    RideCamera->PostProcessSettings.DepthOfFieldEnabled = true;
-    RideCamera->PostProcessSettings.bOverride_DepthOfFieldFstop = true;
-    RideCamera->PostProcessSettings.DepthOfFieldFstop = 11.0f;
-    RideCamera->PostProcessSettings.bOverride_DepthOfFieldFocalDistance = true;
-    RideCamera->PostProcessSettings.DepthOfFieldFocalDistance = 4200.0f;
+    RideCamera->PostProcessSettings.DepthOfFieldEnabled = false;
 
     SkyLight = CreateDefaultSubobject<USkyLightComponent>(TEXT("SkyLight"));
     SkyLight->SetupAttachment(SceneRoot);
-    SkyLight->SetIntensity(3.0f);
+    // Real-time-capture skylight: intensity is a multiplier on the captured
+    // physical sky. 3.0 over-filled shadows, flattening the scene. ~1.1 keeps
+    // ambient physically plausible and restores cinematic shadow contrast.
+    SkyLight->SetIntensity(1.1f);
     SkyLight->SetRealTimeCapture(true);
 
     SunLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("SunLight"));
@@ -294,6 +294,30 @@ void ACoasterRideActor::BeginPlay()
     if (FParse::Param(CommandLine, TEXT("YarlungHideClouds")))
     {
         VolumetricClouds->SetVisibility(false, true);
+    }
+
+    // --- Pivot cut #2 diagnostics: localize the "styrofoam white" terrain ---
+    // Terrain vertex albedo is already dark humid green-grey (~0.08), so the
+    // white must come from the lighting/exposure chain. These command-line
+    // knobs isolate which lever clips it, without re-baking anything.
+    float DiagExposureBias = 0.0f;
+    if (FParse::Value(CommandLine, TEXT("YarlungExposureBias="), DiagExposureBias))
+    {
+        RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
+        RideCamera->PostProcessSettings.AutoExposureBias = DiagExposureBias;
+        UE_LOG(LogTemp, Display, TEXT("[diag] YarlungExposureBias=%.2f"), DiagExposureBias);
+    }
+    float DiagSkyLightIntensity = 0.0f;
+    if (FParse::Value(CommandLine, TEXT("YarlungSkyLightIntensity="), DiagSkyLightIntensity))
+    {
+        SkyLight->SetIntensity(DiagSkyLightIntensity);
+        UE_LOG(LogTemp, Display, TEXT("[diag] YarlungSkyLightIntensity=%.2f"), DiagSkyLightIntensity);
+    }
+    float DiagSunIntensity = 0.0f;
+    if (FParse::Value(CommandLine, TEXT("YarlungSunIntensity="), DiagSunIntensity))
+    {
+        SunLight->SetIntensity(DiagSunIntensity);
+        UE_LOG(LogTemp, Display, TEXT("[diag] YarlungSunIntensity=%.2f"), DiagSunIntensity);
     }
 
     SkyLight->RecaptureSky();
@@ -483,7 +507,7 @@ void ACoasterRideActor::ApplyVisualMaterials()
 {
     UMaterialInterface* TintMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
 
-    auto TintComponent = [TintMaterial](UMeshComponent* Component, const FLinearColor& Color)
+    auto TintComponent = [TintMaterial](UMeshComponent* Component, const FLinearColor& Color, float Metallic, float Roughness)
     {
         if (!Component)
         {
@@ -503,15 +527,20 @@ void ACoasterRideActor::ApplyVisualMaterials()
 
         Material->SetVectorParameterValue(TEXT("Color"), Color);
         Material->SetVectorParameterValue(TEXT("BaseColor"), Color);
-        Material->SetScalarParameterValue(TEXT("Roughness"), 0.88f);
-        Material->SetScalarParameterValue(TEXT("Specular"), 0.10f);
+        Material->SetScalarParameterValue(TEXT("Metallic"), Metallic);
+        Material->SetScalarParameterValue(TEXT("Roughness"), Roughness);
+        Material->SetScalarParameterValue(TEXT("Specular"), 0.5f);
     };
 
-    TintComponent(TrainBody, FLinearColor(0.09f, 0.10f, 0.11f));
-    TintComponent(LeftRail, FLinearColor(0.22f, 0.25f, 0.27f));
-    TintComponent(RightRail, FLinearColor(0.22f, 0.25f, 0.27f));
-    TintComponent(Ties, FLinearColor(0.13f, 0.12f, 0.105f));
-    TintComponent(Supports, FLinearColor(0.20f, 0.24f, 0.27f));
+    // Steel coaster: rails are bright polished steel, the structure is painted/
+    // galvanized metal, ties read as weathered metal-composite. Rendering these
+    // as flat non-metallic matte (old Roughness 0.88, Metallic 0) was the single
+    // biggest reason the track itself never read as a real coaster.
+    TintComponent(TrainBody, FLinearColor(0.16f, 0.015f, 0.012f), 0.55f, 0.32f); // deep red car shell
+    TintComponent(LeftRail, FLinearColor(0.52f, 0.54f, 0.57f), 1.0f, 0.24f);     // polished running rail
+    TintComponent(RightRail, FLinearColor(0.52f, 0.54f, 0.57f), 1.0f, 0.24f);
+    TintComponent(Ties, FLinearColor(0.20f, 0.21f, 0.23f), 0.85f, 0.55f);        // galvanized cross-ties
+    TintComponent(Supports, FLinearColor(0.26f, 0.30f, 0.34f), 0.9f, 0.45f);     // painted steel columns
 }
 
 void ACoasterRideActor::AdvanceRide(float DeltaSeconds)
@@ -528,62 +557,63 @@ void ACoasterRideActor::AdvanceRide(float DeltaSeconds)
     FRotator Rotation;
     SampleFrame(CurrentDistanceCm, Location, Rotation, Forward, Right, Up);
 
-    const FName SectionName = GetSectionName(CurrentDistanceCm);
+    const ECoasterSection Section = TrackSpline->GetSectionAtDistance(CurrentDistanceCm);
     const float GravityAccel = FVector::DotProduct(FVector(0.0f, 0.0f, -GravityCms2), Forward);
-    const float DragAccel = 0.000015f * CurrentSpeedCms * CurrentSpeedCms;
-    const float RollingAccel = 18.0f;
+    const float DragAccel = AeroDragCoefficient * CurrentSpeedCms * CurrentSpeedCms;
+    const float RollingAccel = RollingResistanceCms2;
 
     float DriveAccel = 0.0f;
     float BrakeAccel = 0.0f;
 
-    if (SectionName == TEXT("Lift"))
+    switch (Section)
+    {
+    case ECoasterSection::Lift:
     {
         const float Target = LiftTargetSpeedMps * CmPerMeter;
         DriveAccel = FMath::Clamp((Target - CurrentSpeedCms) * 2.0f, 0.0f, 980.0f);
+        break;
     }
-    else if (SectionName == TEXT("Launch"))
+    case ECoasterSection::Launch:
     {
         const float Target = LaunchTargetSpeedMps * CmPerMeter;
         DriveAccel = CurrentSpeedCms < Target ? 720.0f : 0.0f;
+        break;
     }
-    else if (SectionName == TEXT("Brake"))
+    case ECoasterSection::Brake:
     {
         const float Target = BrakeTargetSpeedMps * CmPerMeter;
         BrakeAccel = CurrentSpeedCms > Target ? FMath::Min((CurrentSpeedCms - Target) * 1.1f, 850.0f) : 0.0f;
+        break;
     }
-    else if (SectionName == TEXT("Station"))
+    case ECoasterSection::Station:
     {
         const float Target = 4.0f * CmPerMeter;
         DriveAccel = FMath::Clamp((Target - CurrentSpeedCms) * 1.0f, -200.0f, 180.0f);
+        break;
     }
-    else if (SectionName == TEXT("Turnaround"))
+    case ECoasterSection::Turnaround:
     {
         const float Target = PoweredTurnaroundTargetSpeedMps * CmPerMeter;
         if (CurrentSpeedCms < Target)
         {
-            DriveAccel = FMath::Clamp(
-                (Target - CurrentSpeedCms) * 1.4f,
-                0.0f,
-                PoweredDriveMaxAccelMps2 * CmPerMeter);
+            DriveAccel = FMath::Clamp((Target - CurrentSpeedCms) * 1.4f, 0.0f, PoweredDriveMaxAccelMps2 * CmPerMeter);
         }
         else
         {
-            BrakeAccel = FMath::Min(
-                (CurrentSpeedCms - Target) * 1.1f,
-                PoweredBrakeMaxAccelMps2 * CmPerMeter);
+            BrakeAccel = FMath::Min((CurrentSpeedCms - Target) * 1.1f, PoweredBrakeMaxAccelMps2 * CmPerMeter);
         }
+        break;
     }
-    else
+    default: // Outbound / Return / Coast → powered cruise
     {
         const float Target = PoweredCruiseTargetSpeedMps * CmPerMeter;
-        DriveAccel = FMath::Clamp(
-            (Target - CurrentSpeedCms) * 1.1f,
-            0.0f,
-            PoweredDriveMaxAccelMps2 * CmPerMeter);
+        DriveAccel = FMath::Clamp((Target - CurrentSpeedCms) * 1.1f, 0.0f, PoweredDriveMaxAccelMps2 * CmPerMeter);
+        break;
+    }
     }
 
     const float NetAccel = DriveAccel + GravityAccel - DragAccel - RollingAccel - BrakeAccel;
-    CurrentSpeedCms = FMath::Clamp(CurrentSpeedCms + NetAccel * DeltaSeconds, NumericalStallFloorMps * CmPerMeter, 5600.0f);
+    CurrentSpeedCms = FMath::Clamp(CurrentSpeedCms + NetAccel * DeltaSeconds, NumericalStallFloorMps * CmPerMeter, MaxSpeedMps * CmPerMeter);
     CurrentDistanceCm = FMath::Fmod(CurrentDistanceCm + CurrentSpeedCms * DeltaSeconds, TrackLengthCm);
 
     FVector NewLocation;
@@ -606,7 +636,7 @@ void ACoasterRideActor::AdvanceRide(float DeltaSeconds)
     Telemetry.VerticalG = FVector::DotProduct(SeatForceCms2, NewUp) / GravityCms2;
     Telemetry.LateralG = FVector::DotProduct(SeatForceCms2, NewRight) / GravityCms2;
     Telemetry.LongitudinalG = FVector::DotProduct(SeatForceCms2, NewForward) / GravityCms2;
-    Telemetry.SectionName = SectionName;
+    Telemetry.SectionName = UCoasterTrackComponent::SectionName(Section);
 }
 
 void ACoasterRideActor::UpdateFirstPersonCamera()
@@ -622,9 +652,4 @@ void ACoasterRideActor::SampleFrame(float DistanceCm, FVector& OutLocation, FRot
     CoasterBanking::ApplyBank(TrackSpline->GetGeneratedBankRadiansAtDistance(WrappedDistance), OutForward, OutRight, OutUp);
 
     OutRotation = FRotationMatrix::MakeFromXZ(OutForward, OutUp).Rotator();
-}
-
-FName ACoasterRideActor::GetSectionName(float DistanceCm) const
-{
-    return TrackSpline->GetSectionNameAtDistance(DistanceCm);
 }

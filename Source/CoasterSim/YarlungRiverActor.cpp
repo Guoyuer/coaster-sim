@@ -1,5 +1,6 @@
 #include "YarlungRiverActor.h"
 
+#include "YarlungRiverCsv.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/CommandLine.h"
@@ -31,23 +32,6 @@ FVector SampleForward(const TArray<FYarlungRiverSample>& Samples, int32 Index)
 FVector SampleRight(const TArray<FYarlungRiverSample>& Samples, int32 Index)
 {
     return FVector::CrossProduct(FVector::UpVector, SampleForward(Samples, Index)).GetSafeNormal();
-}
-
-bool ParseRiverRow(const FString& Line, FYarlungRiverSample& OutSample)
-{
-    TArray<FString> Columns;
-    Line.ParseIntoArray(Columns, TEXT(","), true);
-    if (Columns.Num() < 6)
-    {
-        return false;
-    }
-
-    OutSample.Center.X = FCString::Atof(*Columns[1]);
-    OutSample.Center.Y = FCString::Atof(*Columns[2]);
-    OutSample.Center.Z = FCString::Atof(*Columns[3]);
-    OutSample.HalfWidthCm = FMath::Clamp(FCString::Atof(*Columns[4]), 4500.0f, 9000.0f);
-    OutSample.Flow = FCString::Atof(*Columns[5]);
-    return true;
 }
 
 float Saturate(float Value)
@@ -128,21 +112,23 @@ void AYarlungRiverActor::RebuildRiver()
 bool AYarlungRiverActor::LoadRiverSamples(TArray<FYarlungRiverSample>& OutSamples) const
 {
     const FString Path = FPaths::ProjectContentDir() / RiverCsvRelativePath;
-    TArray<FString> Lines;
-    if (!FFileHelper::LoadFileToStringArray(Lines, *Path))
+    TArray<FYarlungRiverRow> Rows;
+    FString Error;
+    if (!YarlungRiverCsv::Load(Path, Rows, &Error))
     {
-        UE_LOG(LogTemp, Error, TEXT("Unable to read Yarlung river CSV: %s"), *Path);
+        UE_LOG(LogTemp, Error, TEXT("Unable to read Yarlung river CSV: %s"), *Error);
         return false;
     }
 
     OutSamples.Reset();
-    for (int32 LineIndex = 1; LineIndex < Lines.Num(); ++LineIndex)
+    OutSamples.Reserve(Rows.Num());
+    for (const FYarlungRiverRow& Row : Rows)
     {
         FYarlungRiverSample Sample;
-        if (ParseRiverRow(Lines[LineIndex], Sample))
-        {
-            OutSamples.Add(Sample);
-        }
+        Sample.Center = Row.PositionCm;
+        Sample.HalfWidthCm = FMath::Clamp(Row.HalfWidthCm, 4500.0f, 9000.0f);
+        Sample.Flow = Row.Flow;
+        OutSamples.Add(Sample);
     }
 
     if (OutSamples.Num() < 4)
@@ -292,10 +278,13 @@ void AYarlungRiverActor::ApplyMaterials()
 
     if (UMaterialInstanceDynamic* WaterDynamic = WaterMesh->CreateAndSetMaterialInstanceDynamic(0))
     {
-        WaterDynamic->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.16f, 0.50f, 0.54f, 0.72f));
-        WaterDynamic->SetScalarParameterValue(TEXT("Opacity"), 0.14f);
-        WaterDynamic->SetScalarParameterValue(TEXT("Roughness"), 0.18f);
-        WaterDynamic->SetScalarParameterValue(TEXT("Specular"), 0.75f);
+        // Glacial-fed Yarlung water is milky turquoise and nearly opaque, not a
+        // sheet of glass. Old Opacity 0.14 read as a transparent plate floating
+        // on the terrain. Push it opaque, keep a glossy-but-rippled surface.
+        WaterDynamic->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.10f, 0.34f, 0.36f, 0.92f));
+        WaterDynamic->SetScalarParameterValue(TEXT("Opacity"), 0.92f);
+        WaterDynamic->SetScalarParameterValue(TEXT("Roughness"), 0.34f);
+        WaterDynamic->SetScalarParameterValue(TEXT("Specular"), 0.85f);
     }
 
     if (UMaterialInstanceDynamic* FoamDynamic = FoamMesh->CreateAndSetMaterialInstanceDynamic(0))

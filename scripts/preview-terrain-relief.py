@@ -15,15 +15,21 @@ import numpy as np
 from PIL import Image
 import csv
 
-# --- map constants (must match the commandlet) ---
+# --- map constants: shared single source of truth (same as the commandlet) ---
+from yarlung_config import (
+    SIZE as SRC,
+    MIN_X,
+    MAX_X,
+    MIN_Y,
+    MAX_Y,
+    HEIGHT_MIN as ENC_MIN_Z,
+    HEIGHT_MAX as ENC_MAX_Z,
+    RIVER_ANCHOR_X as RIVER_X0,
+)
+
 HEIGHTMAP = "Content/Generated/YarlungLandscape/YarlungTsangpo_1009.r16"
 TRACK_CSV = "Content/Generated/YarlungLandscape/YarlungTrack.csv"
-SRC = 1009
-GRID = 2017                       # mesh grid resolution (4 m spacing)
-MIN_X, MAX_X = -337778.431, 337778.431
-MIN_Y, MAX_Y = -416981.551, 416981.551
-ENC_MIN_Z, ENC_MAX_Z = 260000.0, 730000.0
-RIVER_X0 = 95543.0
+GRID = 2017                       # mesh grid resolution (4 m spacing) — preview-only
 
 # --- TUNABLES (port the winners to C++ YarlungTerrainReliefCm) ---
 SLOPE_A, SLOPE_B = 0.0, 0.10      # SlopeGate = smooth01((slope - A) / B)

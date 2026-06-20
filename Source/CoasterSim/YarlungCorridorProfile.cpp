@@ -1,12 +1,10 @@
 #include "YarlungCorridorProfile.h"
 
+#include "YarlungTerrainProfile.h"
+
 namespace YarlungCorridorProfile
 {
-float Smooth01(float Value)
-{
-    const float T = FMath::Clamp(Value, 0.0f, 1.0f);
-    return T * T * (3.0f - 2.0f * T);
-}
+using YarlungTerrain::Smooth01;
 
 float AuthoredHeightCm(const FVector2D& Center, float SignedOffsetCm, float TrackBaseHeight, float BaseHeight)
 {

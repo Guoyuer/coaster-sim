@@ -1,6 +1,8 @@
 #include "YarlungSceneryActor.h"
 
 #include "YarlungCorridorProfile.h"
+#include "YarlungTerrainProfile.h"
+#include "YarlungTrackCsv.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -12,40 +14,14 @@
 
 namespace
 {
-constexpr int32 HeightmapSize = 1009;
-constexpr float MinX = -337778.431f;
-constexpr float MaxX = 337778.431f;
-constexpr float MinY = -416981.551f;
-constexpr float MaxY = 416981.551f;
-constexpr float EncodedMinZ = 260000.0f;
-constexpr float EncodedMaxZ = 730000.0f;
+// Heightmap dimensions, world bounds, and height encoding all come from
+// YarlungTerrain::Config() (Config/yarlung-terrain.json) — the same source the
+// Python pipeline and the import commandlet use.
 
 float Hash01(float X, float Y)
 {
     const float Value = FMath::Sin(X * 12.9898f + Y * 78.233f) * 43758.5453f;
     return FMath::Frac(Value);
-}
-
-float HeightValueToCm(uint16 Encoded)
-{
-    return FMath::Lerp(EncodedMinZ, EncodedMaxZ, static_cast<float>(Encoded) / 65535.0f);
-}
-
-bool ParseTrackRow(const FString& Line, FYarlungSceneryTrackSample& OutRow)
-{
-    TArray<FString> Columns;
-    Line.ParseIntoArray(Columns, TEXT(","), true);
-    if (Columns.Num() < 7)
-    {
-        return false;
-    }
-
-    OutRow.Position = FVector(
-        FCString::Atof(*Columns[1]),
-        FCString::Atof(*Columns[2]),
-        FCString::Atof(*Columns[3]));
-    OutRow.Section = Columns[5].TrimStartAndEnd();
-    return true;
 }
 
 FVector HorizontalForward(const TArray<FYarlungSceneryTrackSample>& Samples, int32 Index)
@@ -182,20 +158,23 @@ void AYarlungSceneryActor::RebuildScenery()
 bool AYarlungSceneryActor::LoadOutboundTrack(TArray<FYarlungSceneryTrackSample>& OutSamples) const
 {
     const FString Path = FPaths::ProjectContentDir() / TrackCsvRelativePath;
-    TArray<FString> Lines;
-    if (!FFileHelper::LoadFileToStringArray(Lines, *Path))
+    TArray<FYarlungTrackRow> Rows;
+    FString Error;
+    if (!YarlungTrackCsv::Load(Path, Rows, &Error))
     {
-        UE_LOG(LogTemp, Error, TEXT("Unable to read Yarlung scenery track CSV: %s"), *Path);
+        UE_LOG(LogTemp, Error, TEXT("Unable to read Yarlung scenery track CSV: %s"), *Error);
         return false;
     }
 
     OutSamples.Reset();
-    for (int32 LineIndex = 1; LineIndex < Lines.Num(); ++LineIndex)
+    for (const FYarlungTrackRow& Row : Rows)
     {
-        FYarlungSceneryTrackSample Row;
-        if (ParseTrackRow(Lines[LineIndex], Row) && Row.Section.Equals(TEXT("Outbound"), ESearchCase::IgnoreCase))
+        if (Row.Section.Equals(TEXT("Outbound"), ESearchCase::IgnoreCase))
         {
-            OutSamples.Add(Row);
+            FYarlungSceneryTrackSample Sample;
+            Sample.Position = Row.PositionCm;
+            Sample.Section = Row.Section;
+            OutSamples.Add(Sample);
         }
     }
 
@@ -218,6 +197,7 @@ bool AYarlungSceneryActor::LoadHeightmap(TArray<uint16>& OutHeightData) const
         return false;
     }
 
+    const int32 HeightmapSize = YarlungTerrain::Config().GridSize;
     const int32 ExpectedByteCount = HeightmapSize * HeightmapSize * sizeof(uint16);
     if (RawBytes.Num() != ExpectedByteCount)
     {
@@ -232,8 +212,10 @@ bool AYarlungSceneryActor::LoadHeightmap(TArray<uint16>& OutHeightData) const
 
 float AYarlungSceneryActor::SampleHeightCm(const TArray<uint16>& HeightData, float X, float Y) const
 {
-    const float GridX = FMath::Clamp((X - MinX) / (MaxX - MinX) * (HeightmapSize - 1), 0.0f, static_cast<float>(HeightmapSize - 1));
-    const float GridY = FMath::Clamp((Y - MinY) / (MaxY - MinY) * (HeightmapSize - 1), 0.0f, static_cast<float>(HeightmapSize - 1));
+    const YarlungTerrain::FConfig& Tc = YarlungTerrain::Config();
+    const int32 HeightmapSize = Tc.GridSize;
+    const float GridX = FMath::Clamp((X - Tc.MinXCm) / (Tc.MaxXCm - Tc.MinXCm) * (HeightmapSize - 1), 0.0f, static_cast<float>(HeightmapSize - 1));
+    const float GridY = FMath::Clamp((Y - Tc.MinYCm) / (Tc.MaxYCm - Tc.MinYCm) * (HeightmapSize - 1), 0.0f, static_cast<float>(HeightmapSize - 1));
     const int32 X0 = FMath::FloorToInt(GridX);
     const int32 Y0 = FMath::FloorToInt(GridY);
     const int32 X1 = FMath::Min(HeightmapSize - 1, X0 + 1);
@@ -241,9 +223,9 @@ float AYarlungSceneryActor::SampleHeightCm(const TArray<uint16>& HeightData, flo
     const float Tx = GridX - X0;
     const float Ty = GridY - Y0;
 
-    const auto At = [&HeightData](int32 SampleX, int32 SampleY)
+    const auto At = [&HeightData, HeightmapSize](int32 SampleX, int32 SampleY)
     {
-        return HeightValueToCm(HeightData[SampleY * HeightmapSize + SampleX]);
+        return YarlungTerrain::HeightValueToCm(HeightData[SampleY * HeightmapSize + SampleX]);
     };
 
     const float A = FMath::Lerp(At(X0, Y0), At(X1, Y0), Tx);
@@ -319,7 +301,8 @@ void AYarlungSceneryActor::BuildScatter(const TArray<FYarlungSceneryTrackSample>
             const FVector Location2D = Center + Forward * AlongJitterCm + Right * Side * LateralCm;
             const float SignedOffsetCm = Side * LateralCm;
 
-            if (Location2D.X < MinX || Location2D.X > MaxX || Location2D.Y < MinY || Location2D.Y > MaxY)
+            const YarlungTerrain::FConfig& Bounds = YarlungTerrain::Config();
+            if (Location2D.X < Bounds.MinXCm || Location2D.X > Bounds.MaxXCm || Location2D.Y < Bounds.MinYCm || Location2D.Y > Bounds.MaxYCm)
             {
                 continue;
             }
@@ -404,10 +387,14 @@ void AYarlungSceneryActor::ApplyMaterials()
         }
     };
 
-    ApplyTint(RockOutcrops, FLinearColor(0.23f, 0.28f, 0.26f));
+    // Wet Himalayan gorge rock sits around 0.08-0.13 albedo. The old 0.23-0.28
+    // tints were ~3x the terrain mesh (~0.08), so under the daylight sun these
+    // flat-tinted rock assets clipped to "styrofoam white" in the foreground
+    // while the terrain behind them read correctly. Bring them into rock range.
+    ApplyTint(RockOutcrops, FLinearColor(0.105f, 0.125f, 0.118f));
     ApplyTint(UnderstoryClumps, FLinearColor(0.035f, 0.16f, 0.055f));
-    ApplyTint(CliffRockFacesA, FLinearColor(0.18f, 0.23f, 0.22f));
-    ApplyTint(CliffRockFacesB, FLinearColor(0.15f, 0.20f, 0.19f));
+    ApplyTint(CliffRockFacesA, FLinearColor(0.098f, 0.122f, 0.116f));
+    ApplyTint(CliffRockFacesB, FLinearColor(0.086f, 0.108f, 0.102f));
     ApplyTint(ForestShrubsA, FLinearColor(0.026f, 0.13f, 0.048f));
     ApplyTint(ForestShrubsB, FLinearColor(0.045f, 0.18f, 0.068f));
 }

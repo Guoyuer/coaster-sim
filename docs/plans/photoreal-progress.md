@@ -44,7 +44,11 @@
   31. 🟨 **bug/代码卫生 pass v1：护栏更干净，视觉仍 FAIL**。先按用户要求暂停审美堆叠，修会污染判断的 bug/重复代码：新增 `YarlungCorridorProfile`，让 commandlet corridor mesh 与 `AYarlungSceneryActor` 共用同一套 authored talus/buttress/ravine/wet-gully 高度剖面，删除两份重复函数；新增 Automation `CoasterSim.Yarlung.CorridorProfile.*` 覆盖 near-track envelope 与 wall-rise 不变量（日志确认 Found 2 tests，2/2 Success）。水/foam 侧：`AYarlungRiverActor` 改单面 quad、运行时 river half-width clamp 到 45–90m、降低顶点 alpha 与动态 opacity；`M_YarlungRiverWater/Foam` 关 `two_sided` 并降低默认 opacity。支撑侧：`SupportStep 72m→144m`、横撑最多 2 道，减少第一人称支撑占比。验证：UE build PASS；Automation PASS；`import-yarlung-landscape.ps1 -SkipAssetGeneration -ForceMaterials -SkipModels -Verify` PASS；offscreen `Saved\OffscreenShots\cleanup-water-support-v1.png` 与 `cleanup-river-width-v1.png` 已 Read。肉眼结论：支撑噪声降低，但英雄帧的大块白青/棕灰面片几乎不变，说明主问题不只是水材质双面或河宽，仍是 corridor terrain/第一人称遮挡组合的系统性视觉 FAIL；C2 不标 Done。下一步：继续定位这块大面片的 actor/material 来源（必要时做 actor visibility A/B 截图），再决定是切分近景地面/中景山体/河面，还是引入更大的 authored canyon-wall 资产。
   32. ⚠️ **2026-06-20 战略 PIVOT —— 重排优先级，暂停地形（见 [`bottleneck-misframed-strategic-pivot`](../reviews/2026-06-20-bottleneck-misframed-strategic-pivot.md)）**。接棒 agent **不要先碰地形**，按此顺序做 establishing-shot 整体过关：
       1. 🟨 **解封天空 + 大气透视**（杠杆最大）：`UVolumetricCloudComponent` + 轻蓝灰 `ValleyFog` 第一刀已落，`pivot-clouds-atmosphere-v3` 可见云带但未达照片级；后续只做微调，不再把天空禁掉。
-      2. **下一步：整体调色脱"泡沫塑料白"**：湿绿坡 + 不透明奶绿松石江 + 暖谷底。查 `M_YarlungMeshTerrain.TerrainBrightness`/反照率、`M_YarlungCorridorTerrain` 顶点色、太阳色温/SkyLight。便宜。
+      2. **下一步：脱"泡沫塑料白" —— ⚠️ 诊断已修正：不是反照率问题（review 追评已独立验证）。** `YarlungColorAtPosition()` 顶点色其实已是暗绿灰湿润色（Base `0.075,0.145,0.120`／Forest `0.018,0.115,0.048`），材质链 `lerp(vtx, rockTex, 0.12)×TerrainBrightness(0.64)≈0.08` 反照率很暗。**白来自光照/曝光/绑定链，不要去改 `YarlungColorAtPosition` 颜色（已对，改了是浪费一刀）。** 先做**受控诊断定位**，别瞎调：
+         - **A 曝光**：`RideCamera` 现为 `AEM_Manual`+物理相机+`AutoExposureBias=0.95`，疑未对准 `SunLight=120000 lux` 日光。试 bias 降 2~3 档（或设物理 EV≈14~15）→ 若白山变正常 = 曝光冲爆（最可能）。
+         - **B 环境光**：`SkyLight->SetIntensity(3.0)` 临时设 0 → 若山明显变暗 = 实时捕获亮天的环境光过抬。
+         - **C 绑定**：确认 `SM_YarlungCorridorTerrain` 真带顶点色且 `M_YarlungMeshTerrain` 读到（截 vertex-color-only 调试图）→ 若不带 = 退回默认 0.18 灰被冲白。
+         - 哪一刀杀掉白就定位了 lever；定位后再做真实调色（不透明奶绿江 + 暖谷底），**且第一刀的大气透视会顺带显形**（白被压住后远山才褪色）。
       3. **砍第一人称立柱+电缆篱笆**：`ACoasterRideActor` 支撑生成大幅减密度/改稀疏纪念碑桥墩并移出视锥中心，或调相机使其不糊脸。
       4. **江水不透明化**：`M_YarlungRiverWater` 降 translucency + depth fade + flow normal，别再是漂在地面的玻璃板。
       5. **才回到地形折面**：用一张"其余已照片级"的帧裁决；大概率只需英雄段近崖局部用真实岩壁资产/Nanite displacement，不必重烤整张 mesh。

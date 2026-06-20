@@ -69,6 +69,13 @@ def connect_material_property(material, expression, material_property, label):
         raise RuntimeError(f"Unable to connect {label}")
 
 
+def connect_detail_texture(material, texture, x, y, coordinates, material_property, label):
+    """Sample a PBR detail texture and wire it straight to a material output."""
+    sample = create_texture_sample(material, texture, x, y, coordinates)
+    connect_material_property(material, sample, material_property, label)
+    return sample
+
+
 def create_vector_parameter(material, name, value, x, y):
     expression = unreal.MaterialEditingLibrary.create_material_expression(
         material,
@@ -248,6 +255,15 @@ def create_tint_material():
         create_scalar_parameter(material, "Specular", 0.10, -500, 240),
         unreal.MaterialProperty.MP_SPECULAR,
         "tint Specular",
+    )
+    # Metallic param (default 0 = dielectric, e.g. rock/vegetation). The coaster
+    # steel sets this to ~1.0 per component so rails/structure read as real metal
+    # instead of flat matte plastic. Shared material, so rocks leave it at 0.
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "Metallic", 0.0, -500, 400),
+        unreal.MaterialProperty.MP_METALLIC,
+        "tint Metallic",
     )
 
     unreal.MaterialEditingLibrary.set_material_usage(
@@ -448,50 +464,15 @@ def create_mesh_terrain_material(rock_textures):
     ):
         raise RuntimeError("Unable to connect mesh terrain rock BaseColor")
 
-    rock_normal = create_texture_sample(
-        material,
-        rock_textures["T_AerialGrassRock_Normal"],
-        -640,
-        120,
-        detail_coordinates,
-    )
-    connected = unreal.MaterialEditingLibrary.connect_material_property(
-        rock_normal,
-        "",
-        unreal.MaterialProperty.MP_NORMAL,
-    )
-    if not connected:
-        raise RuntimeError("Unable to connect mesh terrain Normal")
-
-    rock_roughness = create_texture_sample(
-        material,
-        rock_textures["T_AerialGrassRock_Rough"],
-        -640,
-        360,
-        detail_coordinates,
-    )
-    connected = unreal.MaterialEditingLibrary.connect_material_property(
-        rock_roughness,
-        "",
-        unreal.MaterialProperty.MP_ROUGHNESS,
-    )
-    if not connected:
-        raise RuntimeError("Unable to connect mesh terrain Roughness")
-
-    rock_ao = create_texture_sample(
-        material,
-        rock_textures["T_AerialGrassRock_AO"],
-        -640,
-        580,
-        detail_coordinates,
-    )
-    connected = unreal.MaterialEditingLibrary.connect_material_property(
-        rock_ao,
-        "",
-        unreal.MaterialProperty.MP_AMBIENT_OCCLUSION,
-    )
-    if not connected:
-        raise RuntimeError("Unable to connect mesh terrain Ambient Occlusion")
+    connect_detail_texture(
+        material, rock_textures["T_AerialGrassRock_Normal"], -640, 120, detail_coordinates,
+        unreal.MaterialProperty.MP_NORMAL, "mesh terrain Normal")
+    connect_detail_texture(
+        material, rock_textures["T_AerialGrassRock_Rough"], -640, 360, detail_coordinates,
+        unreal.MaterialProperty.MP_ROUGHNESS, "mesh terrain Roughness")
+    connect_detail_texture(
+        material, rock_textures["T_AerialGrassRock_AO"], -640, 580, detail_coordinates,
+        unreal.MaterialProperty.MP_AMBIENT_OCCLUSION, "mesh terrain Ambient Occlusion")
 
     connect_material_property(
         material,
@@ -606,13 +587,7 @@ def create_landscape_material(rock_textures, grass_textures, macro_textures):
         640,
         "landscape detail normal",
     )
-    connected = unreal.MaterialEditingLibrary.connect_material_property(
-        detail_normal,
-        "",
-        unreal.MaterialProperty.MP_NORMAL,
-    )
-    if not connected:
-        raise RuntimeError("Unable to connect landscape Normal")
+    connect_material_property(material, detail_normal, unreal.MaterialProperty.MP_NORMAL, "landscape Normal")
 
     rock_roughness = create_texture_sample(
         material,
@@ -652,13 +627,7 @@ def create_landscape_material(rock_textures, grass_textures, macro_textures):
         1120,
         "landscape macro/detail roughness",
     )
-    connected = unreal.MaterialEditingLibrary.connect_material_property(
-        final_roughness,
-        "",
-        unreal.MaterialProperty.MP_ROUGHNESS,
-    )
-    if not connected:
-        raise RuntimeError("Unable to connect landscape Roughness")
+    connect_material_property(material, final_roughness, unreal.MaterialProperty.MP_ROUGHNESS, "landscape Roughness")
 
     rock_ao = create_texture_sample(
         material,
@@ -686,13 +655,7 @@ def create_landscape_material(rock_textures, grass_textures, macro_textures):
         640,
         "landscape detail ao",
     )
-    connected = unreal.MaterialEditingLibrary.connect_material_property(
-        ambient_occlusion,
-        "",
-        unreal.MaterialProperty.MP_AMBIENT_OCCLUSION,
-    )
-    if not connected:
-        raise RuntimeError("Unable to connect landscape Ambient Occlusion")
+    connect_material_property(material, ambient_occlusion, unreal.MaterialProperty.MP_AMBIENT_OCCLUSION, "landscape Ambient Occlusion")
     connect_material_property(
         material,
         create_constant(material, 0.06, -260, 620),
