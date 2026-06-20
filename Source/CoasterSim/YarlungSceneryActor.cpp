@@ -66,6 +66,37 @@ FQuat SurfaceAlignedRotation(const FVector& Normal, float YawDegrees)
     const FQuat Yaw = FQuat(FVector::UpVector, FMath::DegreesToRadians(YawDegrees));
     return Yaw * SurfaceTilt;
 }
+
+float Smooth01(float Value)
+{
+    const float T = FMath::Clamp(Value, 0.0f, 1.0f);
+    return T * T * (3.0f - 2.0f * T);
+}
+
+float AuthoredSceneryHeightCm(const FVector& Center, float SignedOffsetCm, float TrackBaseHeight, float BaseHeight)
+{
+    const float AbsOffset = FMath::Abs(SignedOffsetCm);
+    const float Side = SignedOffsetCm >= 0.0f ? 1.0f : -1.0f;
+    const float Along = Center.X * 0.00032f + Center.Y * 0.00027f;
+    const float Across = AbsOffset * 0.000044f;
+
+    const float Talus = Smooth01((AbsOffset - 24000.0f) / 52000.0f);
+    const float Wall = Smooth01((AbsOffset - 62000.0f) / 50000.0f);
+    const float Skyline = Smooth01((AbsOffset - 104000.0f) / 24000.0f);
+    const float ProfileRise = -6200.0f + Talus * 10400.0f + Wall * 18800.0f + Skyline * 7200.0f;
+
+    const float WallMask = Smooth01((AbsOffset - 30000.0f) / 34000.0f)
+        * (1.0f - Smooth01((AbsOffset - 112000.0f) / 18000.0f));
+    const float Buttress =
+        0.58f * FMath::Sin(Along * 1.35f + Side * 1.1f)
+        + 0.42f * FMath::Sin(Along * 2.15f - Across * 1.15f + Side * 2.2f);
+    const float Ravine = FMath::Pow(FMath::Clamp(0.5f + 0.5f * FMath::Sin(Along * 2.75f + Across * 2.0f - Side * 0.7f), 0.0f, 1.0f), 4.0f);
+    const float WetGully = FMath::Pow(FMath::Clamp(0.5f + 0.5f * FMath::Sin(Along * 4.2f - Across * 3.1f + Side * 1.8f), 0.0f, 1.0f), 8.0f);
+    const float MacroBreakup = WallMask * (Buttress * 3600.0f - Ravine * 6200.0f - WetGully * 2600.0f);
+    const float AuthoredHeight = TrackBaseHeight + ProfileRise + MacroBreakup;
+    const float DemBlend = 0.08f + 0.08f * Skyline;
+    return FMath::Lerp(AuthoredHeight, BaseHeight, DemBlend);
+}
 }
 
 AYarlungSceneryActor::AYarlungSceneryActor()
@@ -85,11 +116,55 @@ AYarlungSceneryActor::AYarlungSceneryActor()
     UnderstoryClumps->SetCastShadow(false);
     UnderstoryClumps->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+    CliffRockFacesA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesA"));
+    CliffRockFacesA->SetupAttachment(SceneRoot);
+    CliffRockFacesA->SetCastShadow(true);
+    CliffRockFacesA->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    CliffRockFacesB = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesB"));
+    CliffRockFacesB->SetupAttachment(SceneRoot);
+    CliffRockFacesB->SetCastShadow(true);
+    CliffRockFacesB->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    ForestShrubsA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ForestShrubsA"));
+    ForestShrubsA->SetupAttachment(SceneRoot);
+    ForestShrubsA->SetCastShadow(false);
+    ForestShrubsA->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    ForestShrubsB = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ForestShrubsB"));
+    ForestShrubsB->SetupAttachment(SceneRoot);
+    ForestShrubsB->SetCastShadow(false);
+    ForestShrubsB->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
     static ConstructorHelpers::FObjectFinder<UStaticMesh> BoulderMesh(TEXT("/Game/Generated/Models/Boulder01/boulder_01_1k.boulder_01_1k"));
     if (BoulderMesh.Succeeded())
     {
         RockOutcrops->SetStaticMesh(BoulderMesh.Object);
         UnderstoryClumps->SetStaticMesh(BoulderMesh.Object);
+    }
+
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> RockFaceAMesh(TEXT("/Game/Generated/Models/RockFace01/rock_face_01_1k.rock_face_01_1k"));
+    if (RockFaceAMesh.Succeeded())
+    {
+        CliffRockFacesA->SetStaticMesh(RockFaceAMesh.Object);
+    }
+
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> RockFaceBMesh(TEXT("/Game/Generated/Models/RockFace02/rock_face_02_1k.rock_face_02_1k"));
+    if (RockFaceBMesh.Succeeded())
+    {
+        CliffRockFacesB->SetStaticMesh(RockFaceBMesh.Object);
+    }
+
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> ShrubAMesh(TEXT("/Game/Generated/Models/Shrub03/shrub_03_1k.shrub_03_1k"));
+    if (ShrubAMesh.Succeeded())
+    {
+        ForestShrubsA->SetStaticMesh(ShrubAMesh.Object);
+    }
+
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> ShrubBMesh(TEXT("/Game/Generated/Models/Shrub04/shrub_04_1k.shrub_04_1k"));
+    if (ShrubBMesh.Succeeded())
+    {
+        ForestShrubsB->SetStaticMesh(ShrubBMesh.Object);
     }
 }
 
@@ -206,13 +281,26 @@ void AYarlungSceneryActor::BuildScatter(const TArray<FYarlungSceneryTrackSample>
 {
     RockOutcrops->ClearInstances();
     UnderstoryClumps->ClearInstances();
+    CliffRockFacesA->ClearInstances();
+    CliffRockFacesB->ClearInstances();
+    ForestShrubsA->ClearInstances();
+    ForestShrubsB->ClearInstances();
 
     constexpr int32 RockCount = 2200;
     constexpr int32 ClumpCount = 0;
+    constexpr int32 CliffFaceCount = 720;
+    constexpr int32 ShrubCount = 2600;
     constexpr float MinLateralCm = 2600.0f;
     constexpr float MaxLateralCm = 118000.0f;
 
-    const auto AddScatter = [&](UHierarchicalInstancedStaticMeshComponent* Component, int32 Count, bool bLargeRock)
+    enum class EScatterKind
+    {
+        Boulder,
+        CliffFace,
+        Shrub
+    };
+
+    const auto AddScatter = [&](UHierarchicalInstancedStaticMeshComponent* Component, int32 Count, EScatterKind Kind, float Seed)
     {
         if (!Component || !Component->GetStaticMesh())
         {
@@ -221,31 +309,42 @@ void AYarlungSceneryActor::BuildScatter(const TArray<FYarlungSceneryTrackSample>
 
         for (int32 Index = 0; Index < Count; ++Index)
         {
-            const float AlongHash = Hash01(Index * 3.171f, bLargeRock ? 17.0f : 29.0f);
+            const bool bLargeRock = Kind == EScatterKind::Boulder;
+            const bool bCliffFace = Kind == EScatterKind::CliffFace;
+            const bool bShrub = Kind == EScatterKind::Shrub;
+            const float AlongHash = Hash01(Index * 3.171f + Seed, bLargeRock ? 17.0f : (bCliffFace ? 23.0f : 29.0f));
             const int32 SampleIndex = FMath::Clamp(
                 FMath::FloorToInt(AlongHash * static_cast<float>(TrackSamples.Num() - 1)),
                 0,
                 TrackSamples.Num() - 2);
             const FYarlungSceneryTrackSample& A = TrackSamples[SampleIndex];
             const FYarlungSceneryTrackSample& B = TrackSamples[SampleIndex + 1];
-            const float LocalT = Hash01(Index * 8.311f, bLargeRock ? 4.0f : 11.0f);
+            const float LocalT = Hash01(Index * 8.311f + Seed, bLargeRock ? 4.0f : 11.0f);
             const FVector Center = FMath::Lerp(A.Position, B.Position, LocalT);
             const FVector Forward = HorizontalForward(TrackSamples, SampleIndex);
             const FVector Right = RightFromForward(Forward);
 
-            const float Side = Hash01(Index * 5.991f, 3.0f) < 0.56f ? 1.0f : -1.0f;
-            const float DistanceT = FMath::Pow(Hash01(Index * 1.731f, bLargeRock ? 41.0f : 53.0f), bLargeRock ? 0.82f : 1.35f);
-            const float LateralCm = FMath::Lerp(MinLateralCm, MaxLateralCm, DistanceT);
-            const float AlongJitterCm = FMath::Lerp(-1800.0f, 1800.0f, Hash01(Index * 2.117f, 71.0f));
+            const float SideBias = bCliffFace ? 0.70f : 0.58f;
+            const float Side = Hash01(Index * 5.991f + Seed, 3.0f) < SideBias ? 1.0f : -1.0f;
+            const float DistanceHash = Hash01(Index * 1.731f + Seed, bLargeRock ? 41.0f : (bCliffFace ? 47.0f : 53.0f));
+            const float DistanceT = FMath::Pow(DistanceHash, bLargeRock ? 0.82f : (bCliffFace ? 0.72f : 1.18f));
+            const float LocalMinLateralCm = bCliffFace ? 5200.0f : (bShrub ? 3600.0f : MinLateralCm);
+            const float LocalMaxLateralCm = bCliffFace ? 86000.0f : (bShrub ? 108000.0f : MaxLateralCm);
+            const float LateralCm = FMath::Lerp(LocalMinLateralCm, LocalMaxLateralCm, DistanceT);
+            const float AlongJitterCm = FMath::Lerp(-2400.0f, 2400.0f, Hash01(Index * 2.117f + Seed, 71.0f));
             const FVector Location2D = Center + Forward * AlongJitterCm + Right * Side * LateralCm;
+            const float SignedOffsetCm = Side * LateralCm;
 
             if (Location2D.X < MinX || Location2D.X > MaxX || Location2D.Y < MinY || Location2D.Y > MaxY)
             {
                 continue;
             }
 
-            const float Height = SampleHeightCm(HeightData, Location2D.X, Location2D.Y);
-            if (Height < 262000.0f || Height > 430000.0f)
+            const float BaseHeight = SampleHeightCm(HeightData, Location2D.X, Location2D.Y);
+            const float TrackBaseHeight = SampleHeightCm(HeightData, Center.X, Center.Y);
+            const float Height = AuthoredSceneryHeightCm(Center, SignedOffsetCm, TrackBaseHeight, BaseHeight);
+            const float MaxHeightCm = bShrub ? 455000.0f : (bCliffFace ? 520000.0f : 430000.0f);
+            if (Height < 262000.0f || Height > MaxHeightCm)
             {
                 continue;
             }
@@ -256,28 +355,44 @@ void AYarlungSceneryActor::BuildScatter(const TArray<FYarlungSceneryTrackSample>
             {
                 continue;
             }
+            if (bCliffFace && Slope < 0.075f)
+            {
+                continue;
+            }
 
-            const float Yaw = Hash01(Index * 4.121f, 97.0f) * 360.0f;
+            const float Yaw = bCliffFace
+                ? FMath::RadiansToDegrees(FMath::Atan2((-Side * Right).Y, (-Side * Right).X)) + FMath::Lerp(-24.0f, 24.0f, Hash01(Index * 3.1f + Seed, 8.0f))
+                : Hash01(Index * 4.121f + Seed, 97.0f) * 360.0f;
             const float ScaleBase = bLargeRock
                 ? FMath::Lerp(2.4f, 9.5f, Hash01(Index * 6.617f, 13.0f))
-                : FMath::Lerp(0.28f, 1.15f, Hash01(Index * 6.617f, 13.0f));
+                : (bCliffFace ? FMath::Lerp(18.0f, 56.0f, Hash01(Index * 6.617f + Seed, 13.0f)) : FMath::Lerp(7.5f, 24.0f, Hash01(Index * 6.617f + Seed, 13.0f)));
             const FVector Scale = bLargeRock
                 ? FVector(ScaleBase * FMath::Lerp(0.7f, 1.8f, Hash01(Index * 9.0f, 1.0f)), ScaleBase, ScaleBase * FMath::Lerp(0.45f, 1.15f, Hash01(Index * 7.0f, 2.0f)))
-                : FVector(ScaleBase * FMath::Lerp(0.9f, 1.8f, Hash01(Index * 9.0f, 1.0f)), ScaleBase * FMath::Lerp(0.7f, 1.3f, Hash01(Index * 7.0f, 2.0f)), ScaleBase * FMath::Lerp(0.12f, 0.34f, Hash01(Index * 5.0f, 3.0f)));
-            const FVector Location(Location2D.X, Location2D.Y, Height + (bLargeRock ? 24.0f : 7.0f));
+                : (bCliffFace
+                    ? FVector(ScaleBase * FMath::Lerp(0.8f, 1.9f, Hash01(Index * 9.0f + Seed, 1.0f)), ScaleBase * FMath::Lerp(0.45f, 1.2f, Hash01(Index * 7.0f + Seed, 2.0f)), ScaleBase * FMath::Lerp(0.65f, 1.45f, Hash01(Index * 5.0f + Seed, 3.0f)))
+                    : FVector(ScaleBase * FMath::Lerp(0.8f, 1.55f, Hash01(Index * 9.0f + Seed, 1.0f)), ScaleBase * FMath::Lerp(0.75f, 1.3f, Hash01(Index * 7.0f + Seed, 2.0f)), ScaleBase * FMath::Lerp(0.75f, 1.8f, Hash01(Index * 5.0f + Seed, 3.0f))));
+            const FVector Location(Location2D.X, Location2D.Y, Height + (bLargeRock ? 24.0f : (bCliffFace ? 18.0f : 6.0f)));
             Component->AddInstance(FTransform(SurfaceAlignedRotation(Normal, Yaw), Location, Scale));
         }
     };
 
-    AddScatter(RockOutcrops, RockCount, true);
-    AddScatter(UnderstoryClumps, ClumpCount, false);
+    AddScatter(RockOutcrops, RockCount, EScatterKind::Boulder, 0.0f);
+    AddScatter(UnderstoryClumps, ClumpCount, EScatterKind::Shrub, 3.0f);
+    AddScatter(CliffRockFacesA, CliffFaceCount, EScatterKind::CliffFace, 17.0f);
+    AddScatter(CliffRockFacesB, CliffFaceCount, EScatterKind::CliffFace, 31.0f);
+    AddScatter(ForestShrubsA, ShrubCount, EScatterKind::Shrub, 43.0f);
+    AddScatter(ForestShrubsB, ShrubCount, EScatterKind::Shrub, 59.0f);
 
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Yarlung scatter instances: rocks=%d understory=%d"),
+        TEXT("Yarlung scatter instances: rocks=%d understory=%d cliff_a=%d cliff_b=%d shrubs_a=%d shrubs_b=%d"),
         RockOutcrops->GetInstanceCount(),
-        UnderstoryClumps->GetInstanceCount());
+        UnderstoryClumps->GetInstanceCount(),
+        CliffRockFacesA->GetInstanceCount(),
+        CliffRockFacesB->GetInstanceCount(),
+        ForestShrubsA->GetInstanceCount(),
+        ForestShrubsB->GetInstanceCount());
 }
 
 void AYarlungSceneryActor::ApplyMaterials()
@@ -303,4 +418,8 @@ void AYarlungSceneryActor::ApplyMaterials()
 
     ApplyTint(RockOutcrops, FLinearColor(0.23f, 0.28f, 0.26f));
     ApplyTint(UnderstoryClumps, FLinearColor(0.035f, 0.16f, 0.055f));
+    ApplyTint(CliffRockFacesA, FLinearColor(0.18f, 0.23f, 0.22f));
+    ApplyTint(CliffRockFacesB, FLinearColor(0.15f, 0.20f, 0.19f));
+    ApplyTint(ForestShrubsA, FLinearColor(0.026f, 0.13f, 0.048f));
+    ApplyTint(ForestShrubsB, FLinearColor(0.045f, 0.18f, 0.068f));
 }

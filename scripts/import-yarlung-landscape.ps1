@@ -22,7 +22,13 @@ $ModelScript = Join-Path $PSScriptRoot "import-polyhaven-models.py"
 $InspectScript = Join-Path $PSScriptRoot "inspect-yarlung-map.py"
 $MaterialSuccessMarker = Join-Path $RepoRoot "Saved\material-generation-ok.txt"
 $LandscapeMaterialAsset = Join-Path $RepoRoot "Content\Generated\Materials\M_YarlungLandscapeGround.uasset"
-$BoulderAsset = Join-Path $RepoRoot "Content\Generated\Models\Boulder01\boulder_01_1k.uasset"
+$ModelAssets = @(
+    (Join-Path $RepoRoot "Content\Generated\Models\Boulder01\boulder_01_1k.uasset"),
+    (Join-Path $RepoRoot "Content\Generated\Models\RockFace01\rock_face_01_1k.uasset"),
+    (Join-Path $RepoRoot "Content\Generated\Models\RockFace02\rock_face_02_1k.uasset"),
+    (Join-Path $RepoRoot "Content\Generated\Models\Shrub03\shrub_03_1k.uasset"),
+    (Join-Path $RepoRoot "Content\Generated\Models\Shrub04\shrub_04_1k.uasset")
+)
 $HeightmapAsset = Join-Path $RepoRoot "Content\Generated\YarlungLandscape\YarlungTsangpo_1009.r16"
 $MacroTextureSources = @(
     (Join-Path $RepoRoot "SourceAssets\Generated\YarlungLandscape\YarlungTsangpo_macro_albedo.tga"),
@@ -124,18 +130,18 @@ if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOut
     }
 }
 
-if (-not $SkipModels -and ($ForceModels -or -not (Test-Path -LiteralPath $BoulderAsset))) {
+if (-not $SkipModels -and ($ForceModels -or -not (Test-AllPathsExist $ModelAssets))) {
     Invoke-TimedStep "import models" {
         & $EditorCmd $Project "-ExecutePythonScript=$ModelScript" -unattended -nop4 -NullRHI -NoSplash
         if ($LASTEXITCODE -ne 0) {
             throw "Poly Haven model import failed with exit code $LASTEXITCODE"
         }
-        if (-not (Test-Path -LiteralPath $BoulderAsset)) {
-            throw "Poly Haven model import did not produce $BoulderAsset"
+        if (-not (Test-AllPathsExist $ModelAssets)) {
+            throw "Poly Haven model import did not produce all expected assets"
         }
     }
 } elseif (-not $SkipModels) {
-    Write-Host "[YARLUNG-TIME] skip import models: existing asset $BoulderAsset"
+    Write-Host "[YARLUNG-TIME] skip import models: expected assets exist"
 }
 
 if (-not $SkipMapImport) {

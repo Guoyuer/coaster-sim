@@ -130,12 +130,18 @@ def main():
         emit(f"[YARLUNG-INSPECT] scenery={actor.get_actor_label()} class={actor.get_class().get_name()}")
         total_instances = 0
         rock_instances = 0
+        cliff_face_instances = 0
+        forest_shrub_instances = 0
         for component in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
             material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
             instance_count = component.get_instance_count()
             total_instances += instance_count
             if component.get_name() == "RockOutcrops":
                 rock_instances = instance_count
+            if component.get_name().startswith("CliffRockFaces"):
+                cliff_face_instances += instance_count
+            if component.get_name().startswith("ForestShrubs"):
+                forest_shrub_instances += instance_count
             emit(
                 f"[YARLUNG-INSPECT] scenery_component={component.get_name()} "
                 f"class={component.get_class().get_name()} hidden={component.get_editor_property('hidden_in_game')} "
@@ -143,6 +149,10 @@ def main():
             )
         if rock_instances < 500:
             raise RuntimeError(f"Yarlung rock scatter is too sparse: {rock_instances} instances")
+        if cliff_face_instances < 400:
+            raise RuntimeError(f"Yarlung cliff-face asset scatter is too sparse: {cliff_face_instances} instances")
+        if forest_shrub_instances < 1000:
+            raise RuntimeError(f"Yarlung forest shrub asset scatter is too sparse: {forest_shrub_instances} instances")
 
     cliff_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungCliffActor")]
     if cliff_actors:
