@@ -95,9 +95,6 @@ protected:
     UPROPERTY(VisibleAnywhere, Category = "Track Visuals")
     TObjectPtr<UInstancedStaticMeshComponent> Supports;
 
-    UPROPERTY(VisibleAnywhere, Category = "Environment")
-    TObjectPtr<UInstancedStaticMeshComponent> BoulderOutcrops;
-
     UPROPERTY(EditAnywhere, Category = "Track")
     TArray<FVector> ControlPoints;
 
@@ -132,9 +129,6 @@ private:
     void EnsureDefaultTrack();
     void RebuildSpline();
     void RebuildVisuals();
-    void RebuildEnvironment();
-    void ClearEnvironmentVisuals();
-    void BuildBoulderOutcrops();
     void ApplyVisualMaterials();
     void AdvanceRide(float DeltaSeconds);
     void UpdateFirstPersonCamera();

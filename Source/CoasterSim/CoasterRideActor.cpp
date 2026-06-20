@@ -3,7 +3,6 @@
 #include "CoasterBanking.h"
 #include "CoasterTrackComponent.h"
 #include "YarlungCoasterProfile.h"
-#include "YarlungTerrainProfile.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/DirectionalLightComponent.h"
@@ -26,7 +25,6 @@ namespace
 {
 constexpr float CmPerMeter = 100.0f;
 constexpr float GravityCms2 = 980.665f;
-constexpr float RiverZCm = 265200.0f;
 constexpr float FallbackGeneratedRiverSurfaceZCm = 267655.0f;
 
 FTransform MakeSegmentTransform(const FVector& Start, const FVector& End, const FVector& ScaleCm)
@@ -36,13 +34,6 @@ FTransform MakeSegmentTransform(const FVector& Start, const FVector& End, const 
     const float Length = FMath::Max(Delta.Length(), 1.0f);
     const FRotator Rotation = FRotationMatrix::MakeFromX(Delta.GetSafeNormal()).Rotator();
     return FTransform(Rotation, Mid, FVector(Length / 100.0f, ScaleCm.Y / 100.0f, ScaleCm.Z / 100.0f));
-}
-
-using YarlungCoaster::Smooth01;
-
-float Hash01(float A, float B)
-{
-    return FMath::Frac(FMath::Sin(A * 12.9898f + B * 78.233f) * 43758.5453f);
 }
 
 bool LoadGeneratedRiverAverageZCm(float& OutZCm)
@@ -76,33 +67,6 @@ bool LoadGeneratedRiverAverageZCm(float& OutZCm)
 
     OutZCm = static_cast<float>(SumZ / static_cast<double>(Count));
     return true;
-}
-
-float YarlungLandscapeHeight(float X, float Y)
-{
-    const float RiverY = YarlungTerrain::RiverCenterY(X);
-    const float Lateral = FMath::Abs(Y - RiverY);
-    const float WideValley = Smooth01((Lateral - 1150.0f) / 9400.0f);
-    const float OuterMountain = Smooth01((Lateral - 5800.0f) / 7600.0f);
-    const float CliffBand = Smooth01((Lateral - 3100.0f) / 4200.0f);
-    const float LongRidge = 155.0f * FMath::Sin(X * 0.00075f + Y * 0.00018f);
-    const float FoldNoise = 82.0f * FMath::Sin(X * 0.0018f - Y * 0.00072f)
-        + 46.0f * FMath::Sin(X * 0.0034f + Y * 0.0011f);
-    const float Terraces = 58.0f * FMath::Sin((Lateral - 1200.0f) * 0.0018f + X * 0.00042f);
-
-    float Height = RiverZCm - 22.0f
-        + WideValley * 520.0f
-        + CliffBand * 1420.0f
-        + OuterMountain * 1900.0f
-        + LongRidge + FoldNoise + Terraces;
-
-    if (Lateral < 980.0f)
-    {
-        const float Channel = Smooth01(Lateral / 980.0f);
-        Height = FMath::Lerp(RiverZCm - 46.0f, RiverZCm + 34.0f, Channel);
-    }
-
-    return YarlungCoaster::ApplyTrackClearanceCut(X, Y, Height);
 }
 
 }
@@ -212,9 +176,6 @@ ACoasterRideActor::ACoasterRideActor()
     Ties->SetupAttachment(SceneRoot);
     Supports = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Supports"));
     Supports->SetupAttachment(SceneRoot);
-    BoulderOutcrops = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("BoulderOutcrops"));
-    BoulderOutcrops->SetupAttachment(SceneRoot);
-    BoulderOutcrops->SetCastShadow(true);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
     if (CubeMesh.Succeeded())
@@ -226,12 +187,6 @@ ACoasterRideActor::ACoasterRideActor()
         Supports->SetStaticMesh(CubeMesh.Object);
     }
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> BoulderMesh(TEXT("/Game/Generated/Models/Boulder01/boulder_01_1k.boulder_01_1k"));
-    if (BoulderMesh.Succeeded())
-    {
-        BoulderOutcrops->SetStaticMesh(BoulderMesh.Object);
-    }
-
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
     if (BasicMaterial.Succeeded())
     {
@@ -240,7 +195,6 @@ ACoasterRideActor::ACoasterRideActor()
         RightRail->SetMaterial(0, BasicMaterial.Object);
         Ties->SetMaterial(0, BasicMaterial.Object);
         Supports->SetMaterial(0, BasicMaterial.Object);
-        BoulderOutcrops->SetMaterial(0, BasicMaterial.Object);
     }
 
     CurrentSpeedCms = 450.0f;
@@ -252,7 +206,6 @@ void ACoasterRideActor::OnConstruction(const FTransform& Transform)
     EnsureDefaultTrack();
     RebuildSpline();
     ApplyVisualMaterials();
-    RebuildEnvironment();
     RebuildVisuals();
 }
 
@@ -262,7 +215,6 @@ void ACoasterRideActor::BeginPlay()
     EnsureDefaultTrack();
     RebuildSpline();
     ApplyVisualMaterials();
-    RebuildEnvironment();
     RebuildVisuals();
     SkyLight->RecaptureSky();
     StartRideFromCommandLine(0.34f, 18.0f);
@@ -459,50 +411,6 @@ void ACoasterRideActor::RebuildVisuals()
     }
 }
 
-void ACoasterRideActor::RebuildEnvironment()
-{
-    ClearEnvironmentVisuals();
-    BuildBoulderOutcrops();
-}
-
-void ACoasterRideActor::ClearEnvironmentVisuals()
-{
-    BoulderOutcrops->ClearInstances();
-}
-
-void ACoasterRideActor::BuildBoulderOutcrops()
-{
-    if (!BoulderOutcrops || !BoulderOutcrops->GetStaticMesh())
-    {
-        return;
-    }
-
-    constexpr int32 BoulderCount = 118;
-    constexpr float MinX = -3200.0f;
-    constexpr float MaxX = 11600.0f;
-
-    for (int32 Index = 0; Index < BoulderCount; ++Index)
-    {
-        const float T = static_cast<float>(Index) / static_cast<float>(BoulderCount - 1);
-        const float X = FMath::Lerp(MinX, MaxX, T) + (Hash01(Index * 2.9f, 5.1f) - 0.5f) * 520.0f;
-        const float Side = (Index % 2 == 0) ? -1.0f : 1.0f;
-        const float Lateral = Side * FMath::Lerp(780.0f, 2650.0f, Hash01(Index * 4.7f, 1.4f));
-        const float Y = YarlungTerrain::RiverCenterY(X) + Lateral;
-        const float Height = YarlungLandscapeHeight(X, Y);
-        if (Height < 120.0f || Height > 2550.0f)
-        {
-            continue;
-        }
-
-        const float Yaw = Hash01(Index * 7.2f, 8.4f) * 360.0f;
-        const float Pitch = FMath::Lerp(-8.0f, 8.0f, Hash01(Index * 3.5f, 2.2f));
-        const float Roll = FMath::Lerp(-6.0f, 6.0f, Hash01(Index * 5.8f, 9.6f));
-        const float Scale = FMath::Lerp(0.42f, 1.08f, Hash01(Index * 1.8f, 3.1f));
-        const FVector Location(X, Y, Height + 18.0f);
-        BoulderOutcrops->AddInstance(FTransform(FRotator(Pitch, Yaw, Roll), Location, FVector(Scale)));
-    }
-}
-
 void ACoasterRideActor::ApplyVisualMaterials()
 {
     UMaterialInterface* TintMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
@@ -536,7 +444,6 @@ void ACoasterRideActor::ApplyVisualMaterials()
     TintComponent(RightRail, FLinearColor(0.22f, 0.25f, 0.27f));
     TintComponent(Ties, FLinearColor(0.13f, 0.12f, 0.105f));
     TintComponent(Supports, FLinearColor(0.20f, 0.24f, 0.27f));
-    TintComponent(BoulderOutcrops, FLinearColor(0.20f, 0.23f, 0.20f));
 }
 
 void ACoasterRideActor::AdvanceRide(float DeltaSeconds)
