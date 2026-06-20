@@ -9,6 +9,7 @@
 #include "YarlungCoasterProfile.h"
 #include "YarlungTerrainProfile.h"
 #include "YarlungTerrainRelief.h"
+#include "YarlungViewCorridor.h"
 #include "Components/StaticMeshComponent.h"
 #include "Editor.h"
 #include "Engine/StaticMesh.h"
@@ -35,11 +36,6 @@ constexpr float YarlungMaxY = 416981.551f;
 const TCHAR* YarlungTerrainMeshPackagePath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungMeshTerrain");
 const TCHAR* YarlungTerrainMeshAssetName = TEXT("SM_YarlungMeshTerrain");
 const TCHAR* YarlungTerrainMeshObjectPath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungMeshTerrain.SM_YarlungMeshTerrain");
-
-struct FYarlungTerrainTrackPoint
-{
-    FVector2D Position;
-};
 
 struct FYarlungTerrainVertexSample
 {
@@ -135,82 +131,9 @@ FVector YarlungSmoothNormalAtMeshGrid(const TArray<uint16>& HeightData, int32 XI
     return FVector(Left - Right, Down - Up, XSpacing + YSpacing).GetSafeNormal();
 }
 
-float YarlungDistanceToTrackCm(const TArray<FYarlungTerrainTrackPoint>& TrackPoints, const FVector2D& Position)
+float YarlungCorridorRockMask(const TArray<YarlungViewCorridor::FTrackPoint>& TrackPoints, float X, float Y, float Height, const FVector& BaseNormal)
 {
-    if (TrackPoints.Num() < 2)
-    {
-        return TNumericLimits<float>::Max();
-    }
-
-    float BestSquared = TNumericLimits<float>::Max();
-    for (int32 Index = 0; Index < TrackPoints.Num(); ++Index)
-    {
-        const FVector2D A = TrackPoints[Index].Position;
-        const FVector2D B = TrackPoints[(Index + 1) % TrackPoints.Num()].Position;
-        const FVector2D AB = B - A;
-        const float LengthSquared = AB.SizeSquared();
-        const float T = LengthSquared > KINDA_SMALL_NUMBER
-            ? FMath::Clamp(FVector2D::DotProduct(Position - A, AB) / LengthSquared, 0.0f, 1.0f)
-            : 0.0f;
-        const FVector2D Closest = A + AB * T;
-        BestSquared = FMath::Min(BestSquared, FVector2D::DistSquared(Position, Closest));
-    }
-
-    return FMath::Sqrt(BestSquared);
-}
-
-float YarlungViewCorridorMask(const TArray<FYarlungTerrainTrackPoint>& TrackPoints, const FVector2D& Position)
-{
-    if (TrackPoints.Num() < 3)
-    {
-        return 0.0f;
-    }
-
-    constexpr float BackwardFadeCm = 12000.0f;
-    constexpr float FarStartCm = 160000.0f;
-    constexpr float FarFadeCm = 120000.0f;
-    constexpr float SideBaseCm = 14000.0f;
-    constexpr float SideFadeCm = 26000.0f;
-    constexpr float MaxSideCm = 180000.0f;
-    constexpr float TanHalfFov = 0.84f; // ~80 deg horizontal FOV, matching the broad FP read.
-
-    float BestMask = 0.0f;
-    for (int32 Index = 0; Index < TrackPoints.Num(); ++Index)
-    {
-        const FVector2D Previous = TrackPoints[(Index + TrackPoints.Num() - 1) % TrackPoints.Num()].Position;
-        const FVector2D Current = TrackPoints[Index].Position;
-        const FVector2D Next = TrackPoints[(Index + 1) % TrackPoints.Num()].Position;
-        const FVector2D Tangent = (Next - Previous).GetSafeNormal();
-        if (Tangent.IsNearlyZero())
-        {
-            continue;
-        }
-
-        const FVector2D Relative = Position - Current;
-        const float ForwardCm = FVector2D::DotProduct(Relative, Tangent);
-        if (ForwardCm < -BackwardFadeCm || ForwardCm > FarStartCm + FarFadeCm)
-        {
-            continue;
-        }
-
-        const float LateralCm = FMath::Abs(Tangent.X * Relative.Y - Tangent.Y * Relative.X);
-        const float SideLimitCm = FMath::Clamp(SideBaseCm + FMath::Max(ForwardCm, 0.0f) * TanHalfFov, SideBaseCm, MaxSideCm);
-        const float ForwardMask = YarlungTerrain::Smooth01((ForwardCm + BackwardFadeCm) / BackwardFadeCm)
-            * (1.0f - YarlungTerrain::Smooth01((ForwardCm - FarStartCm) / FarFadeCm));
-        const float SideMask = 1.0f - YarlungTerrain::Smooth01((LateralCm - SideLimitCm) / SideFadeCm);
-        BestMask = FMath::Max(BestMask, ForwardMask * SideMask);
-        if (BestMask >= 0.999f)
-        {
-            return 1.0f;
-        }
-    }
-
-    return FMath::Clamp(BestMask, 0.0f, 1.0f);
-}
-
-float YarlungCorridorRockMask(const TArray<FYarlungTerrainTrackPoint>& TrackPoints, float X, float Y, float Height, const FVector& BaseNormal)
-{
-    const float TrackDistance = YarlungDistanceToTrackCm(TrackPoints, FVector2D(X, Y));
+    const float TrackDistance = YarlungViewCorridor::DistanceToTrackCm(TrackPoints, FVector2D(X, Y));
     const float NearFade = YarlungTerrain::Smooth01((TrackDistance - 1800.0f) / 6200.0f);
     const float FarFade = 1.0f - YarlungTerrain::Smooth01((TrackDistance - 260000.0f) / 140000.0f);
     const float DistanceMask = NearFade * FarFade;
@@ -221,7 +144,7 @@ float YarlungCorridorRockMask(const TArray<FYarlungTerrainTrackPoint>& TrackPoin
 
 FYarlungTerrainVertexSample YarlungTerrainVertexSampleAtMeshGrid(
     const TArray<uint16>& HeightData,
-    const TArray<FYarlungTerrainTrackPoint>& TrackPoints,
+    const TArray<YarlungViewCorridor::FTrackPoint>& TrackPoints,
     int32 XIndex,
     int32 YIndex)
 {
@@ -231,8 +154,8 @@ FYarlungTerrainVertexSample YarlungTerrainVertexSampleAtMeshGrid(
     const float Y = FMath::Lerp(YarlungMinY, YarlungMaxY, V);
     const float BaseHeight = YarlungHeightAtMeshGrid(HeightData, XIndex, YIndex);
     const FVector BaseNormal = YarlungSmoothNormalAtMeshGrid(HeightData, XIndex, YIndex);
-    const float TrackDistance = YarlungDistanceToTrackCm(TrackPoints, FVector2D(X, Y));
-    const float ViewCorridorMask = YarlungViewCorridorMask(TrackPoints, FVector2D(X, Y));
+    const float TrackDistance = YarlungViewCorridor::DistanceToTrackCm(TrackPoints, FVector2D(X, Y));
+    const float ViewCorridorMask = YarlungViewCorridor::ComputeMask(TrackPoints, FVector2D(X, Y));
     const float RockMask = YarlungCorridorRockMask(TrackPoints, X, Y, BaseHeight, BaseNormal);
     const float DisplacementCm = YarlungTerrainRelief::ComputeReliefCm(
         FVector2D(X, Y),
@@ -295,7 +218,7 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, float RockMa
     return Base;
 }
 
-bool LoadYarlungTerrainTrackPoints(TArray<FYarlungTerrainTrackPoint>& OutTrackPoints)
+bool LoadYarlungTerrainTrackPoints(TArray<YarlungViewCorridor::FTrackPoint>& OutTrackPoints)
 {
     const FString Path = FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungTrack.csv");
     TArray<FString> Lines;
@@ -315,7 +238,7 @@ bool LoadYarlungTerrainTrackPoints(TArray<FYarlungTerrainTrackPoint>& OutTrackPo
             continue;
         }
 
-        FYarlungTerrainTrackPoint Point;
+        YarlungViewCorridor::FTrackPoint Point;
         Point.Position = FVector2D(FCString::Atof(*Columns[1]), FCString::Atof(*Columns[2]));
         OutTrackPoints.Add(Point);
     }
@@ -340,7 +263,7 @@ UStaticMesh* BuildYarlungTerrainStaticMesh(const TArray<uint16>& HeightData)
         return nullptr;
     }
 
-    TArray<FYarlungTerrainTrackPoint> TrackPoints;
+    TArray<YarlungViewCorridor::FTrackPoint> TrackPoints;
     if (!LoadYarlungTerrainTrackPoints(TrackPoints))
     {
         return nullptr;
