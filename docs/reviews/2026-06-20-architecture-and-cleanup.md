@@ -99,3 +99,12 @@
 
 ### 全会话清债收尾
 backlog #1–#6 处置：#1 split-brain ✅根治、#2 CSV 整合 ✅、#3 物理 feel 常量 ✅、#5 section 枚举 ✅、#6 材质去样板 ✅、#4 commandlet 拆分 ✅。唯一剩余：移除运行时已死的 `M_YarlungLandscapeGround` + macro 贴图链（需级联验证，建议单独一轮）。
+
+### 第四轮清理（2026-06-20）— 清除不需要的 fallback
+
+1. **C++ `YarlungTerrain::FConfig` 的硬编码"JSON 缺失回退"默认值**：上轮为防御保留的 260000/730000/95543/centerline 等默认值，其实是把刚消除的 split-brain 常量又抄回了 C++。改为**字段全部零初始化**，值只来自 JSON；缺/坏文件 → 记 Error + 零配置（被 `TerrainConfigParity` 测试与 heightmap 字节数校验当场抓住），不再有"静默用对的常量"的影子源。JSON 成为唯一真相，无 C++ 镜像。
+2. **Python 合成程序化地形 fallback**：`generate-yarlung-landscape-assets.py` 的 `--source synthetic` 分支 + `terrain_height()` 函数 + `if source_heights else terrain_height(...)`/`else None` 守卫，是真实 DEM 架构之前的遗留路径——管线只走 `copernicus`（默认、无人传 `--source`），`build_copernicus_height_grid` 永远返回满网格。全部删除并 dedent 主路径；顺带去掉因此变 unused 的 `RIVER_Z` 导入。copernicus 输出可证不变（守卫恒为真）。
+
+验证：UE build PASS；`py_compile` + `--help` argparse PASS；Python parity PASS；C++ Automation 10/10 Success / 0 Fail（`TerrainConfigParity` 仍过 ⇒ 零默认下 `Config()` 仍正确读 JSON，证明回退确实多余）。
+
+保留（非"不需要"的 fallback，刻意不动）：`verify-track-clearance.py` 的 `normalize(a, fallback)` 数值退化保护；actor `LoadObject` 的"缺则跳过"守卫（不是回退到默认材质，旧的默认材质回退此前已删）。

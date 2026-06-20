@@ -12,14 +12,14 @@ namespace
 {
 FConfig LoadConfigFromDisk()
 {
-    FConfig Cfg; // struct defaults act as the fallback
+    FConfig Cfg; // zero-initialized; the JSON is the only source of real values
 
     const FString Path = FPaths::ProjectDir() / TEXT("Config/yarlung-terrain.json");
     FString Raw;
     if (!FFileHelper::LoadFileToString(Raw, *Path))
     {
         UE_LOG(LogTemp, Error,
-            TEXT("YarlungTerrain: missing %s; using fallback constants (TerrainConfigParity test should flag this)"),
+            TEXT("YarlungTerrain: required config %s is missing; terrain config is zeroed (TerrainConfigParity test will flag this)"),
             *Path);
         return Cfg;
     }
@@ -28,7 +28,7 @@ FConfig LoadConfigFromDisk()
     const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Raw);
     if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
     {
-        UE_LOG(LogTemp, Error, TEXT("YarlungTerrain: failed to parse %s; using fallback constants"), *Path);
+        UE_LOG(LogTemp, Error, TEXT("YarlungTerrain: failed to parse %s; terrain config is zeroed"), *Path);
         return Cfg;
     }
 

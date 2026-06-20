@@ -27,7 +27,6 @@ from yarlung_config import (
     MIN_X,
     MIN_Y,
     RIVER_MASK_HALF_WIDTH_CM,
-    RIVER_Z,
     SIZE,
     river_center_y,
     smooth01,
@@ -173,33 +172,6 @@ def write_river_csv(path: Path, heights: list[float], river_guide: list[float] |
                 ]
             )
             row_index += 1
-
-
-def terrain_height(x: float, y: float) -> float:
-    river_y = river_center_y(x)
-    lateral = abs(y - river_y)
-    wide_valley = smooth01((lateral - 1150.0) / 9400.0)
-    outer_mountain = smooth01((lateral - 5800.0) / 7600.0)
-    cliff_band = smooth01((lateral - 3100.0) / 4200.0)
-    long_ridge = 155.0 * math.sin(x * 0.00075 + y * 0.00018)
-    fold_noise = 82.0 * math.sin(x * 0.0018 - y * 0.00072) + 46.0 * math.sin(x * 0.0034 + y * 0.0011)
-    terraces = 58.0 * math.sin((lateral - 1200.0) * 0.0018 + x * 0.00042)
-
-    height = (
-        RIVER_Z
-        - 22.0
-        + wide_valley * 520.0
-        + cliff_band * 1420.0
-        + outer_mountain * 1900.0
-        + long_ridge
-        + fold_noise
-        + terraces
-    )
-    if lateral < 980.0:
-        channel = smooth01(lateral / 980.0)
-        height = (RIVER_Z - 46.0) * (1.0 - channel) + (RIVER_Z + 34.0) * channel
-    normalized = smooth01((height + 360.0) / 4260.0)
-    return lerp(HEIGHT_MIN, HEIGHT_MAX, normalized)
 
 
 def height01(height: float) -> float:
@@ -728,7 +700,6 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="Content/Generated/YarlungLandscape")
     parser.add_argument("--texture-out", default="SourceAssets/Generated/YarlungLandscape")
-    parser.add_argument("--source", choices=("copernicus", "synthetic"), default="copernicus")
     parser.add_argument("--dem-cache", default=str(DEM_CACHE_DIR))
     parser.add_argument("--track-guide", default=str(DEFAULT_TRACK_GUIDE_PATH))
     args = parser.parse_args()
@@ -740,21 +711,18 @@ def main() -> None:
     texture_out_dir = Path(args.texture_out)
     texture_out_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.source == "copernicus":
-        source_heights, source_metadata = build_copernicus_height_grid(Path(args.dem_cache))
-        source_heights = naturalize_height_grid(source_heights)
-        source_heights, outbound_softening = soften_outbound_cliff_slope(source_heights, Path(args.track_guide))
-        source_metadata["naturalization"] = {
-            "enabled": NATURALIZE_STEEP_TERRAIN,
-            "purpose": "Preserve broad Yarlung canyon shapes while reshaping near-vertical 30m DEM cliffs into ride-scale natural slopes for first-person photorealism.",
-            "broad_blur": "box blur radius=18, passes=3, steep-relief weighted blend",
-            "slope_relaxation": "max_slope=0.78, passes=8",
-            "outbound_cliff_softening": outbound_softening,
-        }
-    else:
-        source_heights, source_metadata = [], {"source": "synthetic procedural fallback"}
+    source_heights, source_metadata = build_copernicus_height_grid(Path(args.dem_cache))
+    source_heights = naturalize_height_grid(source_heights)
+    source_heights, outbound_softening = soften_outbound_cliff_slope(source_heights, Path(args.track_guide))
+    source_metadata["naturalization"] = {
+        "enabled": NATURALIZE_STEEP_TERRAIN,
+        "purpose": "Preserve broad Yarlung canyon shapes while reshaping near-vertical 30m DEM cliffs into ride-scale natural slopes for first-person photorealism.",
+        "broad_blur": "box blur radius=18, passes=3, steep-relief weighted blend",
+        "slope_relaxation": "max_slope=0.78, passes=8",
+        "outbound_cliff_softening": outbound_softening,
+    }
 
-    river_guide = build_dem_river_guide(source_heights) if source_heights else None
+    river_guide = build_dem_river_guide(source_heights)
     if river_guide:
         source_metadata["river_mask"] = {
             "centerline": "DEM thalweg extracted from the naturalized height grid",
@@ -778,7 +746,7 @@ def main() -> None:
             u = x_index / (SIZE - 1)
             x = lerp(MIN_X, MAX_X, u)
             data_index = y_index * SIZE + x_index
-            height = source_heights[data_index] if source_heights else terrain_height(x, y)
+            height = source_heights[data_index]
             river_y = guided_river_center_y(x, river_guide)
             stats["min_cm"] = min(stats["min_cm"], height)
             stats["max_cm"] = max(stats["max_cm"], height)
@@ -815,7 +783,7 @@ def main() -> None:
         "macro_roughness": str(texture_out_dir / "YarlungTsangpo_macro_roughness.tga"),
         "resolution": [SIZE, SIZE],
         "format": "little-endian uint16 raw",
-        "source": args.source,
+        "source": "copernicus",
         "dem": source_metadata,
         "world_bounds_cm": {"min_x": MIN_X, "max_x": MAX_X, "min_y": MIN_Y, "max_y": MAX_Y},
         "height_range_cm": {"encoded_min": HEIGHT_MIN, "encoded_max": HEIGHT_MAX, **stats},

@@ -3,12 +3,14 @@
 #include "CoreMinimal.h"
 
 // Yarlung terrain georeferencing + river layout. The numeric values live in a
-// single source of truth — Config/yarlung-terrain.json — which BOTH this C++ code
+// SINGLE source of truth — Config/yarlung-terrain.json — which BOTH this C++ code
 // (via Config()) and the Python asset pipeline (scripts/yarlung_config.py) read,
 // so the runtime mesh and the generated heightmap/textures can never silently
-// drift apart. The compiled-in defaults below are only a last-resort fallback if
-// the JSON is missing; the CoasterSim.Yarlung.TerrainConfigParity automation test
-// enforces that they (and the JSON) match the expected golden values.
+// drift apart. There are deliberately NO compiled-in constants here: the fields
+// default to zero and are populated only from the JSON. A missing/invalid file is
+// a hard setup error — Config() logs it and yields a zeroed config, which the
+// CoasterSim.Yarlung.TerrainConfigParity test and the heightmap byte-count check
+// catch loudly rather than running on silently-wrong numbers.
 namespace YarlungTerrain
 {
 struct FCenterlineTerm
@@ -20,20 +22,18 @@ struct FCenterlineTerm
 
 struct FConfig
 {
-    int32 GridSize = 1009;
-    float MinXCm = -337778.4313411617f;
-    float MaxXCm = 337778.4313411617f;
-    float MinYCm = -416981.55087574443f;
-    float MaxYCm = 416981.55087574443f;
-    float EncodedMinZCm = 260000.0f;
-    float EncodedMaxZCm = 730000.0f;
-    float RiverAnchorXCm = 95543.0f;
-    float RiverAnchorYCm = -142330.0f;
-    float RiverZCm = 265200.0f;
-    float RiverMaskHalfWidthCm = 26000.0f;
-    TArray<FCenterlineTerm> RiverCenterlineTerms = {
-        {9000.0f, 0.00009f, 0.25f},
-        {4200.0f, 0.00021f, -0.6f}};
+    int32 GridSize = 0;
+    float MinXCm = 0.0f;
+    float MaxXCm = 0.0f;
+    float MinYCm = 0.0f;
+    float MaxYCm = 0.0f;
+    float EncodedMinZCm = 0.0f;
+    float EncodedMaxZCm = 0.0f;
+    float RiverAnchorXCm = 0.0f;
+    float RiverAnchorYCm = 0.0f;
+    float RiverZCm = 0.0f;
+    float RiverMaskHalfWidthCm = 0.0f;
+    TArray<FCenterlineTerm> RiverCenterlineTerms;
 };
 
 // Lazily loads + caches Config/yarlung-terrain.json on first call.
