@@ -6,6 +6,7 @@ param(
     [switch]$ForceMaterials,
     [switch]$SkipModels,
     [switch]$ForceModels,
+    [switch]$SkipMapImport,
     [switch]$Verify
 )
 
@@ -137,14 +138,21 @@ if (-not $SkipModels -and ($ForceModels -or -not (Test-Path -LiteralPath $Boulde
     Write-Host "[YARLUNG-TIME] skip import models: existing asset $BoulderAsset"
 }
 
-Invoke-TimedStep "import landscape map" {
-    & $EditorCmd $Project -run=YarlungLandscapeImport -unattended -nop4 -NullRHI -NoSplash
-    if ($LASTEXITCODE -ne 0) {
-        throw "Yarlung landscape import failed with exit code $LASTEXITCODE"
+if (-not $SkipMapImport) {
+    Invoke-TimedStep "import landscape map" {
+        & $EditorCmd $Project -run=YarlungLandscapeImport -unattended -nop4 -NullRHI -NoSplash
+        if ($LASTEXITCODE -ne 0) {
+            throw "Yarlung landscape import failed with exit code $LASTEXITCODE"
+        }
     }
+} else {
+    Write-Host "[YARLUNG-TIME] skip import landscape map: requested"
 }
 
 if ($Verify) {
+    if ($SkipMapImport) {
+        Write-Host "[YARLUNG-TIME] verify existing map without reimport"
+    }
     Invoke-TimedStep "verify map" {
         & $EditorCmd $Project "-ExecutePythonScript=$InspectScript" -unattended -nop4 -NullRHI -NoSplash
         if ($LASTEXITCODE -ne 0) {

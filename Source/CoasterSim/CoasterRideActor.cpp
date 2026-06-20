@@ -164,7 +164,7 @@ ACoasterRideActor::ACoasterRideActor()
     RideCamera->PostProcessSettings.bOverride_CameraISO = true;
     RideCamera->PostProcessSettings.CameraISO = 100.0f;
     RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-    RideCamera->PostProcessSettings.AutoExposureBias = 1.2f;
+    RideCamera->PostProcessSettings.AutoExposureBias = 1.65f;
     RideCamera->PostProcessSettings.bOverride_FilmSlope = true;
     RideCamera->PostProcessSettings.FilmSlope = 0.86f;
     RideCamera->PostProcessSettings.bOverride_FilmToe = true;
@@ -184,7 +184,7 @@ ACoasterRideActor::ACoasterRideActor()
 
     SkyLight = CreateDefaultSubobject<USkyLightComponent>(TEXT("SkyLight"));
     SkyLight->SetupAttachment(SceneRoot);
-    SkyLight->SetIntensity(3.0f);
+    SkyLight->SetIntensity(4.0f);
     SkyLight->SetRealTimeCapture(true);
 
     SunLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("SunLight"));

@@ -397,14 +397,33 @@ def create_mesh_terrain_material(rock_textures):
         -940,
         -180,
     )
-    if not unreal.MaterialEditingLibrary.connect_material_property(
+    detail_coordinates = create_texture_coordinate(material, -940, 240, 18.0, 18.0)
+    rock_diffuse = create_texture_sample(
+        material,
+        rock_textures["T_AerialGrassRock_Diffuse"],
+        -640,
+        -220,
+        detail_coordinates,
+    )
+    rock_mix = create_lerp(
+        material,
         vertex_color,
+        "",
+        rock_diffuse,
+        "",
+        create_constant(material, 0.35, -640, -20),
+        "",
+        -360,
+        -160,
+        "mesh terrain rock diffuse mix",
+    )
+    if not unreal.MaterialEditingLibrary.connect_material_property(
+        rock_mix,
         "",
         unreal.MaterialProperty.MP_BASE_COLOR,
     ):
-        raise RuntimeError("Unable to connect mesh terrain vertex BaseColor")
+        raise RuntimeError("Unable to connect mesh terrain rock BaseColor")
 
-    detail_coordinates = create_texture_coordinate(material, -940, 240, 240.0, 240.0)
     rock_normal = create_texture_sample(
         material,
         rock_textures["T_AerialGrassRock_Normal"],
