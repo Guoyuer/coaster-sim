@@ -25,10 +25,10 @@
 ## 2. 现状基线（实现者必读：已有什么，别重造）
 
 - **物理已存在**：`CoasterRideActor.cpp::AdvanceRide` 已实现能量法物理——重力沿前向投影、空气阻力 `0.000015·v²`、滚阻 `18 cm/s²`、Lift/Launch/Brake/Station 分段驱动、速度积分 `Clamp(180..5600 cm/s)`、距离推进；并算出 `Telemetry.{SpeedMps,HeightMeters,TrackDistanceMeters,VerticalG,LateralG,LongitudinalG,SectionName}`（座椅力 = 世界加速度 − 重力，投影到 Up/Right/Forward）。**保留并扩展，勿重写。**
-- **轨道现状**：`YarlungCoasterProfile.h::DefaultTrackControlPoints()` = **8 个硬编码 `FVector`（cm）** 的闭环（~216×154m）；`CoasterRideActor::RebuildSpline` 建 `USplineComponent`（Curve 点、闭环）。`EnsureDefaultTrack` 含 legacy 检测。
-- **倾斜现状**：`SampleFrame:775` 是**装饰性正弦** `Bank = 28°·sin(ratio·2π·3)`，与物理/曲率无关。
-- **分段现状**：`GetSectionName` 按 `TrackRatio` 区间硬分（Station<0.04 / Lift<0.24 / Launch 0.56–0.62 / Brake>0.88 / Coast），**为短环写死，不可用于变长轨道**。
-- **净空现状**：`ApplyTrackClearanceCut` 半径已设 0（完全关闭），运行时无贴地/clamp/防穿插 → **全环不穿山无保证**（见未结外审 `docs/reviews/2026-06-19-a2-track-adapts-v1.md`，本 spec 闭环它）。
+- **轨道现状**：`UCoasterTrackComponent::LoadGeneratedTrack()` 从 `Content/Generated/YarlungLandscape/YarlungTrack.csv` 加载约 5km 闭环轨道；`ACoasterRideActor` 不再持有编辑器控制点，也不再自动回退旧 8 点短环。
+- **倾斜现状**：生成器按曲率/设计速度写入 `roll_deg`，运行时 `SampleFrame` 按距离插值 CSV banking 并应用到座椅坐标。
+- **分段现状**：`YarlungTrack.csv` 每点写 `section`，`UCoasterTrackComponent` 构建距离区间；运行时按距离查段，不再按 `TrackRatio` 写死。
+- **净空现状**：全环不穿山保证由 `scripts/verify-track-clearance.py` 的生成即校验门禁承担；旧 no-op clearance-cut 代码已删除，不再靠运行时/导入侧硬挖山兜底。
 - **坐标系/编码**（生成器与 commandlet 一致）：
   - 世界网格 `SIZE=1009`，`X∈[-337778.43, 337778.43]cm`（≈6.76km），`Y∈[-416981.55, 416981.55]cm`（≈8.34km），原点居中。
   - Landscape 在原点，`Scale=(XYScaleX≈670.2, XYScaleY≈827.3, ZScale≈917.97)`，`SectionSizeQuads=63`。
@@ -68,7 +68,7 @@
 
 同时生成器更新 `manifest.json` 增加 `track` 块：`{length_m, control_point_count, out_back_split_m, min_clearance_m, min_curve_radius_m, max_grade_pct, est_max_vert_g, est_max_lat_g, section_distances_m:{...}}`。
 
-> 决策 D1：**长轨道不再硬编码进 `.h`**。~5km 在合理控制点间距下约 80–160 点，且必须可从 DEM 再生。改为生成+提交的 CSV，符合现有「generated assets」模式（`.r16`/macro/manifest 都是生成提交的）。Yarlung 运行时路径必须加载 `YarlungTrack.csv`；`DefaultTrackControlPoints()` 只保留为旧原型/显式测试资料，不作为自动 fallback。
+> 决策 D1：**长轨道不再硬编码进 `.h`**。~5km 在合理控制点间距下约 80–160 点，且必须可从 DEM 再生。改为生成+提交的 CSV，符合现有「generated assets」模式（`.r16`/macro/manifest 都是生成提交的）。Yarlung 运行时路径必须加载 `YarlungTrack.csv`；旧 `DefaultTrackControlPoints()` / `YarlungCoasterProfile.h` 已删除，不能作为 fallback 重新引入。
 
 ---
 
@@ -122,7 +122,7 @@
 4. **输出**：`Saved/Diagnostics/track-clearance-*.csv/.png`（净空沿弧长曲线、违规段高亮），并打印 `min_clearance_m / 违规段数 / min_radius / max_grade / est_max_g`。
 5. **门禁**：任一采样 `clearance < clearance_floor`（如 < 2m）或 G 超舒适包络 → **非零退出**，build/验收**不放行**。
 
-> 决策 D6：这把**关掉 clearance cut 后失去的全环不穿山保证**用「生成即校验 + 硬门禁」补回来，直接闭环未结外审。可选再保留一个很小的 `ApplyTrackClearanceCut` inner 半径作运行时微小兜底（外审建议），但**主保证靠校验器**，不靠挖山。
+> 决策 D6：这把**关掉 clearance cut 后失去的全环不穿山保证**用「生成即校验 + 硬门禁」补回来，直接闭环未结外审。当前代码不保留 `ApplyTrackClearanceCut` fallback；**主保证靠校验器**，不靠挖山。
 
 **舒适包络（硬约束，校验器与运行时遥测共用阈值）—— 用户拍板「更刺激」定档**：
 - 垂直 G：`[-1.5, +5.5]`（强 ejector airtime ↔ 强正向压）
@@ -141,17 +141,17 @@
 现 `CoasterRideActor.cpp`（802 行 god actor）把相机/后期、轨道几何、物理、环境建模混在一起；重定位的 C++ 改动正落在最乱的核心。**在写任何 5km 新功能前，先做一次零行为变更的针对性重构**，切出干净的轨道/乘坐核心；现短环重构后骑乘**一模一样**，用 offscreen smoke 验证零回归。范围**只限**轨道/乘坐/banking/分段这条缝；**环境建模迁出不并入 P0**，留到 P4（已另有 2026-06-18 迁出决策）。
 
 目标模块边界：
-- **`UCoasterTrackComponent`（或 `FYarlungTrack`）= 轨道唯一真相**：持控制点（P2 起从 CSV 载）+ `USplineComponent`；`SampleFrame(distance)→frame`（**纯几何，不含 banking**）、`GetCurvature(distance)`、`GetLength()`、`GetSection(distance)`。**消灭双表示**——运行时只用 spline；`DistanceToTrack2D`(直线段) 与 `ApplyTrackClearanceCut` 退回**地形导入侧**（commandlet），不再与运行时轨道同住 `YarlungCoasterProfile.h`。
+- **`UCoasterTrackComponent`（或 `FYarlungTrack`）= 轨道唯一真相**：从 CSV 载控制点 + `USplineComponent`；`SampleFrame(distance)→frame`（纯几何）、`GetLength()`、`GetSection(distance)`、`GetGeneratedBankRadiansAtDistance()`、`GetGeneratedTerrainZAtDistance()`。**消灭双表示**——运行时只用 generated CSV/spline；旧 `DistanceToTrack2D` / `ApplyTrackClearanceCut` / `YarlungCoasterProfile.h` 已退役。
 - **`ECoasterSection` 枚举 + `TArray<FCoasterSectionRange>`（距离区间）** 替换字符串分派（`AdvanceRide` 的 `== TEXT("Lift")` 等全删）。
 - **banking 抽成纯函数** `CoasterBanking::AngleFromCurvature(R, v, limits)`，与帧采样解耦；P0 阶段先用它复刻「等效现有观感」的占位实现，曲率真值在 P3 接。
 - **`AdvanceRide` 保留**（已较自洽），改为消费 track component 的 `GetSection`/几何，不再自持轨道。
 - **`ACoasterRideActor` 瘦成编排者**：持 track 组件 + 相机 + 车，tick 物理、设变换。相机/后期构造块可抽 helper（低优先，非必须）。
 
-出口：编译通过；现 8 点短环 offscreen smoke 与重构前逐帧一致（零回归）；`CoasterRideActor.cpp` 行数显著下降、各模块单一职责。
+出口：编译通过；P0 阶段曾用旧短环 offscreen smoke 做零回归；当前运行时已切到 generated CSV 长轨道，`CoasterRideActor.cpp` 职责继续收窄。
 
 ### 6.1 长轨道与数据驱动（P2 起，建在 P0 干净边界上）
 
-1. **加载长轨道**：`UCoasterTrackComponent::LoadGeneratedTrack()` 读 `YarlungTrack.csv` 填控制点（+ 每点 `roll_deg/section/terrain_z`）。CSV 缺失或解析失败必须报错并停止装载，不能回退 `DefaultTrackControlPoints()`。`RebuildSpline` 逻辑不变（已支持任意点数、闭环）。
+1. **加载长轨道**：`UCoasterTrackComponent::LoadGeneratedTrack()` 读 `YarlungTrack.csv` 填控制点（+ 每点 `roll_deg/section/terrain_z`）。CSV 缺失或解析失败必须报错并停止装载，不能回退旧 8 点短环。`RebuildSpline` 逻辑不变（已支持任意点数、闭环）。
 2. **分段按距离查表**：`GetSectionName(float TrackRatio)` 改为 `GetSectionName(float DistanceCm)`，按生成器写入的 `section_distances` 命中标签。`AdvanceRide` 调用处同步。
 3. **曲率驱动 banking**（替换 `SampleFrame:775` 正弦）：
    - 由样条在该距离的曲率 `κ`（或半径 `R=1/κ`）与当前速度 `v` 求**抵消横向 G 的倾斜** `θ = atan(v² / (g·R))`，限幅 `≤ bank_max`（如 70°），并沿弧长**限速率**（避免 banking 抖动）。

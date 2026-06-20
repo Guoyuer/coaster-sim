@@ -124,37 +124,11 @@ void UCoasterTrackComponent::SampleBaseFrame(
     OutRotation = FRotationMatrix::MakeFromXZ(OutForward, OutUp).Rotator();
 }
 
-ECoasterSection UCoasterTrackComponent::GetLegacySection(float TrackRatio) const
-{
-    if (TrackRatio < 0.04f)
-    {
-        return ECoasterSection::Station;
-    }
-    if (TrackRatio < 0.24f)
-    {
-        return ECoasterSection::Lift;
-    }
-    if (TrackRatio > 0.56f && TrackRatio < 0.62f)
-    {
-        return ECoasterSection::Launch;
-    }
-    if (TrackRatio > 0.88f)
-    {
-        return ECoasterSection::Brake;
-    }
-    return ECoasterSection::Coast;
-}
-
-FName UCoasterTrackComponent::GetLegacySectionName(float TrackRatio) const
-{
-    return SectionName(GetLegacySection(TrackRatio));
-}
-
 ECoasterSection UCoasterTrackComponent::GetSectionAtDistance(float DistanceCm) const
 {
     if (SectionRanges.IsEmpty())
     {
-        UE_LOG(LogTemp, Error, TEXT("Generated coaster section ranges are unavailable; returning Coast without legacy fallback."));
+        UE_LOG(LogTemp, Error, TEXT("Generated coaster section ranges are unavailable; using Coast sentinel."));
         return ECoasterSection::Coast;
     }
 

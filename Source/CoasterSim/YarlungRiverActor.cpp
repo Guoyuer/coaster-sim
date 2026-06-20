@@ -266,25 +266,20 @@ void AYarlungRiverActor::ApplyMaterials()
 {
     UMaterialInterface* WaterMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_YarlungRiverWater.M_YarlungRiverWater"));
     UMaterialInterface* FoamMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_YarlungRiverFoam.M_YarlungRiverFoam"));
-    UMaterialInterface* FallbackMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
 
-    if (!WaterMaterial)
+    if (!WaterMaterial || !FoamMaterial)
     {
-        WaterMaterial = FallbackMaterial;
-    }
-    if (!FoamMaterial)
-    {
-        FoamMaterial = FallbackMaterial;
+        UE_LOG(
+            LogTemp,
+            Error,
+            TEXT("Missing required Yarlung river materials: water=%s foam=%s"),
+            WaterMaterial ? TEXT("ok") : TEXT("missing"),
+            FoamMaterial ? TEXT("ok") : TEXT("missing"));
+        return;
     }
 
-    if (WaterMaterial)
-    {
-        WaterMesh->SetMaterial(0, WaterMaterial);
-    }
-    if (FoamMaterial)
-    {
-        FoamMesh->SetMaterial(0, FoamMaterial);
-    }
+    WaterMesh->SetMaterial(0, WaterMaterial);
+    FoamMesh->SetMaterial(0, FoamMaterial);
 
     if (UMaterialInstanceDynamic* WaterDynamic = WaterMesh->CreateAndSetMaterialInstanceDynamic(0))
     {

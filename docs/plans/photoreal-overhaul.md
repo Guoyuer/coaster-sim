@@ -14,7 +14,7 @@
 
 1. **Camera-real（像相机拍的，不是像游戏）**：照片级真实度。判据是"截一帧出来像一张真实照片/电影画面"，而不是"比原型好"。
 2. **风景如画的雅鲁藏布江 / 林芝**：湿润深绿密林、乳白—青绿湍流江水、冷灰/灰绿湿岩崖壁、云带薄雾、远处南迦巴瓦式雪山、晴天蓝天白云（视觉锚点见 `CONTEXT.md`）。
-3. **视角永远是过山车第一人称（on-rails）**：相机始终挂在沿固定轨道样条运动的车上（`CoasterRideActor.cpp` 的 `RideCamera` + `SampleFrame`，轨道控制点在 `YarlungCoasterProfile.h:17`）。**没有自由漫游、没有任意机位。**
+3. **视角永远是过山车第一人称（on-rails）**：相机始终挂在沿固定轨道样条运动的车上（`CoasterRideActor.cpp` 的 `RideCamera` + `SampleFrame`，轨道由 `Content/Generated/YarlungLandscape/YarlungTrack.csv` 经 `UCoasterTrackComponent` 加载）。**没有自由漫游、没有任意机位。**
 
 > **这三条合起来给出一条比"通用电影级"清晰得多、可行得多的路**，因为约束 3 让我们只需要把"相机沿轨道飞过去时视锥里看到的东西"做到照片级，而不是整个世界从任何角度都成立。这是 on-rails 最大的红利，全程要吃满。
 
@@ -71,7 +71,7 @@ CoasterGameMode::BeginPlay            ──> 运行时若无 ride actor 再 spa
 ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 + 天空/云/远山/河/植被/巨石(全部环境)
 ```
 
-**两套地形并存（结构性 bug）**：真实地形 = commandlet spawn 的 `ALandscape`（高度来自 `.r16`，材质 `M_YarlungLandscapeGround`，`YarlungLandscapeImportCommandlet.cpp:89`）；影子地形 = `CoasterRideActor.cpp:53` 的解析函数 `YarlungLandscapeHeight()`，被用来摆巨石(`:676`)/植被(`:720`)/支撑脚。两份高度场来源不同、不保证一致 → 植被/巨石浮空或穿插。唯一共用的是轨道净空切槽 `ApplyTrackClearanceCut`（`YarlungCoasterProfile.h:70`）。
+**历史结构性 bug（已部分清理）**：早期真实地形 = commandlet spawn 的 `ALandscape`（高度来自 `.r16`），影子地形 = `CoasterRideActor.cpp` 内解析函数，用来摆巨石/植被/支撑脚，导致两份高度场不一致。当前 ride actor 已清掉旧 boulder/scenery 影子地形，支撑脚读 `YarlungTrack.csv terrain_z`；剩余环境内容应继续放在独立 scenery actor / generated level 管线。
 
 ---
 
@@ -113,16 +113,16 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 - **A2 真实 DEM 地形（如画轮廓的来源）— 真实尺度，不压缩**（2026-06-18 决策）：
   - **尺度方案=真实尺度子区域**：裁取约 **5–10 km** 的一段壮观真实峡谷，按**接近 1:1** 导成**公里级 UE Landscape**（UE 跑公里级地形正常）。**禁止**把整条峡谷压进现有 164×187m 的玩具尺度——那会让崖壁只剩 ~43m、远山变成贴轨小丘，第一人称读成桌面沙盘，丢掉"如画"壮阔感（压缩倍率水平~212×/垂直~114×，已验证不可接受）。
   - **垂直保持真实尺度**：崖壁几百米量级，抬头能看到压过来的峡谷墙与真正"远"的雪山。
-  - **过山车作为峡谷里的小型设施**：占地约 150m 的轨道是这个公里级峡谷中的一段（符合现实）。**轨道样条坐标需随新世界尺度重新定位/缩放**（`YarlungCoasterProfile.h:17` 的控制点），并让样条穿过取景好的临江高弯。这是 A2 的核心工作。
+  - **过山车作为峡谷里的小型设施**：占地约 150m 的早期短环已被世界最长约 5km 沿江往返线路取代。轨道样条坐标由生成器写入 `YarlungTrack.csv`，并让样条穿过取景好的临江高弯。
   - **选定子区域（2026-06-18 用户拍板）=大拐弯最深峡谷段**，南迦巴瓦与加拉白垒之间（世界最深，最大深度 6009m）。险峻+如画。
     - **裁剪 bbox（约 8.3×6.8 km）**：`lat 29.745–29.820°N, lon 94.945–95.015°E`。框内含：谷底最深点 `29.7697°N, 94.9899°E`（Copernicus GLO-30 实采约 **2652m**，接近画面中心）、加拉白垒峰 `29.8133°N, 94.9672°E`（实采约 **7048m**，北缘，做远景雪山背景）、两者之间最陡崖壁。当前 bbox 实采范围约 **2613m→7144m ≈ 4530m**。参考：南迦巴瓦峰 `29.6258°N, 95.0572°E`（7782m）。
     - **DEM 源 = Copernicus GLO-30（30m）优先**（高海拔陡坡质量最好、空洞最少）；ALOS AW3D30 备选；**不要用 SRTM 做主力**（喜马拉雅陡坡有空洞/噪点）。
     - **分辨率维持 1009×1009×16-bit，不用加**（DEM 原生 30m，8km 框原生才~267 采样点，1009 已过采样；近景细节交给阶段 C 材质/法线/Nanite，不靠高度图）。**不需要改** commandlet 的 `HeightmapSize`。
-    - **垂直 1:1 真实尺度（关键）**：把 `YarlungLandscapeImportCommandlet.cpp` 的 `EncodedMinZ/EncodedMaxZ` 从 `-360cm/3900cm` 改成框内**真实海拔范围**（当前编码窗口 **2600m–7300m**，注意单位 cm），让崖壁是几百上千米而非 43m。`XYScale` 由 bbox 自动算出（当前 X≈6.70m/quad、Y≈8.27m/quad，可接受）。保留 `ApplyTrackClearanceCut`。
+    - **垂直 1:1 真实尺度（关键）**：把 `YarlungLandscapeImportCommandlet.cpp` 的 `EncodedMinZ/EncodedMaxZ` 从 `-360cm/3900cm` 改成框内**真实海拔范围**（当前编码窗口 **2600m–7300m**，注意单位 cm），让崖壁是几百上千米而非 43m。`XYScale` 由 bbox 自动算出（当前 X≈6.70m/quad、Y≈8.27m/quad，可接受）。不要再依赖 clearance-cut 挖山；轨道净空由生成器 + `verify-track-clearance.py` 门禁保证。
     - **保险步骤**：正式导入前先出一张该 bbox 的 hillshade（晕渲）预览图肉眼确认河道走向与雪峰位置，避免下错瓦片/朝向不对白跑一轮。
   - 远景"画意"主要来自真实山体轮廓+真实尺度——这一步价值最高。
   - **照片向自然化（2026-06-19 转向）**：若 DEM 近景陡崖或轨道净空切槽在 FP 帧中读成水平货架/人工墙，允许并应当 naturalize heightfield、改轨道 Z/XY、重塑走廊地形。DEM 保留中远景大轮廓；近景以照片自然性为准。
-  - **轨道适配地形**：`ApplyTrackClearanceCut` 只能作为最后的微小安全兜底，不能用来硬挖一条峡谷槽。优先根据自然地形重新计算轨道控制点高度/路径，使轨道不穿山、离地合理、近景坡面自然。
+  - **轨道适配地形**：不要硬挖一条峡谷槽。优先根据自然地形重新计算轨道高度/路径，使轨道不穿山、离地合理、近景坡面自然；全环净空用校验器硬门禁闭环。
   - 验收：英雄段 FP 帧里对岸崖壁/远山轮廓接近参照照片的真实山形与**尺度感**（壮阔，不是小土坡），不再是平滑解析坡；轨道附近不能出现人工水平台阶墙/硬切槽。
 - **A3 scatter 改查真实地形，并迁出 ride actor**：用 Landscape 真表面点+法线放置巨石/植被，替换对解析 `YarlungLandscapeHeight()` 的依赖。首选在 `YarlungLandscapeImportCommandlet.cpp` 或专门的 generated scenery/PCG 管线中生成关卡内容；若必须用运行时 `LineTraceSingleByChannel`（高空向下打 `ECC_WorldStatic`），也要封装到独立 scenery actor，不要继续写进 `ACoasterRideActor::RebuildEnvironment`。注意 Landscape 碰撞就绪时序（commandlet 离屏环境与 PIE/运行时都要验证）。最终删除影子地形函数。
   - 验收：植被/巨石与地表无缝贴合，无浮空/半埋；`Yarlung scatter instances` 计数 > 0。
@@ -175,7 +175,7 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 
 ## 7. 参考文件清单
 - 仿真+环境主体：`Source/CoasterSim/CoasterRideActor.cpp` / `.h`
-- 轨道剖面/控制点/净空：`Source/CoasterSim/YarlungCoasterProfile.h`
+- 轨道数据/分段/banking：`Content/Generated/YarlungLandscape/YarlungTrack.csv`、`Source/CoasterSim/CoasterTrackComponent.*`、`scripts/generate-yarlung-track.py`、`scripts/verify-track-clearance.py`
 - 关卡导入 commandlet：`Source/CoasterSim/YarlungLandscapeImportCommandlet.cpp`
 - GameMode：`Source/CoasterSim/CoasterGameMode.cpp`
 - 材质/贴图生成：`scripts/create-coaster-materials.py`

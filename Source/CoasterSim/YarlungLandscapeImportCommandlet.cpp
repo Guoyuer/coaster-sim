@@ -6,7 +6,6 @@
 #include "YarlungRiverActor.h"
 #include "YarlungSceneryActor.h"
 #include "YarlungMeshTerrainActor.h"
-#include "YarlungCoasterProfile.h"
 #include "YarlungTerrainProfile.h"
 #include "YarlungTerrainRelief.h"
 #include "YarlungViewCorridor.h"
@@ -481,23 +480,6 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
     TArray<uint16> HeightData;
     HeightData.SetNumUninitialized(HeightmapSize * HeightmapSize);
     FMemory::Memcpy(HeightData.GetData(), RawBytes.GetData(), RawBytes.Num());
-
-    for (int32 YIndex = 0; YIndex < HeightmapSize; ++YIndex)
-    {
-        const float V = static_cast<float>(YIndex) / static_cast<float>(HeightmapSize - 1);
-        const float Y = FMath::Lerp(MinY, MaxY, V);
-        for (int32 XIndex = 0; XIndex < HeightmapSize; ++XIndex)
-        {
-            const float U = static_cast<float>(XIndex) / static_cast<float>(HeightmapSize - 1);
-            const float X = FMath::Lerp(MinX, MaxX, U);
-            const int32 DataIndex = YIndex * HeightmapSize + XIndex;
-            const float EncodedT = static_cast<float>(HeightData[DataIndex]) / 65535.0f;
-            const float HeightCm = FMath::Lerp(EncodedMinZ, EncodedMaxZ, EncodedT);
-            const float CutHeightCm = YarlungCoaster::ApplyTrackClearanceCut(X, Y, HeightCm);
-            const float CutT = FMath::Clamp((CutHeightCm - EncodedMinZ) / (EncodedMaxZ - EncodedMinZ), 0.0f, 1.0f);
-            HeightData[DataIndex] = static_cast<uint16>(FMath::RoundToInt(CutT * 65535.0f));
-        }
-    }
 
     UStaticMesh* MeshTerrainAsset = nullptr;
     if (bSkipTerrainMeshBuild)

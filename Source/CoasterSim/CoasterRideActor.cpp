@@ -2,7 +2,6 @@
 
 #include "CoasterBanking.h"
 #include "CoasterTrackComponent.h"
-#include "YarlungCoasterProfile.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/DirectionalLightComponent.h"
@@ -25,7 +24,6 @@ namespace
 {
 constexpr float CmPerMeter = 100.0f;
 constexpr float GravityCms2 = 980.665f;
-constexpr float FallbackGeneratedRiverSurfaceZCm = 267655.0f;
 
 FTransform MakeSegmentTransform(const FVector& Start, const FVector& End, const FVector& ScaleCm)
 {
@@ -42,7 +40,7 @@ bool LoadGeneratedRiverAverageZCm(float& OutZCm)
     TArray<FString> Lines;
     if (!FFileHelper::LoadFileToStringArray(Lines, *Path))
     {
-        UE_LOG(LogTemp, Warning, TEXT("Unable to read Yarlung river CSV for fog anchor: %s"), *Path);
+        UE_LOG(LogTemp, Error, TEXT("Unable to read Yarlung river CSV for fog anchor: %s"), *Path);
         return false;
     }
 
@@ -61,7 +59,7 @@ bool LoadGeneratedRiverAverageZCm(float& OutZCm)
 
     if (Count == 0)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Yarlung river CSV has no usable fog-anchor samples: %s"), *Path);
+        UE_LOG(LogTemp, Error, TEXT("Yarlung river CSV has no usable fog-anchor samples: %s"), *Path);
         return false;
     }
 
@@ -157,7 +155,7 @@ ACoasterRideActor::ACoasterRideActor()
 
     ValleyFog = CreateDefaultSubobject<UExponentialHeightFogComponent>(TEXT("ValleyFog"));
     ValleyFog->SetupAttachment(SceneRoot);
-    ValleyFog->SetRelativeLocation(FVector(0.0f, 0.0f, FallbackGeneratedRiverSurfaceZCm + 70.0f));
+    ValleyFog->SetRelativeLocation(FVector::ZeroVector);
     ValleyFog->SetFogDensity(0.000020f);
     ValleyFog->SetFogHeightFalloff(0.40f);
     ValleyFog->SetFogMaxOpacity(0.035f);
@@ -203,7 +201,6 @@ ACoasterRideActor::ACoasterRideActor()
 void ACoasterRideActor::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
-    EnsureDefaultTrack();
     RebuildSpline();
     ApplyVisualMaterials();
     RebuildVisuals();
@@ -212,7 +209,6 @@ void ACoasterRideActor::OnConstruction(const FTransform& Transform)
 void ACoasterRideActor::BeginPlay()
 {
     Super::BeginPlay();
-    EnsureDefaultTrack();
     RebuildSpline();
     ApplyVisualMaterials();
     RebuildVisuals();
@@ -226,24 +222,8 @@ void ACoasterRideActor::Tick(float DeltaSeconds)
     AdvanceRide(DeltaSeconds);
 }
 
-void ACoasterRideActor::EnsureDefaultTrack()
-{
-    const bool bLooksLikeLegacyDefault =
-        ControlPoints.Num() == 11 &&
-        ControlPoints[0].Equals(FVector(0.0f, 0.0f, 350.0f), 2.0f) &&
-        ControlPoints[1].Equals(FVector(900.0f, 0.0f, 1150.0f), 2.0f);
-
-    if (!ControlPoints.IsEmpty() && !bLooksLikeLegacyDefault)
-    {
-        return;
-    }
-
-    ControlPoints = YarlungCoaster::DefaultTrackControlPoints();
-}
-
 void ACoasterRideActor::StartRideAt(float TrackRatio, float SpeedMps)
 {
-    EnsureDefaultTrack();
     RebuildSpline();
 
     const float ClampedRatio = FMath::Clamp(TrackRatio, 0.0f, 0.999f);
@@ -272,7 +252,6 @@ void ACoasterRideActor::StartRideFromCommandLine(float DefaultTrackRatio, float 
 
     if (FParse::Value(CommandLine, TEXT("CoasterStartSeconds="), StartSeconds))
     {
-        EnsureDefaultTrack();
         RebuildSpline();
         const float ClampedRatio = FMath::Clamp(TrackRatio, 0.0f, 0.999f);
         const float StartDistanceCm = TrackLengthCm * ClampedRatio;
@@ -301,12 +280,17 @@ void ACoasterRideActor::RebuildSpline()
 
     TrackLengthCm = TrackSpline->GetTrackLengthCm();
 
-    float RiverSurfaceZCm = FallbackGeneratedRiverSurfaceZCm;
+    float RiverSurfaceZCm = 0.0f;
     if (LoadGeneratedRiverAverageZCm(RiverSurfaceZCm))
     {
+        ValleyFog->SetVisibility(true, true);
+        ValleyFog->SetRelativeLocation(FVector(0.0f, 0.0f, RiverSurfaceZCm + 70.0f));
         UE_LOG(LogTemp, Display, TEXT("Anchored valley fog to generated Yarlung river average Z: %.1fcm"), RiverSurfaceZCm);
+        return;
     }
-    ValleyFog->SetRelativeLocation(FVector(0.0f, 0.0f, RiverSurfaceZCm + 70.0f));
+
+    ValleyFog->SetVisibility(false, true);
+    UE_LOG(LogTemp, Error, TEXT("Generated Yarlung river CSV is required for valley fog; fog disabled."));
 }
 
 void ACoasterRideActor::RebuildVisuals()

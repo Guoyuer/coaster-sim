@@ -31,7 +31,6 @@ class COASTERSIM_API UCoasterTrackComponent : public USplineComponent
 
 public:
     bool LoadGeneratedTrack(const FString& CsvPath);
-    void RebuildFromControlPoints(const TArray<FVector>& ControlPoints);
     float GetTrackLengthCm() const;
     void SampleBaseFrame(
         float DistanceCm,
@@ -40,8 +39,6 @@ public:
         FVector& OutForward,
         FVector& OutRight,
         FVector& OutUp) const;
-    ECoasterSection GetLegacySection(float TrackRatio) const;
-    FName GetLegacySectionName(float TrackRatio) const;
     ECoasterSection GetSectionAtDistance(float DistanceCm) const;
     FName GetSectionNameAtDistance(float DistanceCm) const;
     float GetGeneratedBankRadiansAtDistance(float DistanceCm) const;
@@ -51,6 +48,7 @@ public:
 
 private:
     static ECoasterSection ParseSectionName(const FString& Value);
+    void RebuildFromControlPoints(const TArray<FVector>& ControlPoints);
     void BuildSectionRanges(const TArray<FVector>& Points, const TArray<ECoasterSection>& Sections);
 
     TArray<FCoasterSectionRange> SectionRanges;

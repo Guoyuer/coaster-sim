@@ -95,9 +95,6 @@ protected:
     UPROPERTY(VisibleAnywhere, Category = "Track Visuals")
     TObjectPtr<UInstancedStaticMeshComponent> Supports;
 
-    UPROPERTY(EditAnywhere, Category = "Track")
-    TArray<FVector> ControlPoints;
-
     UPROPERTY(EditAnywhere, Category = "Track", meta = (ClampMin = "0.0"))
     float RailGaugeCm = 170.0f;
 
@@ -126,7 +123,6 @@ protected:
     float NumericalStallFloorMps = 0.2f;
 
 private:
-    void EnsureDefaultTrack();
     void RebuildSpline();
     void RebuildVisuals();
     void ApplyVisualMaterials();
