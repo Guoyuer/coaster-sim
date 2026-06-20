@@ -30,6 +30,21 @@ struct FReliefConfig
     float DetailMin = -1.25f;
     float DetailMax = 1.25f;
 
+    float CliffFoldRiverDistanceStartCm = 36000.0f;
+    float CliffFoldRiverDistanceFadeCm = 120000.0f;
+    float CliffFoldWarpScale = 1.0f / 140000.0f;
+    float CliffFoldWarpAmplitudeCm = 18000.0f;
+    float CliffFoldAlongRiverScale = 1.0f / 180000.0f;
+    float CliffFoldAcrossWallScale = 1.0f / 30000.0f;
+    int32 CliffFoldOctaves = 4;
+    float CliffFoldBias = 0.36f;
+    float CliffFoldWeight = 1.0f;
+    float CliffFoldFbmWeight = 0.20f;
+    float CliffFoldDetailMin = -1.25f;
+    float CliffFoldDetailMax = 0.35f;
+    float CliffFoldMinAmplitudeCm = 3500.0f;
+    float CliffFoldMaxAmplitudeCm = 7000.0f;
+
     float MinAmplitudeCm = 2500.0f;
     float MaxAmplitudeCm = 7000.0f;
     float NearTrackProtectStartCm = 4000.0f;
@@ -42,6 +57,7 @@ float ComputeReliefCm(
     float HeightCm,
     const FVector& BaseNormal,
     float TrackDistanceCm,
+    float ViewCorridorMask = 1.0f,
     const FReliefConfig& Config = FReliefConfig());
 FVector ApplyNormalDisplacement(const FVector& BasePosition, const FVector& BaseNormal, float DisplacementCm);
 }

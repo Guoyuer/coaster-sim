@@ -1,10 +1,9 @@
 """Fast offline preview of the Yarlung terrain mesh relief.
 
-Mirrors the C++ relief synthesis in YarlungLandscapeImportCommandlet.cpp
-(YarlungTerrainReliefCm + coherent noise / fbm / ridged) in vectorized numpy,
-then hillshades the result so we can judge smooth-vs-rugged-vs-crystalline in
-seconds instead of a ~5 min UE Nanite mesh rebuild. Pure geometry/normal
-shading -- independent of UE material/exposure.
+Mirrors the C++ relief synthesis in YarlungTerrainRelief.cpp in vectorized
+numpy, then hillshades the result so we can judge smooth-vs-rugged-vs-crystalline
+in seconds instead of a multi-minute UE Nanite mesh rebuild. Pure
+geometry/normal shading -- independent of UE material/exposure.
 
 Tune the constants in TUNABLES, run, eyeball the PNG, then port the chosen
 values back into the C++ (the noise character is governed by these params; the
@@ -13,9 +12,11 @@ exact lattice values differ but the rugged character transfers 1:1).
 
 import numpy as np
 from PIL import Image
+import csv
 
 # --- map constants (must match the commandlet) ---
 HEIGHTMAP = "Content/Generated/YarlungLandscape/YarlungTsangpo_1009.r16"
+TRACK_CSV = "Content/Generated/YarlungLandscape/YarlungTrack.csv"
 SRC = 1009
 GRID = 2017                       # mesh grid resolution (4 m spacing)
 MIN_X, MAX_X = -337778.431, 337778.431
@@ -33,6 +34,27 @@ RIDGED_BIAS, RIDGED_W = 0.42, 1.9
 FBM_W, STRATA_W = 0.40, 0.0
 STRATA_FREQ = 0.004              # keep above the ~8 m grid Nyquist (was 0.011 -> aliased moire)
 AMP_MIN_CM, AMP_MAX_CM = 2500.0, 7000.0
+CLIFF_FOLD_START_CM, CLIFF_FOLD_FADE_CM = 36000.0, 120000.0
+CLIFF_FOLD_WARP_WL_CM = 140000.0
+CLIFF_FOLD_WARP_AMP_CM = 18000.0
+CLIFF_FOLD_ALONG_WL_CM = 180000.0
+CLIFF_FOLD_ACROSS_WL_CM = 30000.0
+CLIFF_FOLD_OCTAVES = 4
+CLIFF_FOLD_BIAS, CLIFF_FOLD_W = 0.36, 1.0
+CLIFF_FOLD_FBM_W = 0.20
+CLIFF_FOLD_MIN, CLIFF_FOLD_MAX = -1.25, 0.35
+CLIFF_FOLD_AMP_MIN_CM, CLIFF_FOLD_AMP_MAX_CM = 3500.0, 7000.0
+
+# First-person camera corridor approximation. This is intentionally wider than a
+# single exact frame: it marks terrain likely to pass through the on-rails camera
+# frustum over the ride, so relief tuning follows the coaster, not the river.
+VIEW_BACKWARD_FADE_CM = 12000.0
+VIEW_FAR_START_CM = 160000.0
+VIEW_FAR_FADE_CM = 120000.0
+VIEW_SIDE_BASE_CM = 14000.0
+VIEW_SIDE_FADE_CM = 26000.0
+VIEW_MAX_SIDE_CM = 180000.0
+VIEW_TAN_HALF_FOV = 0.84
 
 
 def smooth01(t):
@@ -80,7 +102,42 @@ def river_center_y(x):
     return -142330.0 + 9000.0 * np.sin(ox * 0.00009 + 0.25) + 4200.0 * np.sin(ox * 0.00021 - 0.6)
 
 
+def load_track_points():
+    with open(TRACK_CSV, newline="", encoding="utf-8") as handle:
+        return [(float(row["x"]), float(row["y"])) for row in csv.DictReader(handle)]
+
+
+def view_corridor_mask(x, y, track_points):
+    mask = np.zeros_like(x, dtype=np.float64)
+    count = len(track_points)
+    if count < 3:
+        return mask
+
+    for index, current in enumerate(track_points):
+        previous = track_points[(index - 1) % count]
+        next_point = track_points[(index + 1) % count]
+        tx = next_point[0] - previous[0]
+        ty = next_point[1] - previous[1]
+        length = max(np.hypot(tx, ty), 1.0)
+        tx /= length
+        ty /= length
+
+        rel_x = x - current[0]
+        rel_y = y - current[1]
+        forward = rel_x * tx + rel_y * ty
+        lateral = np.abs(tx * rel_y - ty * rel_x)
+        side_limit = np.clip(VIEW_SIDE_BASE_CM + np.maximum(forward, 0.0) * VIEW_TAN_HALF_FOV, VIEW_SIDE_BASE_CM, VIEW_MAX_SIDE_CM)
+        forward_mask = smooth01((forward + VIEW_BACKWARD_FADE_CM) / VIEW_BACKWARD_FADE_CM) * (
+            1.0 - smooth01((forward - VIEW_FAR_START_CM) / VIEW_FAR_FADE_CM)
+        )
+        side_mask = 1.0 - smooth01((lateral - side_limit) / VIEW_SIDE_FADE_CM)
+        mask = np.maximum(mask, forward_mask * side_mask)
+
+    return np.clip(mask, 0.0, 1.0)
+
+
 def main():
+    track_points = load_track_points()
     raw = np.fromfile(HEIGHTMAP, dtype="<u2").astype(np.float64).reshape(SRC, SRC)
     base_src = ENC_MIN_Z + (ENC_MAX_Z - ENC_MIN_Z) * raw / 65535.0
 
@@ -95,6 +152,10 @@ def main():
 
     X = np.linspace(MIN_X, MAX_X, GRID)[None, :] * np.ones((GRID, 1))
     Y = np.linspace(MIN_Y, MAX_Y, GRID)[:, None] * np.ones((1, GRID))
+    small_x = X[::2, ::2]
+    small_y = Y[::2, ::2]
+    small_view_mask = view_corridor_mask(small_x, small_y, track_points)
+    view_mask = np.repeat(np.repeat(small_view_mask, 2, axis=0), 2, axis=1)[:GRID, :GRID]
 
     dx = (MAX_X - MIN_X) / (GRID - 1)
     dy = (MAX_Y - MIN_Y) / (GRID - 1)
@@ -124,6 +185,46 @@ def main():
     amp = AMP_MIN_CM + (AMP_MAX_CM - AMP_MIN_CM) * slope_gate
     disp = slope_gate * river_gate * height_gate * amp * detail
 
+    cliff_fold_gate = view_mask * slope_gate * river_gate * height_gate * smooth01(
+        (river_dist - CLIFF_FOLD_START_CM) / CLIFF_FOLD_FADE_CM
+    )
+    cfs = 1.0 / CLIFF_FOLD_WARP_WL_CM
+    fold_x = X + CLIFF_FOLD_WARP_AMP_CM * fbm(
+        X * cfs,
+        river_dist * cfs,
+        3,
+        LACUNARITY,
+        GAIN,
+    )
+    fold_y = river_dist + CLIFF_FOLD_WARP_AMP_CM * fbm(
+        (X - 3911.0) * cfs,
+        (river_dist + 2207.0) * cfs,
+        3,
+        LACUNARITY,
+        GAIN,
+    )
+    fold_ridged = ridged(
+        fold_x / CLIFF_FOLD_ALONG_WL_CM,
+        fold_y / CLIFF_FOLD_ACROSS_WL_CM,
+        CLIFF_FOLD_OCTAVES,
+        LACUNARITY,
+        GAIN,
+    )
+    fold_fbm = fbm(
+        fold_x / CLIFF_FOLD_ALONG_WL_CM * 1.65,
+        fold_y / CLIFF_FOLD_ACROSS_WL_CM * 1.35,
+        CLIFF_FOLD_OCTAVES,
+        LACUNARITY,
+        GAIN,
+    )
+    fold_detail = np.clip(
+        (fold_ridged - CLIFF_FOLD_BIAS) * CLIFF_FOLD_W + CLIFF_FOLD_FBM_W * fold_fbm,
+        CLIFF_FOLD_MIN,
+        CLIFF_FOLD_MAX,
+    )
+    fold_amp = CLIFF_FOLD_AMP_MIN_CM + (CLIFF_FOLD_AMP_MAX_CM - CLIFF_FOLD_AMP_MIN_CM) * slope_gate
+    disp += cliff_fold_gate * fold_amp * fold_detail
+
     z = base + disp
 
     # hillshade with sun ~ FRotator(pitch=-55, yaw=-18) -> light travel dir
@@ -139,7 +240,19 @@ def main():
     img = (np.clip(shade, 0, 1) * 255).astype(np.uint8)
     out = "Saved/Diagnostics/terrain-relief-preview.png"
     Image.fromarray(img[::-1], "L").save(out)  # flip Y so north is up
-    print(f"wrote {out}  disp_cm[min/mean/max]={disp.min():.0f}/{np.abs(disp).mean():.0f}/{disp.max():.0f}")
+
+    rgb = np.repeat(img[:, :, None], 3, axis=2).astype(np.float64)
+    overlay = view_mask[:, :, None]
+    orange = np.array([255.0, 132.0, 32.0])[None, None, :]
+    rgb = rgb * (1.0 - 0.45 * overlay) + orange * (0.45 * overlay)
+    overlay_out = "Saved/Diagnostics/terrain-relief-preview-viewcorridor.png"
+    Image.fromarray(np.clip(rgb[::-1], 0, 255).astype(np.uint8), "RGB").save(overlay_out)
+
+    print(
+        f"wrote {out} and {overlay_out}  "
+        f"disp_cm[min/mean/max]={disp.min():.0f}/{np.abs(disp).mean():.0f}/{disp.max():.0f} "
+        f"view_mask_coverage={(view_mask > 0.01).mean() * 100:.1f}%"
+    )
 
 
 if __name__ == "__main__":

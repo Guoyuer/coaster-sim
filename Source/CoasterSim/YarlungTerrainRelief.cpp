@@ -66,6 +66,7 @@ float ComputeReliefCm(
     float HeightCm,
     const FVector& BaseNormal,
     float TrackDistanceCm,
+    float ViewCorridorMask,
     const FReliefConfig& Config)
 {
     const float Slope = 1.0f - BaseNormal.GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector).Z;
@@ -75,7 +76,8 @@ float ComputeReliefCm(
         return 0.0f;
     }
 
-    const float RiverDistance = FMath::Abs(Position.Y - YarlungTerrain::RiverCenterY(Position.X));
+    const float RiverCenterY = YarlungTerrain::RiverCenterY(Position.X);
+    const float RiverDistance = FMath::Abs(Position.Y - RiverCenterY);
     const float RiverGate = YarlungTerrain::Smooth01((RiverDistance - Config.RiverProtectInnerCm) / Config.RiverProtectFadeCm);
     if (RiverGate <= 0.001f)
     {
@@ -115,6 +117,51 @@ float ComputeReliefCm(
 
     const float AmplitudeCm = FMath::Lerp(Config.MinAmplitudeCm, Config.MaxAmplitudeCm, SlopeGate);
     float Displacement = SlopeGate * RiverGate * HeightGate * AmplitudeCm * Detail;
+
+    const float CliffFoldGate = SlopeGate
+        * RiverGate
+        * HeightGate
+        * FMath::Clamp(ViewCorridorMask, 0.0f, 1.0f)
+        * YarlungTerrain::Smooth01(
+            (RiverDistance - Config.CliffFoldRiverDistanceStartCm) / Config.CliffFoldRiverDistanceFadeCm);
+    if (CliffFoldGate > 0.001f)
+    {
+        const float FoldWarpX = Position.X
+            + Config.CliffFoldWarpAmplitudeCm * Fbm2D(
+                Position.X * Config.CliffFoldWarpScale,
+                RiverDistance * Config.CliffFoldWarpScale,
+                3,
+                Config.Lacunarity,
+                Config.Gain);
+        const float FoldWarpY = RiverDistance
+            + Config.CliffFoldWarpAmplitudeCm * Fbm2D(
+                (Position.X - 3911.0f) * Config.CliffFoldWarpScale,
+                (RiverDistance + 2207.0f) * Config.CliffFoldWarpScale,
+                3,
+                Config.Lacunarity,
+                Config.Gain);
+        const float FoldRidged = Ridged2D(
+            FoldWarpX * Config.CliffFoldAlongRiverScale,
+            FoldWarpY * Config.CliffFoldAcrossWallScale,
+            Config.CliffFoldOctaves,
+            Config.Lacunarity,
+            Config.Gain);
+        const float FoldFbm = Fbm2D(
+            FoldWarpX * Config.CliffFoldAlongRiverScale * 1.65f,
+            FoldWarpY * Config.CliffFoldAcrossWallScale * 1.35f,
+            Config.CliffFoldOctaves,
+            Config.Lacunarity,
+            Config.Gain);
+        const float CliffFoldDetail = FMath::Clamp(
+            (FoldRidged - Config.CliffFoldBias) * Config.CliffFoldWeight + Config.CliffFoldFbmWeight * FoldFbm,
+            Config.CliffFoldDetailMin,
+            Config.CliffFoldDetailMax);
+        const float CliffFoldAmplitudeCm = FMath::Lerp(
+            Config.CliffFoldMinAmplitudeCm,
+            Config.CliffFoldMaxAmplitudeCm,
+            SlopeGate);
+        Displacement += CliffFoldGate * CliffFoldAmplitudeCm * CliffFoldDetail;
+    }
 
     const float NearTrackUp = 1.0f - YarlungTerrain::Smooth01(
         (TrackDistanceCm - Config.NearTrackProtectStartCm) / Config.NearTrackProtectFadeCm);

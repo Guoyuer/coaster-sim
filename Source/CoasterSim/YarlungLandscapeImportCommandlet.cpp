@@ -46,6 +46,7 @@ struct FYarlungTerrainVertexSample
     FVector Position = FVector::ZeroVector;
     float RockMask = 0.0f;
     float DisplacementCm = 0.0f;
+    float ViewCorridorMask = 0.0f;
 };
 
 float YarlungCubicBsplineInterp(float P0, float P1, float P2, float P3, float T)
@@ -158,6 +159,55 @@ float YarlungDistanceToTrackCm(const TArray<FYarlungTerrainTrackPoint>& TrackPoi
     return FMath::Sqrt(BestSquared);
 }
 
+float YarlungViewCorridorMask(const TArray<FYarlungTerrainTrackPoint>& TrackPoints, const FVector2D& Position)
+{
+    if (TrackPoints.Num() < 3)
+    {
+        return 0.0f;
+    }
+
+    constexpr float BackwardFadeCm = 12000.0f;
+    constexpr float FarStartCm = 160000.0f;
+    constexpr float FarFadeCm = 120000.0f;
+    constexpr float SideBaseCm = 14000.0f;
+    constexpr float SideFadeCm = 26000.0f;
+    constexpr float MaxSideCm = 180000.0f;
+    constexpr float TanHalfFov = 0.84f; // ~80 deg horizontal FOV, matching the broad FP read.
+
+    float BestMask = 0.0f;
+    for (int32 Index = 0; Index < TrackPoints.Num(); ++Index)
+    {
+        const FVector2D Previous = TrackPoints[(Index + TrackPoints.Num() - 1) % TrackPoints.Num()].Position;
+        const FVector2D Current = TrackPoints[Index].Position;
+        const FVector2D Next = TrackPoints[(Index + 1) % TrackPoints.Num()].Position;
+        const FVector2D Tangent = (Next - Previous).GetSafeNormal();
+        if (Tangent.IsNearlyZero())
+        {
+            continue;
+        }
+
+        const FVector2D Relative = Position - Current;
+        const float ForwardCm = FVector2D::DotProduct(Relative, Tangent);
+        if (ForwardCm < -BackwardFadeCm || ForwardCm > FarStartCm + FarFadeCm)
+        {
+            continue;
+        }
+
+        const float LateralCm = FMath::Abs(Tangent.X * Relative.Y - Tangent.Y * Relative.X);
+        const float SideLimitCm = FMath::Clamp(SideBaseCm + FMath::Max(ForwardCm, 0.0f) * TanHalfFov, SideBaseCm, MaxSideCm);
+        const float ForwardMask = YarlungTerrain::Smooth01((ForwardCm + BackwardFadeCm) / BackwardFadeCm)
+            * (1.0f - YarlungTerrain::Smooth01((ForwardCm - FarStartCm) / FarFadeCm));
+        const float SideMask = 1.0f - YarlungTerrain::Smooth01((LateralCm - SideLimitCm) / SideFadeCm);
+        BestMask = FMath::Max(BestMask, ForwardMask * SideMask);
+        if (BestMask >= 0.999f)
+        {
+            return 1.0f;
+        }
+    }
+
+    return FMath::Clamp(BestMask, 0.0f, 1.0f);
+}
+
 float YarlungCorridorRockMask(const TArray<FYarlungTerrainTrackPoint>& TrackPoints, float X, float Y, float Height, const FVector& BaseNormal)
 {
     const float TrackDistance = YarlungDistanceToTrackCm(TrackPoints, FVector2D(X, Y));
@@ -182,12 +232,14 @@ FYarlungTerrainVertexSample YarlungTerrainVertexSampleAtMeshGrid(
     const float BaseHeight = YarlungHeightAtMeshGrid(HeightData, XIndex, YIndex);
     const FVector BaseNormal = YarlungSmoothNormalAtMeshGrid(HeightData, XIndex, YIndex);
     const float TrackDistance = YarlungDistanceToTrackCm(TrackPoints, FVector2D(X, Y));
+    const float ViewCorridorMask = YarlungViewCorridorMask(TrackPoints, FVector2D(X, Y));
     const float RockMask = YarlungCorridorRockMask(TrackPoints, X, Y, BaseHeight, BaseNormal);
     const float DisplacementCm = YarlungTerrainRelief::ComputeReliefCm(
         FVector2D(X, Y),
         BaseHeight,
         BaseNormal,
-        TrackDistance);
+        TrackDistance,
+        ViewCorridorMask);
 
     FYarlungTerrainVertexSample Sample;
     Sample.Position = YarlungTerrainRelief::ApplyNormalDisplacement(
@@ -196,6 +248,7 @@ FYarlungTerrainVertexSample YarlungTerrainVertexSampleAtMeshGrid(
         DisplacementCm);
     Sample.RockMask = RockMask;
     Sample.DisplacementCm = DisplacementCm;
+    Sample.ViewCorridorMask = ViewCorridorMask;
     return Sample;
 }
 
@@ -337,6 +390,7 @@ UStaticMesh* BuildYarlungTerrainStaticMesh(const TArray<uint16>& HeightData)
     Colors.SetNumUninitialized(VertexCount);
 
     int32 DisplacedVertexCount = 0;
+    int32 ViewCorridorVertexCount = 0;
     float MaxAbsDisplacementCm = 0.0f;
     for (int32 YIndex = 0; YIndex < YarlungTerrainMeshGridSize; ++YIndex)
     {
@@ -348,6 +402,10 @@ UStaticMesh* BuildYarlungTerrainStaticMesh(const TArray<uint16>& HeightData)
             {
                 ++DisplacedVertexCount;
                 MaxAbsDisplacementCm = FMath::Max(MaxAbsDisplacementCm, FMath::Abs(Sample.DisplacementCm));
+            }
+            if (Sample.ViewCorridorMask > 0.01f)
+            {
+                ++ViewCorridorVertexCount;
             }
         }
     }
@@ -443,11 +501,12 @@ UStaticMesh* BuildYarlungTerrainStaticMesh(const TArray<uint16>& HeightData)
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Built Nanite Yarlung mesh terrain: %s vertices=%d triangles=%d displaced_vertices=%d max_displacement_cm=%.1f nanite=%s"),
+        TEXT("Built Nanite Yarlung mesh terrain: %s vertices=%d triangles=%d displaced_vertices=%d view_corridor_vertices=%d max_displacement_cm=%.1f nanite=%s"),
         *StaticMesh->GetPathName(),
         YarlungTerrainMeshGridSize * YarlungTerrainMeshGridSize,
         (YarlungTerrainMeshGridSize - 1) * (YarlungTerrainMeshGridSize - 1) * 2,
         DisplacedVertexCount,
+        ViewCorridorVertexCount,
         MaxAbsDisplacementCm,
         StaticMesh->IsNaniteEnabled() ? TEXT("true") : TEXT("false"));
     return StaticMesh;

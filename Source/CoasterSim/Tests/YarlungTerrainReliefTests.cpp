@@ -29,6 +29,29 @@ bool FindPositiveFarRelief(FVector2D& OutPosition, float& OutRelief)
     }
     return false;
 }
+
+bool FindViewCorridorSensitiveRelief(FVector2D& OutPosition, float& OutMaskedRelief, float& OutOpenRelief)
+{
+    for (int32 YIndex = 0; YIndex < 32; ++YIndex)
+    {
+        for (int32 XIndex = 0; XIndex < 32; ++XIndex)
+        {
+            const FVector2D Position(
+                -240000.0f + static_cast<float>(XIndex) * 18000.0f,
+                120000.0f + static_cast<float>(YIndex) * 16000.0f);
+            const float Masked = YarlungTerrainRelief::ComputeReliefCm(Position, 410000.0f, SteepNormal, 60000.0f, 0.0f);
+            const float Open = YarlungTerrainRelief::ComputeReliefCm(Position, 410000.0f, SteepNormal, 60000.0f, 1.0f);
+            if (FMath::Abs(Open - Masked) > 50.0f)
+            {
+                OutPosition = Position;
+                OutMaskedRelief = Masked;
+                OutOpenRelief = Open;
+                return true;
+            }
+        }
+    }
+    return false;
+}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -83,7 +106,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FYarlungTerrainReliefDeterminismAndBoundsTest::RunTest(const FString& Parameters)
 {
     const YarlungTerrainRelief::FReliefConfig Config;
-    const float BoundCm = Config.MaxAmplitudeCm * Config.DetailMax + 1.0f;
+    const float BoundCm = Config.MaxAmplitudeCm * FMath::Max(FMath::Abs(Config.DetailMin), FMath::Abs(Config.DetailMax))
+        + Config.CliffFoldMaxAmplitudeCm * FMath::Max(FMath::Abs(Config.CliffFoldDetailMin), FMath::Abs(Config.CliffFoldDetailMax))
+        + 1.0f;
 
     for (int32 Index = 0; Index < 48; ++Index)
     {
@@ -98,6 +123,23 @@ bool FYarlungTerrainReliefDeterminismAndBoundsTest::RunTest(const FString& Param
         TestTrue(TEXT("Relief remains within configured amplitude bounds"), FMath::Abs(First) <= BoundCm);
     }
 
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FYarlungTerrainReliefViewCorridorGateTest,
+    "CoasterSim.Yarlung.TerrainRelief.ViewCorridorGate",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FYarlungTerrainReliefViewCorridorGateTest::RunTest(const FString& Parameters)
+{
+    FVector2D Position = FVector2D::ZeroVector;
+    float MaskedRelief = 0.0f;
+    float OpenRelief = 0.0f;
+    TestTrue(
+        TEXT("Test fixture finds relief affected by the first-person view corridor mask"),
+        FindViewCorridorSensitiveRelief(Position, MaskedRelief, OpenRelief));
+    TestTrue(TEXT("View corridor mask changes cliff-fold relief"), FMath::Abs(OpenRelief - MaskedRelief) > 50.0f);
     return true;
 }
 
