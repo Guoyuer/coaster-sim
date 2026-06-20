@@ -35,6 +35,18 @@ constexpr float YarlungEncodedMaxZ = 730000.0f;
 const TCHAR* YarlungTerrainMeshPackagePath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungMeshTerrain");
 const TCHAR* YarlungTerrainMeshAssetName = TEXT("SM_YarlungMeshTerrain");
 
+struct FYarlungTerrainTrackPoint
+{
+    FVector2D Position;
+};
+
+struct FYarlungTerrainVertexSample
+{
+    FVector Position = FVector::ZeroVector;
+    float RockMask = 0.0f;
+    float DisplacementCm = 0.0f;
+};
+
 float YarlungHeightValueToCm(uint16 Encoded)
 {
     return FMath::Lerp(YarlungEncodedMinZ, YarlungEncodedMaxZ, static_cast<float>(Encoded) / 65535.0f);
@@ -59,6 +71,11 @@ float YarlungSmooth01(float Value)
 float YarlungValueNoise(float X, float Y)
 {
     return FMath::Frac(FMath::Sin(X * 0.00173f + Y * 0.00291f) * 43758.5453f);
+}
+
+float YarlungSignedValueNoise(float X, float Y)
+{
+    return YarlungValueNoise(X, Y) * 2.0f - 1.0f;
 }
 
 float YarlungRiverCenterY(float X)
@@ -135,7 +152,104 @@ FVector YarlungSmoothNormalAtMeshGrid(const TArray<uint16>& HeightData, int32 XI
     return FVector(Left - Right, Down - Up, XSpacing + YSpacing).GetSafeNormal();
 }
 
-FLinearColor YarlungColorAtPosition(float X, float Y, float Height)
+float YarlungDistanceToTrackCm(const TArray<FYarlungTerrainTrackPoint>& TrackPoints, const FVector2D& Position)
+{
+    if (TrackPoints.Num() < 2)
+    {
+        return TNumericLimits<float>::Max();
+    }
+
+    float BestSquared = TNumericLimits<float>::Max();
+    for (int32 Index = 0; Index < TrackPoints.Num(); ++Index)
+    {
+        const FVector2D A = TrackPoints[Index].Position;
+        const FVector2D B = TrackPoints[(Index + 1) % TrackPoints.Num()].Position;
+        const FVector2D AB = B - A;
+        const float LengthSquared = AB.SizeSquared();
+        const float T = LengthSquared > KINDA_SMALL_NUMBER
+            ? FMath::Clamp(FVector2D::DotProduct(Position - A, AB) / LengthSquared, 0.0f, 1.0f)
+            : 0.0f;
+        const FVector2D Closest = A + AB * T;
+        BestSquared = FMath::Min(BestSquared, FVector2D::DistSquared(Position, Closest));
+    }
+
+    return FMath::Sqrt(BestSquared);
+}
+
+float YarlungCorridorRockMask(const TArray<FYarlungTerrainTrackPoint>& TrackPoints, float X, float Y, float Height, const FVector& BaseNormal)
+{
+    const float TrackDistance = YarlungDistanceToTrackCm(TrackPoints, FVector2D(X, Y));
+    const float NearFade = YarlungSmooth01((TrackDistance - 1800.0f) / 6200.0f);
+    const float FarFade = 1.0f - YarlungSmooth01((TrackDistance - 260000.0f) / 140000.0f);
+    const float DistanceMask = NearFade * FarFade;
+    const float SlopeMask = YarlungSmooth01(((1.0f - BaseNormal.Z) - 0.13f) / 0.38f);
+    const float HeightMask = 1.0f - 0.55f * YarlungSmooth01((Height - 515000.0f) / 120000.0f);
+    return FMath::Clamp(DistanceMask * SlopeMask * HeightMask, 0.0f, 1.0f);
+}
+
+float YarlungSub30mRockDisplacementCm(float X, float Y, float Height, float RockMask, const FVector& BaseNormal)
+{
+    if (RockMask <= 0.001f)
+    {
+        return 0.0f;
+    }
+
+    const float SlopeMask = YarlungSmooth01(((1.0f - BaseNormal.Z) - 0.13f) / 0.38f);
+    const float Strata = FMath::Sin(Height * 0.0064f + X * 0.00021f + FMath::Sin(Y * 0.00017f) * 0.95f);
+    const float FractureA = FMath::Sin(X * 0.0027f + Y * 0.0014f + 1.1f);
+    const float FractureB = FMath::Sin(X * -0.0012f + Y * 0.0032f + Height * 0.0011f);
+    const float Ridged = 1.0f - FMath::Abs(FMath::Sin(X * 0.0044f + Y * 0.0028f));
+    const float Grain = YarlungSignedValueNoise(FMath::FloorToFloat(X / 900.0f), FMath::FloorToFloat(Y / 900.0f));
+    const float Detail = FMath::Clamp(
+        0.44f * Strata + 0.30f * FractureA * FractureB + 0.18f * (Ridged * 2.0f - 1.0f) + 0.08f * Grain,
+        -1.0f,
+        1.0f);
+    const float AmplitudeCm = FMath::Lerp(1100.0f, 5200.0f, SlopeMask);
+    return RockMask * AmplitudeCm * Detail;
+}
+
+FYarlungTerrainVertexSample YarlungTerrainVertexSampleAtMeshGrid(
+    const TArray<uint16>& HeightData,
+    const TArray<FYarlungTerrainTrackPoint>& TrackPoints,
+    int32 XIndex,
+    int32 YIndex)
+{
+    const float U = static_cast<float>(XIndex) / static_cast<float>(YarlungTerrainMeshGridSize - 1);
+    const float V = static_cast<float>(YIndex) / static_cast<float>(YarlungTerrainMeshGridSize - 1);
+    const float X = FMath::Lerp(YarlungMinX, YarlungMaxX, U);
+    const float Y = FMath::Lerp(YarlungMinY, YarlungMaxY, V);
+    const float BaseHeight = YarlungHeightAtMeshGrid(HeightData, XIndex, YIndex);
+    const FVector BaseNormal = YarlungSmoothNormalAtMeshGrid(HeightData, XIndex, YIndex);
+    const float RockMask = YarlungCorridorRockMask(TrackPoints, X, Y, BaseHeight, BaseNormal);
+    const float DisplacementCm = YarlungSub30mRockDisplacementCm(X, Y, BaseHeight, RockMask, BaseNormal);
+
+    FYarlungTerrainVertexSample Sample;
+    Sample.Position = FVector(X, Y, BaseHeight + DisplacementCm);
+    Sample.RockMask = RockMask;
+    Sample.DisplacementCm = DisplacementCm;
+    return Sample;
+}
+
+FVector YarlungNormalFromCachedPositions(const TArray<FVector>& Positions, int32 XIndex, int32 YIndex)
+{
+    const auto PositionAt = [&Positions](int32 X, int32 Y) -> const FVector&
+    {
+        const int32 ClampedX = FMath::Clamp(X, 0, YarlungTerrainMeshGridSize - 1);
+        const int32 ClampedY = FMath::Clamp(Y, 0, YarlungTerrainMeshGridSize - 1);
+        return Positions[ClampedY * YarlungTerrainMeshGridSize + ClampedX];
+    };
+
+    const FVector EastWest = PositionAt(XIndex + 1, YIndex) - PositionAt(XIndex - 1, YIndex);
+    const FVector NorthSouth = PositionAt(XIndex, YIndex + 1) - PositionAt(XIndex, YIndex - 1);
+    FVector Normal = FVector::CrossProduct(EastWest, NorthSouth).GetSafeNormal();
+    if (Normal.Z < 0.0f)
+    {
+        Normal *= -1.0f;
+    }
+    return Normal.IsNearlyZero() ? FVector::UpVector : Normal;
+}
+
+FLinearColor YarlungColorAtPosition(float X, float Y, float Height, float RockMask)
 {
     const float Height01 = FMath::Clamp((Height - YarlungEncodedMinZ) / (YarlungEncodedMaxZ - YarlungEncodedMinZ), 0.0f, 1.0f);
     const float RiverDistance = FMath::Abs(Y - YarlungRiverCenterY(X));
@@ -153,7 +267,44 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height)
     Base = FMath::Lerp(Base, ForestColor, FMath::Clamp(Forest, 0.0f, 0.82f));
     Base = FMath::Lerp(Base, RiverColor, River * 0.72f);
     Base = FMath::Lerp(Base, Snow, YarlungSmooth01((Height01 - 0.74f) / 0.11f));
+    const float RockBreakup = 0.5f + 0.5f * FMath::Sin(X * 0.0019f - Y * 0.0023f + Height * 0.0041f);
+    const FLinearColor WetRock(0.22f + RockBreakup * 0.06f, 0.29f + RockBreakup * 0.06f, 0.27f + RockBreakup * 0.05f, 1.0f);
+    Base = FMath::Lerp(Base, WetRock, FMath::Clamp(RockMask * 0.72f, 0.0f, 0.72f));
     return Base;
+}
+
+bool LoadYarlungTerrainTrackPoints(TArray<FYarlungTerrainTrackPoint>& OutTrackPoints)
+{
+    const FString Path = FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungTrack.csv");
+    TArray<FString> Lines;
+    if (!FFileHelper::LoadFileToStringArray(Lines, *Path))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Unable to read generated Yarlung track for terrain displacement: %s"), *Path);
+        return false;
+    }
+
+    OutTrackPoints.Reset();
+    for (int32 LineIndex = 1; LineIndex < Lines.Num(); ++LineIndex)
+    {
+        TArray<FString> Columns;
+        Lines[LineIndex].ParseIntoArray(Columns, TEXT(","), true);
+        if (Columns.Num() < 7)
+        {
+            continue;
+        }
+
+        FYarlungTerrainTrackPoint Point;
+        Point.Position = FVector2D(FCString::Atof(*Columns[1]), FCString::Atof(*Columns[2]));
+        OutTrackPoints.Add(Point);
+    }
+
+    if (OutTrackPoints.Num() < 8)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Too few generated track points for terrain displacement: %d"), OutTrackPoints.Num());
+        return false;
+    }
+
+    return true;
 }
 
 UStaticMesh* BuildYarlungTerrainStaticMesh(const TArray<uint16>& HeightData)
@@ -164,6 +315,12 @@ UStaticMesh* BuildYarlungTerrainStaticMesh(const TArray<uint16>& HeightData)
     if (!Material)
     {
         UE_LOG(LogTemp, Error, TEXT("Missing required mesh terrain material: /Game/Generated/Materials/M_YarlungMeshTerrain.M_YarlungMeshTerrain"));
+        return nullptr;
+    }
+
+    TArray<FYarlungTerrainTrackPoint> TrackPoints;
+    if (!LoadYarlungTerrainTrackPoints(TrackPoints))
+    {
         return nullptr;
     }
 
@@ -202,15 +359,50 @@ UStaticMesh* BuildYarlungTerrainStaticMesh(const TArray<uint16>& HeightData)
     Builder.SetNumUVLayers(1);
     Builder.ReserveNewVertices(YarlungTerrainMeshGridSize * YarlungTerrainMeshGridSize);
 
-    FPolygonGroupID PolygonGroup = Builder.AppendPolygonGroup(TEXT("YarlungMeshTerrain"));
-    TArray<FVertexID> Vertices;
-    Vertices.Reserve(YarlungTerrainMeshGridSize * YarlungTerrainMeshGridSize);
+    const int32 VertexCount = YarlungTerrainMeshGridSize * YarlungTerrainMeshGridSize;
+    TArray<FVector> Positions;
+    TArray<FVector> Normals;
+    TArray<FLinearColor> Colors;
+    Positions.Reserve(VertexCount);
+    Normals.SetNumUninitialized(VertexCount);
+    Colors.SetNumUninitialized(VertexCount);
+
+    int32 DisplacedVertexCount = 0;
+    float MaxAbsDisplacementCm = 0.0f;
     for (int32 YIndex = 0; YIndex < YarlungTerrainMeshGridSize; ++YIndex)
     {
         for (int32 XIndex = 0; XIndex < YarlungTerrainMeshGridSize; ++XIndex)
         {
-            Vertices.Add(Builder.AppendVertex(YarlungPositionAtMeshGrid(HeightData, XIndex, YIndex)));
+            const FYarlungTerrainVertexSample Sample = YarlungTerrainVertexSampleAtMeshGrid(HeightData, TrackPoints, XIndex, YIndex);
+            Positions.Add(Sample.Position);
+            if (Sample.RockMask > 0.02f)
+            {
+                ++DisplacedVertexCount;
+                MaxAbsDisplacementCm = FMath::Max(MaxAbsDisplacementCm, FMath::Abs(Sample.DisplacementCm));
+            }
         }
+    }
+
+    for (int32 YIndex = 0; YIndex < YarlungTerrainMeshGridSize; ++YIndex)
+    {
+        for (int32 XIndex = 0; XIndex < YarlungTerrainMeshGridSize; ++XIndex)
+        {
+            const int32 VertexIndex = YIndex * YarlungTerrainMeshGridSize + XIndex;
+            const FVector& Position = Positions[VertexIndex];
+            const FVector Normal = YarlungNormalFromCachedPositions(Positions, XIndex, YIndex);
+            const FVector BaseNormal = YarlungSmoothNormalAtMeshGrid(HeightData, XIndex, YIndex);
+            const float RockMask = YarlungCorridorRockMask(TrackPoints, Position.X, Position.Y, YarlungHeightAtMeshGrid(HeightData, XIndex, YIndex), BaseNormal);
+            Normals[VertexIndex] = Normal;
+            Colors[VertexIndex] = YarlungColorAtPosition(Position.X, Position.Y, Position.Z, RockMask);
+        }
+    }
+
+    FPolygonGroupID PolygonGroup = Builder.AppendPolygonGroup(TEXT("YarlungMeshTerrain"));
+    TArray<FVertexID> Vertices;
+    Vertices.Reserve(VertexCount);
+    for (const FVector& Position : Positions)
+    {
+        Vertices.Add(Builder.AppendVertex(Position));
     }
 
     const auto AppendTerrainTriangle = [&](int32 X0, int32 Y0, int32 X1, int32 Y1, int32 X2, int32 Y2)
@@ -227,9 +419,9 @@ UStaticMesh* BuildYarlungTerrainStaticMesh(const TArray<uint16>& HeightData)
 
         for (int32 Corner = 0; Corner < 3; ++Corner)
         {
-            const FVector Position = YarlungPositionAtMeshGrid(HeightData, Xs[Corner], Ys[Corner]);
-            const FVector Normal = YarlungSmoothNormalAtMeshGrid(HeightData, Xs[Corner], Ys[Corner]);
-            const FLinearColor Color = YarlungColorAtPosition(Position.X, Position.Y, Position.Z);
+            const int32 VertexIndex = Ys[Corner] * YarlungTerrainMeshGridSize + Xs[Corner];
+            const FVector& Normal = Normals[VertexIndex];
+            const FLinearColor& Color = Colors[VertexIndex];
             Builder.SetInstanceTangentSpace(Instances[Corner], Normal, FVector::XAxisVector, 1.0f);
             Builder.SetInstanceUV(
                 Instances[Corner],
@@ -282,10 +474,12 @@ UStaticMesh* BuildYarlungTerrainStaticMesh(const TArray<uint16>& HeightData)
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Built Nanite Yarlung mesh terrain: %s vertices=%d triangles=%d nanite=%s"),
+        TEXT("Built Nanite Yarlung mesh terrain: %s vertices=%d triangles=%d displaced_vertices=%d max_displacement_cm=%.1f nanite=%s"),
         *StaticMesh->GetPathName(),
         YarlungTerrainMeshGridSize * YarlungTerrainMeshGridSize,
         (YarlungTerrainMeshGridSize - 1) * (YarlungTerrainMeshGridSize - 1) * 2,
+        DisplacedVertexCount,
+        MaxAbsDisplacementCm,
         StaticMesh->IsNaniteEnabled() ? TEXT("true") : TEXT("false"));
     return StaticMesh;
 }

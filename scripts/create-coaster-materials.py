@@ -155,6 +155,19 @@ def create_landscape_coords(material, x, y, mapping_scale=1009.0):
     return expression
 
 
+def create_texture_coordinate(material, x, y, u_tiling, v_tiling):
+    expression = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionTextureCoordinate,
+        x,
+        y,
+    )
+    expression.set_editor_property("coordinate_index", 0)
+    expression.set_editor_property("u_tiling", u_tiling)
+    expression.set_editor_property("v_tiling", v_tiling)
+    return expression
+
+
 def create_lerp(material, a_expression, a_output, b_expression, b_output, alpha_expression, alpha_output, x, y, label):
     expression = unreal.MaterialEditingLibrary.create_material_expression(
         material,
@@ -373,12 +386,79 @@ def create_river_materials():
     )
 
 
-def create_mesh_terrain_material():
-    create_opaque_vertex_color_material(
-        MESH_TERRAIN_MATERIAL_NAME,
-        0.86,
-        0.06,
+def create_mesh_terrain_material(rock_textures):
+    material = create_material_asset(MESH_TERRAIN_MATERIAL_NAME, PACKAGE_PATH)
+    unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
+    material.set_editor_property("two_sided", True)
+
+    vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionVertexColor,
+        -940,
+        -180,
     )
+    if not unreal.MaterialEditingLibrary.connect_material_property(
+        vertex_color,
+        "",
+        unreal.MaterialProperty.MP_BASE_COLOR,
+    ):
+        raise RuntimeError("Unable to connect mesh terrain vertex BaseColor")
+
+    detail_coordinates = create_texture_coordinate(material, -940, 240, 240.0, 240.0)
+    rock_normal = create_texture_sample(
+        material,
+        rock_textures["T_AerialGrassRock_Normal"],
+        -640,
+        120,
+        detail_coordinates,
+    )
+    connected = unreal.MaterialEditingLibrary.connect_material_property(
+        rock_normal,
+        "",
+        unreal.MaterialProperty.MP_NORMAL,
+    )
+    if not connected:
+        raise RuntimeError("Unable to connect mesh terrain Normal")
+
+    rock_roughness = create_texture_sample(
+        material,
+        rock_textures["T_AerialGrassRock_Rough"],
+        -640,
+        360,
+        detail_coordinates,
+    )
+    connected = unreal.MaterialEditingLibrary.connect_material_property(
+        rock_roughness,
+        "",
+        unreal.MaterialProperty.MP_ROUGHNESS,
+    )
+    if not connected:
+        raise RuntimeError("Unable to connect mesh terrain Roughness")
+
+    rock_ao = create_texture_sample(
+        material,
+        rock_textures["T_AerialGrassRock_AO"],
+        -640,
+        580,
+        detail_coordinates,
+    )
+    connected = unreal.MaterialEditingLibrary.connect_material_property(
+        rock_ao,
+        "",
+        unreal.MaterialProperty.MP_AMBIENT_OCCLUSION,
+    )
+    if not connected:
+        raise RuntimeError("Unable to connect mesh terrain Ambient Occlusion")
+
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "Specular", 0.05, -640, 760),
+        unreal.MaterialProperty.MP_SPECULAR,
+        "mesh terrain Specular",
+    )
+    set_optional_material_usage(material, "MATUSAGE_STATIC_MESH")
+    set_optional_material_usage(material, "MATUSAGE_NANITE")
+    finalize_material(material)
 
 
 def create_landscape_material(rock_textures, grass_textures, macro_textures):
@@ -587,7 +667,6 @@ def main():
     ensure_folder(YARLUNG_MACRO_PACKAGE_PATH)
     create_tint_material()
     create_river_materials()
-    create_mesh_terrain_material()
     leafy_grass_textures = import_textures(LEAFY_GRASS_PACKAGE_PATH, LEAFY_GRASS_SOURCE_DIR, LEAFY_GRASS_TEXTURES)
     aerial_grass_rock_textures = import_textures(
         AERIAL_GRASS_ROCK_PACKAGE_PATH,
@@ -599,6 +678,7 @@ def main():
         YARLUNG_MACRO_SOURCE_DIR,
         YARLUNG_MACRO_TEXTURES,
     )
+    create_mesh_terrain_material(aerial_grass_rock_textures)
     create_landscape_material(aerial_grass_rock_textures, leafy_grass_textures, yarlung_macro_textures)
     marker_path = unreal.Paths.convert_relative_path_to_full(
         unreal.Paths.project_saved_dir() + SUCCESS_MARKER
