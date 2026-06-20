@@ -376,7 +376,7 @@ void ACoasterRideActor::RebuildVisuals()
     const float RailHalfGauge = RailGaugeCm * 0.5f;
     const float SegmentStep = 180.0f;
     const float TieStep = 360.0f;
-    const float SupportStep = 720.0f;
+    const float SupportStep = 7200.0f;
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += SegmentStep)
     {
@@ -433,14 +433,27 @@ void ACoasterRideActor::RebuildVisuals()
             const FVector LeftFoot = FVector(YokeLeft.X, YokeLeft.Y, TerrainFootZ);
             const FVector RightFoot = FVector(YokeRight.X, YokeRight.Y, TerrainFootZ);
 
-            Supports->AddInstance(MakeSegmentTransform(YokeLeft, YokeRight, FVector(RailGaugeCm + 68.0f, 10.0f, 10.0f)));
-            Supports->AddInstance(MakeSegmentTransform(LeftFoot, YokeLeft, FVector(YokeLeft.Z, 9.0f, 9.0f)));
-            Supports->AddInstance(MakeSegmentTransform(RightFoot, YokeRight, FVector(YokeRight.Z, 9.0f, 9.0f)));
+            // The track is a high canyon viaduct (avg ~157 m, up to ~331 m above the
+            // valley floor). Drop a few thick monumental piers, not thousands of
+            // hair-thin threads: girth scales with height so a 150 m pier still
+            // reads as structure instead of a vertical streak. (MakeSegmentTransform
+            // derives length from the endpoints, so ScaleCm.X is unused.)
+            const float PierHeight = FMath::Max(YokeCenter.Z - TerrainFootZ, 1.0f);
+            const float LegThickness = FMath::Clamp(PierHeight * 0.014f, 150.0f, 470.0f);
 
-            if (YokeCenter.Z > 850.0f)
+            Supports->AddInstance(MakeSegmentTransform(YokeLeft, YokeRight, FVector(0.0f, LegThickness * 1.25f, LegThickness)));
+            Supports->AddInstance(MakeSegmentTransform(LeftFoot, YokeLeft, FVector(0.0f, LegThickness, LegThickness)));
+            Supports->AddInstance(MakeSegmentTransform(RightFoot, YokeRight, FVector(0.0f, LegThickness, LegThickness)));
+
+            // Horizontal cross-ties up the legs read as an engineered trestle ladder
+            // and break up the otherwise blank tall pier face.
+            const int32 BraceCount = FMath::Clamp(FMath::FloorToInt(PierHeight / 5000.0f), 0, 4);
+            for (int32 BraceIndex = 1; BraceIndex <= BraceCount; ++BraceIndex)
             {
-                Supports->AddInstance(MakeSegmentTransform(LeftFoot, YokeRight, FVector(YokeRight.Z, 6.0f, 6.0f)));
-                Supports->AddInstance(MakeSegmentTransform(RightFoot, YokeLeft, FVector(YokeLeft.Z, 6.0f, 6.0f)));
+                const float BraceT = static_cast<float>(BraceIndex) / static_cast<float>(BraceCount + 1);
+                const FVector BraceLeft = FMath::Lerp(LeftFoot, YokeLeft, BraceT);
+                const FVector BraceRight = FMath::Lerp(RightFoot, YokeRight, BraceT);
+                Supports->AddInstance(MakeSegmentTransform(BraceLeft, BraceRight, FVector(0.0f, LegThickness * 0.5f, LegThickness * 0.5f)));
             }
         }
     }
