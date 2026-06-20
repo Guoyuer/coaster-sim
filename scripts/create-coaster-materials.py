@@ -411,18 +411,15 @@ def create_mesh_terrain_material(rock_textures):
         "",
         rock_diffuse,
         "",
-        create_constant(material, 0.35, -640, -20),
+        create_constant(material, 0.10, -640, -20),
         "",
         -360,
         -160,
         "mesh terrain rock diffuse mix",
     )
-    # The procedural vertex-color albedo (dark forest/wet-rock, ~0.06-0.36) is much
-    # darker than the bright aerial-photo Landscape albedo the B2 daylight exposure
-    # was calibrated against, so the terrain read near-black under the (correct)
-    # sunny-day exposure. Lift terrain reflectance here instead of raising exposure,
-    # which would blow out the already-correct sky.
-    brightness = create_scalar_parameter(material, "TerrainBrightness", 1.55, -440, 40)
+    # Keep the corridor terrain mostly vertex-color driven. Bright tiled rock albedo
+    # made the first-person corridor read like snow instead of wet Yarlung slopes.
+    brightness = create_scalar_parameter(material, "TerrainBrightness", 0.90, -440, 40)
     base_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
         unreal.MaterialExpressionMultiply,

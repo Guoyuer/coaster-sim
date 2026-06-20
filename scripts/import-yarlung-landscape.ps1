@@ -7,7 +7,6 @@ param(
     [switch]$SkipModels,
     [switch]$ForceModels,
     [switch]$SkipMapImport,
-    [switch]$SkipTerrainMeshBuild,
     [switch]$Verify
 )
 
@@ -142,9 +141,6 @@ if (-not $SkipModels -and ($ForceModels -or -not (Test-Path -LiteralPath $Boulde
 if (-not $SkipMapImport) {
     Invoke-TimedStep "import landscape map" {
         $MapImportArgs = @($Project, "-run=YarlungLandscapeImport", "-unattended", "-nop4", "-NullRHI", "-NoSplash")
-        if ($SkipTerrainMeshBuild) {
-            $MapImportArgs += "-SkipTerrainMeshBuild"
-        }
         & $EditorCmd @MapImportArgs
         if ($LASTEXITCODE -ne 0) {
             throw "Yarlung landscape import failed with exit code $LASTEXITCODE"

@@ -173,8 +173,8 @@ float ComputeReliefCm(
     return Displacement;
 }
 
-FVector ApplyNormalDisplacement(const FVector& BasePosition, const FVector& BaseNormal, float DisplacementCm)
+FVector ApplyVerticalDisplacement(const FVector& BasePosition, float DisplacementCm)
 {
-    return BasePosition + BaseNormal.GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector) * DisplacementCm;
+    return BasePosition + FVector::UpVector * DisplacementCm;
 }
 }

@@ -42,11 +42,11 @@ struct FReliefConfig
     float CliffFoldFbmWeight = 0.20f;
     float CliffFoldDetailMin = -1.25f;
     float CliffFoldDetailMax = 0.35f;
-    float CliffFoldMinAmplitudeCm = 3500.0f;
-    float CliffFoldMaxAmplitudeCm = 7000.0f;
+    float CliffFoldMinAmplitudeCm = 450.0f;
+    float CliffFoldMaxAmplitudeCm = 1200.0f;
 
-    float MinAmplitudeCm = 2500.0f;
-    float MaxAmplitudeCm = 7000.0f;
+    float MinAmplitudeCm = 450.0f;
+    float MaxAmplitudeCm = 1400.0f;
     float NearTrackProtectStartCm = 4000.0f;
     float NearTrackProtectFadeCm = 12000.0f;
     float NearTrackPositiveScale = 0.15f;
@@ -59,5 +59,5 @@ float ComputeReliefCm(
     float TrackDistanceCm,
     float ViewCorridorMask = 1.0f,
     const FReliefConfig& Config = FReliefConfig());
-FVector ApplyNormalDisplacement(const FVector& BasePosition, const FVector& BaseNormal, float DisplacementCm);
+FVector ApplyVerticalDisplacement(const FVector& BasePosition, float DisplacementCm);
 }

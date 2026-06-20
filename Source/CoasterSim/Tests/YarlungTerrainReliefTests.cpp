@@ -144,18 +144,18 @@ bool FYarlungTerrainReliefViewCorridorGateTest::RunTest(const FString& Parameter
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-    FYarlungTerrainReliefNormalDisplacementTest,
-    "CoasterSim.Yarlung.TerrainRelief.NormalDisplacement",
+    FYarlungTerrainReliefVerticalDisplacementTest,
+    "CoasterSim.Yarlung.TerrainRelief.VerticalDisplacement",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FYarlungTerrainReliefNormalDisplacementTest::RunTest(const FString& Parameters)
+bool FYarlungTerrainReliefVerticalDisplacementTest::RunTest(const FString& Parameters)
 {
     const FVector BasePosition(100.0f, 200.0f, 300.0f);
-    const FVector Normal = FVector(0.6f, 0.0f, 0.8f).GetSafeNormal();
-    const FVector Result = YarlungTerrainRelief::ApplyNormalDisplacement(BasePosition, Normal, 100.0f);
+    const FVector Result = YarlungTerrainRelief::ApplyVerticalDisplacement(BasePosition, 100.0f);
 
-    TestTrue(TEXT("Normal displacement moves steep faces laterally"), Result.X > BasePosition.X + 50.0f);
-    TestTrue(TEXT("Normal displacement is not world-Z-only"), Result.Z < BasePosition.Z + 95.0f);
+    TestEqual(TEXT("Terrain relief keeps X stable to avoid folding corridor walls"), Result.X, BasePosition.X);
+    TestEqual(TEXT("Terrain relief keeps Y stable to avoid folding corridor walls"), Result.Y, BasePosition.Y);
+    TestEqual(TEXT("Terrain relief applies height detail in world Z"), Result.Z, BasePosition.Z + 100.0f);
     return true;
 }
 
