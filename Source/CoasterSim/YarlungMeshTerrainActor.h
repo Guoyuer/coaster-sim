@@ -14,6 +14,9 @@ class COASTERSIM_API AYarlungMeshTerrainActor : public AActor
 public:
     AYarlungMeshTerrainActor();
 
+protected:
+    virtual void BeginPlay() override;
+
 private:
     UPROPERTY(VisibleAnywhere, Category = "Components")
     TObjectPtr<USceneComponent> SceneRoot;

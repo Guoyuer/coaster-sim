@@ -117,7 +117,7 @@ ACoasterRideActor::ACoasterRideActor()
     RideCamera->PostProcessSettings.bOverride_CameraISO = true;
     RideCamera->PostProcessSettings.CameraISO = 100.0f;
     RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-    RideCamera->PostProcessSettings.AutoExposureBias = 1.65f;
+    RideCamera->PostProcessSettings.AutoExposureBias = 0.95f;
     RideCamera->PostProcessSettings.bOverride_FilmSlope = true;
     RideCamera->PostProcessSettings.FilmSlope = 0.86f;
     RideCamera->PostProcessSettings.bOverride_FilmToe = true;
@@ -137,7 +137,7 @@ ACoasterRideActor::ACoasterRideActor()
 
     SkyLight = CreateDefaultSubobject<USkyLightComponent>(TEXT("SkyLight"));
     SkyLight->SetupAttachment(SceneRoot);
-    SkyLight->SetIntensity(8.0f);
+    SkyLight->SetIntensity(3.0f);
     SkyLight->SetRealTimeCapture(true);
 
     SunLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("SunLight"));
@@ -212,6 +212,21 @@ void ACoasterRideActor::BeginPlay()
     RebuildSpline();
     ApplyVisualMaterials();
     RebuildVisuals();
+
+    const TCHAR* CommandLine = FCommandLine::Get();
+    if (FParse::Param(CommandLine, TEXT("YarlungHideRide")))
+    {
+        TrainBody->SetVisibility(false, true);
+        LeftRail->SetVisibility(false, true);
+        RightRail->SetVisibility(false, true);
+        Ties->SetVisibility(false, true);
+        Supports->SetVisibility(false, true);
+    }
+    if (FParse::Param(CommandLine, TEXT("YarlungHideFog")))
+    {
+        ValleyFog->SetVisibility(false, true);
+    }
+
     SkyLight->RecaptureSky();
     StartRideFromCommandLine(0.34f, 18.0f);
 }

@@ -1,6 +1,8 @@
 #include "YarlungMeshTerrainActor.h"
 
 #include "Components/StaticMeshComponent.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 AYarlungMeshTerrainActor::AYarlungMeshTerrainActor()
 {
@@ -13,4 +15,15 @@ AYarlungMeshTerrainActor::AYarlungMeshTerrainActor()
     TerrainMesh->SetupAttachment(SceneRoot);
     TerrainMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     TerrainMesh->SetCastShadow(false);
+}
+
+void AYarlungMeshTerrainActor::BeginPlay()
+{
+    Super::BeginPlay();
+
+    if (FParse::Param(FCommandLine::Get(), TEXT("YarlungHideTerrain")))
+    {
+        SetActorHiddenInGame(true);
+        TerrainMesh->SetVisibility(false, true);
+    }
 }

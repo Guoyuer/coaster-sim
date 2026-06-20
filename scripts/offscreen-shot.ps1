@@ -11,6 +11,7 @@ param(
     [double]$StartSpeedMps = 18.0,
     [switch]$KeepSourceFrames,
     [switch]$SimulateWait,
+    [string[]]$ExtraArgs = @(),
     [ValidateSet("MovieFrames", "ImmediateHighResShot")]
     [string]$Mode = "MovieFrames"
 )
@@ -58,6 +59,8 @@ $CommonArgs = @(
     "-FullStdOutLogOutput",
     "-log=$LogPath"
 )
+
+$CommonArgs += $ExtraArgs
 
 if (-not $SimulateWait) {
     $CommonArgs += @(

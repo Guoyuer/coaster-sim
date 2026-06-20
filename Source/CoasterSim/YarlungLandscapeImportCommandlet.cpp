@@ -156,19 +156,19 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, float RockMa
     const float Forest = YarlungTerrain::Smooth01((RiverDistance - 18000.0f) / 115000.0f) * (1.0f - YarlungTerrain::Smooth01((Height01 - 0.60f) / 0.26f));
     const float Noise = YarlungValueNoise(X, Y);
 
-    FLinearColor Base(0.13f + Noise * 0.035f, 0.22f + Noise * 0.055f, 0.18f + Noise * 0.035f, 1.0f);
-    const FLinearColor Rock(0.18f + Height01 * 0.08f, 0.23f + Height01 * 0.07f, 0.22f + Height01 * 0.06f, 1.0f);
-    const FLinearColor ForestColor(0.025f + Noise * 0.035f, 0.15f + Noise * 0.10f, 0.070f + Noise * 0.045f, 1.0f);
+    FLinearColor Base(0.075f + Noise * 0.020f, 0.145f + Noise * 0.035f, 0.120f + Noise * 0.025f, 1.0f);
+    const FLinearColor Rock(0.105f + Height01 * 0.035f, 0.145f + Height01 * 0.035f, 0.140f + Height01 * 0.030f, 1.0f);
+    const FLinearColor ForestColor(0.018f + Noise * 0.026f, 0.115f + Noise * 0.080f, 0.048f + Noise * 0.035f, 1.0f);
     const FLinearColor RiverColor(0.50f, 0.78f, 0.74f, 1.0f);
-    const FLinearColor Snow(0.72f, 0.78f, 0.78f, 1.0f);
+    const FLinearColor Snow(0.58f, 0.64f, 0.63f, 1.0f);
 
-    Base = FMath::Lerp(Base, Rock, FMath::Clamp(Height01 * 0.72f, 0.0f, 0.48f));
-    Base = FMath::Lerp(Base, ForestColor, FMath::Clamp(Forest, 0.0f, 0.88f));
+    Base = FMath::Lerp(Base, Rock, FMath::Clamp(Height01 * 0.50f, 0.0f, 0.36f));
+    Base = FMath::Lerp(Base, ForestColor, FMath::Clamp(Forest, 0.0f, 0.82f));
     Base = FMath::Lerp(Base, RiverColor, River * 0.12f);
-    Base = FMath::Lerp(Base, Snow, YarlungTerrain::Smooth01((Height01 - 0.985f) / 0.025f));
+    Base = FMath::Lerp(Base, Snow, 0.12f * YarlungTerrain::Smooth01((Height01 - 0.992f) / 0.018f));
     const float RockBreakup = 0.5f + 0.5f * FMath::Sin(X * 0.0019f - Y * 0.0023f + Height * 0.0041f);
-    const FLinearColor WetRock(0.17f + RockBreakup * 0.05f, 0.24f + RockBreakup * 0.05f, 0.23f + RockBreakup * 0.05f, 1.0f);
-    Base = FMath::Lerp(Base, WetRock, FMath::Clamp(RockMask * 0.60f, 0.0f, 0.60f));
+    const FLinearColor WetRock(0.095f + RockBreakup * 0.035f, 0.135f + RockBreakup * 0.045f, 0.130f + RockBreakup * 0.040f, 1.0f);
+    Base = FMath::Lerp(Base, WetRock, FMath::Clamp(RockMask * 0.68f, 0.0f, 0.68f));
     return Base;
 }
 
@@ -262,7 +262,7 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
     constexpr int32 LaneCount = LanesPerSide * 2 + 1;
     constexpr float AlongStepCm = 650.0f;
     constexpr float HalfWidthCm = 125000.0f;
-    constexpr float InnerFlattenHalfWidthCm = 18000.0f;
+    constexpr float TrackTerrainVoidHalfWidthCm = 68000.0f;
     const int32 RingCount = TrackPoints.Num() * RingsPerTrackSegment;
     const int32 VertexCount = RingCount * LaneCount;
 
@@ -370,6 +370,31 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
         Vertices.Add(Builder.AppendVertex(Position));
     }
 
+    const auto LaneOffsetCm = [](int32 LaneIndex) -> float
+    {
+        const float LaneT = static_cast<float>(LaneIndex - LanesPerSide) / static_cast<float>(LanesPerSide);
+        return LaneT * HalfWidthCm;
+    };
+
+    const auto ShouldEmitTerrainQuad = [&LaneOffsetCm, &Positions, &TrackPoints](int32 RingIndex, int32 NextRing, int32 LaneIndex) -> bool
+    {
+        const float QuadMidOffsetCm = 0.5f * (LaneOffsetCm(LaneIndex) + LaneOffsetCm(LaneIndex + 1));
+        if (FMath::Abs(QuadMidOffsetCm) < TrackTerrainVoidHalfWidthCm)
+        {
+            return false;
+        }
+
+        const FVector& P00 = Positions[RingIndex * LaneCount + LaneIndex];
+        const FVector& P01 = Positions[RingIndex * LaneCount + LaneIndex + 1];
+        const FVector& P10 = Positions[NextRing * LaneCount + LaneIndex];
+        const FVector& P11 = Positions[NextRing * LaneCount + LaneIndex + 1];
+        const FVector2D QuadCenter(
+            (P00.X + P01.X + P10.X + P11.X) * 0.25f,
+            (P00.Y + P01.Y + P10.Y + P11.Y) * 0.25f);
+        const float ClosestTrackDistanceCm = YarlungViewCorridor::DistanceToTrackCm(TrackPoints, QuadCenter);
+        return ClosestTrackDistanceCm >= TrackTerrainVoidHalfWidthCm;
+    };
+
     const auto AppendCorridorTriangle = [&](int32 Ring0, int32 Lane0, int32 Ring1, int32 Lane1, int32 Ring2, int32 Lane2)
     {
         const int32 I0 = Ring0 * LaneCount + Lane0;
@@ -393,11 +418,17 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
         Builder.AppendTriangle(VI0, VI1, VI2, PolygonGroup);
     };
 
+    int32 SkippedNearTrackQuadCount = 0;
     for (int32 RingIndex = 0; RingIndex < RingCount; ++RingIndex)
     {
         const int32 NextRing = (RingIndex + 1) % RingCount;
         for (int32 LaneIndex = 0; LaneIndex < LaneCount - 1; ++LaneIndex)
         {
+            if (!ShouldEmitTerrainQuad(RingIndex, NextRing, LaneIndex))
+            {
+                ++SkippedNearTrackQuadCount;
+                continue;
+            }
             AppendCorridorTriangle(RingIndex, LaneIndex, NextRing, LaneIndex, NextRing, LaneIndex + 1);
             AppendCorridorTriangle(RingIndex, LaneIndex, NextRing, LaneIndex + 1, RingIndex, LaneIndex + 1);
         }
@@ -431,10 +462,11 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Built Nanite Yarlung corridor terrain: %s vertices=%d triangles=%d displaced_vertices=%d max_displacement_cm=%.1f max_authored_delta_cm=%.1f nanite=%s"),
+        TEXT("Built Nanite Yarlung corridor terrain: %s vertices=%d triangles=%d skipped_near_track_quads=%d displaced_vertices=%d max_displacement_cm=%.1f max_authored_delta_cm=%.1f nanite=%s"),
         *StaticMesh->GetPathName(),
         VertexCount,
-        RingCount * (LaneCount - 1) * 2,
+        (RingCount * (LaneCount - 1) - SkippedNearTrackQuadCount) * 2,
+        SkippedNearTrackQuadCount,
         DisplacedVertexCount,
         MaxAbsDisplacementCm,
         MaxAbsAuthoredDeltaCm,

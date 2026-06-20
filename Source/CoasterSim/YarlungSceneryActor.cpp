@@ -4,8 +4,10 @@
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Misc/Parse.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -149,6 +151,17 @@ void AYarlungSceneryActor::BeginPlay()
 {
     Super::BeginPlay();
     RebuildScenery();
+
+    if (FParse::Param(FCommandLine::Get(), TEXT("YarlungHideScenery")))
+    {
+        SetActorHiddenInGame(true);
+        RockOutcrops->SetVisibility(false, true);
+        UnderstoryClumps->SetVisibility(false, true);
+        CliffRockFacesA->SetVisibility(false, true);
+        CliffRockFacesB->SetVisibility(false, true);
+        ForestShrubsA->SetVisibility(false, true);
+        ForestShrubsB->SetVisibility(false, true);
+    }
 }
 
 void AYarlungSceneryActor::RebuildScenery()

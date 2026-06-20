@@ -2,8 +2,10 @@
 
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Misc/Parse.h"
 #include "ProceduralMeshComponent.h"
 
 namespace
@@ -99,6 +101,13 @@ void AYarlungRiverActor::BeginPlay()
 {
     Super::BeginPlay();
     RebuildRiver();
+
+    if (FParse::Param(FCommandLine::Get(), TEXT("YarlungHideRiver")))
+    {
+        SetActorHiddenInGame(true);
+        WaterMesh->SetVisibility(false, true);
+        FoamMesh->SetVisibility(false, true);
+    }
 }
 
 void AYarlungRiverActor::RebuildRiver()
