@@ -183,13 +183,13 @@ void AYarlungRiverActor::BuildWaterMesh(const TArray<FYarlungRiverSample>& Sampl
             Normals.Add((FVector::UpVector - Forward * FlowChop - Right * CrossChop).GetSafeNormal());
             UVs.Add(FVector2D(Sample.Flow * 28.0f, AcrossValue * 0.5f + 0.5f));
             const float BankFade = Saturate((EdgeWeight - 0.72f) / 0.28f);
-            const float Alpha = FMath::Lerp(0.76f, 0.24f, BankFade);
+            const float Alpha = FMath::Lerp(0.50f, 0.12f, BankFade);
             const float MilkyWater = Saturate(Energy * (0.62f + CenterWeight * 0.42f));
             Colors.Add(FLinearColor(
                 FMath::Lerp(0.12f + CenterWeight * 0.24f, 0.62f, MilkyWater),
                 FMath::Lerp(0.42f + CenterWeight * 0.22f, 0.80f, MilkyWater),
                 FMath::Lerp(0.46f + CenterWeight * 0.20f, 0.72f, MilkyWater),
-                FMath::Max(Alpha, 0.42f + MilkyWater * 0.20f)));
+                FMath::Max(Alpha, 0.22f + MilkyWater * 0.12f)));
             Tangents.Add(FProcMeshTangent(Forward, false));
         }
     }
@@ -241,7 +241,7 @@ void AYarlungRiverActor::BuildFoamMesh(const TArray<FYarlungRiverSample>& Sample
             Normals.Add(FVector::UpVector);
             UVs.Add(FVector2D(Sample.Flow * 34.0f, 0.0f));
             UVs.Add(FVector2D(Sample.Flow * 34.0f, 1.0f));
-            const float Alpha = Saturate(FMath::Lerp(0.46f, 0.86f, EdgeWeight) + Energy * 0.28f);
+            const float Alpha = Saturate(FMath::Lerp(0.28f, 0.58f, EdgeWeight) + Energy * 0.18f);
             Colors.Add(FLinearColor(0.70f, 0.82f, 0.77f, Alpha * 0.62f));
             Colors.Add(FLinearColor(0.93f, 0.98f, 0.91f, Alpha));
             Tangents.Add(FProcMeshTangent(Forward, false));
@@ -284,7 +284,7 @@ void AYarlungRiverActor::ApplyMaterials()
     if (UMaterialInstanceDynamic* WaterDynamic = WaterMesh->CreateAndSetMaterialInstanceDynamic(0))
     {
         WaterDynamic->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.16f, 0.50f, 0.54f, 0.72f));
-        WaterDynamic->SetScalarParameterValue(TEXT("Opacity"), 0.72f);
+        WaterDynamic->SetScalarParameterValue(TEXT("Opacity"), 0.38f);
         WaterDynamic->SetScalarParameterValue(TEXT("Roughness"), 0.18f);
         WaterDynamic->SetScalarParameterValue(TEXT("Specular"), 0.75f);
     }
@@ -292,7 +292,7 @@ void AYarlungRiverActor::ApplyMaterials()
     if (UMaterialInstanceDynamic* FoamDynamic = FoamMesh->CreateAndSetMaterialInstanceDynamic(0))
     {
         FoamDynamic->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.82f, 0.92f, 0.84f, 0.78f));
-        FoamDynamic->SetScalarParameterValue(TEXT("Opacity"), 0.82f);
+        FoamDynamic->SetScalarParameterValue(TEXT("Opacity"), 0.62f);
         FoamDynamic->SetScalarParameterValue(TEXT("Roughness"), 0.62f);
         FoamDynamic->SetScalarParameterValue(TEXT("Specular"), 0.20f);
     }

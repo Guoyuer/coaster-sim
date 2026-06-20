@@ -315,9 +315,20 @@ def create_translucent_vertex_color_material(name, opacity, roughness, specular)
         unreal.MaterialProperty.MP_BASE_COLOR,
     ):
         raise RuntimeError(f"Unable to connect {name} vertex BaseColor")
+    opacity_scale = create_scalar_parameter(material, "Opacity", opacity, -620, 20)
+    scaled_opacity = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionMultiply,
+        -360,
+        -20,
+    )
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(vertex_color, "A", scaled_opacity, "A"):
+        raise RuntimeError(f"Unable to connect {name} vertex alpha")
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(opacity_scale, "", scaled_opacity, "B"):
+        raise RuntimeError(f"Unable to connect {name} opacity scale")
     if not unreal.MaterialEditingLibrary.connect_material_property(
-        vertex_color,
-        "A",
+        scaled_opacity,
+        "",
         unreal.MaterialProperty.MP_OPACITY,
     ):
         raise RuntimeError(f"Unable to connect {name} vertex Opacity")
@@ -389,7 +400,7 @@ def create_river_materials():
 def create_mesh_terrain_material(rock_textures):
     material = create_material_asset(MESH_TERRAIN_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
-    material.set_editor_property("two_sided", True)
+    material.set_editor_property("two_sided", False)
 
     vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
@@ -411,15 +422,15 @@ def create_mesh_terrain_material(rock_textures):
         "",
         rock_diffuse,
         "",
-        create_constant(material, 0.10, -640, -20),
+        create_constant(material, 0.12, -640, -20),
         "",
         -360,
         -160,
         "mesh terrain rock diffuse mix",
     )
-    # Keep the corridor terrain mostly vertex-color driven. Bright tiled rock albedo
-    # made the first-person corridor read like snow instead of wet Yarlung slopes.
-    brightness = create_scalar_parameter(material, "TerrainBrightness", 0.90, -440, 40)
+    # Keep broad vertex-color landform bands readable; the scanned albedo is only
+    # a surface breakup layer because it photographs too pale on whole mountains.
+    brightness = create_scalar_parameter(material, "TerrainBrightness", 0.78, -440, 40)
     base_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
         unreal.MaterialExpressionMultiply,

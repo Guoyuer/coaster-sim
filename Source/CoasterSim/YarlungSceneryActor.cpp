@@ -208,7 +208,7 @@ void AYarlungSceneryActor::BuildScatter(const TArray<FYarlungSceneryTrackSample>
     UnderstoryClumps->ClearInstances();
 
     constexpr int32 RockCount = 2200;
-    constexpr int32 ClumpCount = 11000;
+    constexpr int32 ClumpCount = 0;
     constexpr float MinLateralCm = 2600.0f;
     constexpr float MaxLateralCm = 118000.0f;
 
@@ -301,6 +301,6 @@ void AYarlungSceneryActor::ApplyMaterials()
         }
     };
 
-    ApplyTint(RockOutcrops, FLinearColor(0.20f, 0.26f, 0.22f));
+    ApplyTint(RockOutcrops, FLinearColor(0.23f, 0.28f, 0.26f));
     ApplyTint(UnderstoryClumps, FLinearColor(0.035f, 0.16f, 0.055f));
 }
