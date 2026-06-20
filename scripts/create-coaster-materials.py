@@ -422,7 +422,7 @@ def create_mesh_terrain_material(rock_textures):
     # was calibrated against, so the terrain read near-black under the (correct)
     # sunny-day exposure. Lift terrain reflectance here instead of raising exposure,
     # which would blow out the already-correct sky.
-    brightness = create_scalar_parameter(material, "TerrainBrightness", 1.6, -440, 40)
+    brightness = create_scalar_parameter(material, "TerrainBrightness", 1.55, -440, 40)
     base_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
         unreal.MaterialExpressionMultiply,
