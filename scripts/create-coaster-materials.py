@@ -417,8 +417,24 @@ def create_mesh_terrain_material(rock_textures):
         -160,
         "mesh terrain rock diffuse mix",
     )
+    # The procedural vertex-color albedo (dark forest/wet-rock, ~0.06-0.36) is much
+    # darker than the bright aerial-photo Landscape albedo the B2 daylight exposure
+    # was calibrated against, so the terrain read near-black under the (correct)
+    # sunny-day exposure. Lift terrain reflectance here instead of raising exposure,
+    # which would blow out the already-correct sky.
+    brightness = create_scalar_parameter(material, "TerrainBrightness", 1.6, -440, 40)
+    base_color = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionMultiply,
+        -200,
+        -160,
+    )
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(rock_mix, "", base_color, "A"):
+        raise RuntimeError("Unable to connect mesh terrain brightness A")
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(brightness, "", base_color, "B"):
+        raise RuntimeError("Unable to connect mesh terrain brightness B")
     if not unreal.MaterialEditingLibrary.connect_material_property(
-        rock_mix,
+        base_color,
         "",
         unreal.MaterialProperty.MP_BASE_COLOR,
     ):

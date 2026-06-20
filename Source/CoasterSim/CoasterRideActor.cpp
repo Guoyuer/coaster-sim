@@ -429,16 +429,22 @@ void ACoasterRideActor::RebuildVisuals()
             const FVector YokeCenter = Location - Up * 62.0f;
             const FVector YokeLeft = YokeCenter - Right * (RailHalfGauge + 34.0f);
             const FVector YokeRight = YokeCenter + Right * (RailHalfGauge + 34.0f);
-            const float TerrainFootZ = TrackSpline->GetGeneratedTerrainZAtDistance(Distance) - 35.0f;
+            // Sink the feet well below the heightfield reference Z so they always
+            // meet the visible Nanite terrain (which carries up to ~49 m of sub-30 m
+            // rock displacement not present in the track CSV's terrain_z) instead of
+            // floating above it. The buried length is occluded by the terrain surface
+            // from the on-rails camera, so there is no visual cost.
+            const float TerrainRefZ = TrackSpline->GetGeneratedTerrainZAtDistance(Distance);
+            const float TerrainFootZ = TerrainRefZ - 6000.0f;
             const FVector LeftFoot = FVector(YokeLeft.X, YokeLeft.Y, TerrainFootZ);
             const FVector RightFoot = FVector(YokeRight.X, YokeRight.Y, TerrainFootZ);
 
             // The track is a high canyon viaduct (avg ~157 m, up to ~331 m above the
             // valley floor). Drop a few thick monumental piers, not thousands of
-            // hair-thin threads: girth scales with height so a 150 m pier still
-            // reads as structure instead of a vertical streak. (MakeSegmentTransform
-            // derives length from the endpoints, so ScaleCm.X is unused.)
-            const float PierHeight = FMath::Max(YokeCenter.Z - TerrainFootZ, 1.0f);
+            // hair-thin threads: girth scales with the *visible* height so a 150 m
+            // pier still reads as structure instead of a vertical streak.
+            // (MakeSegmentTransform derives length from the endpoints, so ScaleCm.X is unused.)
+            const float PierHeight = FMath::Max(YokeCenter.Z - TerrainRefZ, 1.0f);
             const float LegThickness = FMath::Clamp(PierHeight * 0.014f, 150.0f, 470.0f);
 
             Supports->AddInstance(MakeSegmentTransform(YokeLeft, YokeRight, FVector(0.0f, LegThickness * 1.25f, LegThickness)));
@@ -446,13 +452,16 @@ void ACoasterRideActor::RebuildVisuals()
             Supports->AddInstance(MakeSegmentTransform(RightFoot, YokeRight, FVector(0.0f, LegThickness, LegThickness)));
 
             // Horizontal cross-ties up the legs read as an engineered trestle ladder
-            // and break up the otherwise blank tall pier face.
+            // and break up the otherwise blank tall pier face. Place them along the
+            // visible span only (surface -> yoke), not the buried portion.
+            const FVector LeftSurface = FVector(YokeLeft.X, YokeLeft.Y, TerrainRefZ);
+            const FVector RightSurface = FVector(YokeRight.X, YokeRight.Y, TerrainRefZ);
             const int32 BraceCount = FMath::Clamp(FMath::FloorToInt(PierHeight / 5000.0f), 0, 4);
             for (int32 BraceIndex = 1; BraceIndex <= BraceCount; ++BraceIndex)
             {
                 const float BraceT = static_cast<float>(BraceIndex) / static_cast<float>(BraceCount + 1);
-                const FVector BraceLeft = FMath::Lerp(LeftFoot, YokeLeft, BraceT);
-                const FVector BraceRight = FMath::Lerp(RightFoot, YokeRight, BraceT);
+                const FVector BraceLeft = FMath::Lerp(LeftSurface, YokeLeft, BraceT);
+                const FVector BraceRight = FMath::Lerp(RightSurface, YokeRight, BraceT);
                 Supports->AddInstance(MakeSegmentTransform(BraceLeft, BraceRight, FVector(0.0f, LegThickness * 0.5f, LegThickness * 0.5f)));
             }
         }
