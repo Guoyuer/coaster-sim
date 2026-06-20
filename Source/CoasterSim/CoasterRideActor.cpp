@@ -3,6 +3,7 @@
 #include "CoasterBanking.h"
 #include "CoasterTrackComponent.h"
 #include "YarlungCoasterProfile.h"
+#include "YarlungTerrainProfile.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/DirectionalLightComponent.h"
@@ -27,8 +28,6 @@ constexpr float CmPerMeter = 100.0f;
 constexpr float GravityCms2 = 980.665f;
 constexpr float RiverZCm = 265200.0f;
 constexpr float FallbackGeneratedRiverSurfaceZCm = 267655.0f;
-constexpr float YarlungRiverAnchorXCm = 95543.0f;
-constexpr float YarlungRiverAnchorYCm = -142330.0f;
 
 FTransform MakeSegmentTransform(const FVector& Start, const FVector& End, const FVector& ScaleCm)
 {
@@ -79,17 +78,9 @@ bool LoadGeneratedRiverAverageZCm(float& OutZCm)
     return true;
 }
 
-float YarlungRiverCenterY(float X)
-{
-    const float OffsetX = X - YarlungRiverAnchorXCm;
-    return YarlungRiverAnchorYCm
-        + 9000.0f * FMath::Sin(OffsetX * 0.00009f + 0.25f)
-        + 4200.0f * FMath::Sin(OffsetX * 0.00021f - 0.6f);
-}
-
 float YarlungLandscapeHeight(float X, float Y)
 {
-    const float RiverY = YarlungRiverCenterY(X);
+    const float RiverY = YarlungTerrain::RiverCenterY(X);
     const float Lateral = FMath::Abs(Y - RiverY);
     const float WideValley = Smooth01((Lateral - 1150.0f) / 9400.0f);
     const float OuterMountain = Smooth01((Lateral - 5800.0f) / 7600.0f);
@@ -496,7 +487,7 @@ void ACoasterRideActor::BuildBoulderOutcrops()
         const float X = FMath::Lerp(MinX, MaxX, T) + (Hash01(Index * 2.9f, 5.1f) - 0.5f) * 520.0f;
         const float Side = (Index % 2 == 0) ? -1.0f : 1.0f;
         const float Lateral = Side * FMath::Lerp(780.0f, 2650.0f, Hash01(Index * 4.7f, 1.4f));
-        const float Y = YarlungRiverCenterY(X) + Lateral;
+        const float Y = YarlungTerrain::RiverCenterY(X) + Lateral;
         const float Height = YarlungLandscapeHeight(X, Y);
         if (Height < 120.0f || Height > 2550.0f)
         {

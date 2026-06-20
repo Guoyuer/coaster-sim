@@ -7,6 +7,8 @@
 #include "YarlungSceneryActor.h"
 #include "YarlungMeshTerrainActor.h"
 #include "YarlungCoasterProfile.h"
+#include "YarlungTerrainProfile.h"
+#include "YarlungTerrainRelief.h"
 #include "Components/StaticMeshComponent.h"
 #include "Editor.h"
 #include "Engine/StaticMesh.h"
@@ -30,8 +32,6 @@ constexpr float YarlungMinX = -337778.431f;
 constexpr float YarlungMaxX = 337778.431f;
 constexpr float YarlungMinY = -416981.551f;
 constexpr float YarlungMaxY = 416981.551f;
-constexpr float YarlungEncodedMinZ = 260000.0f;
-constexpr float YarlungEncodedMaxZ = 730000.0f;
 const TCHAR* YarlungTerrainMeshPackagePath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungMeshTerrain");
 const TCHAR* YarlungTerrainMeshAssetName = TEXT("SM_YarlungMeshTerrain");
 const TCHAR* YarlungTerrainMeshObjectPath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungMeshTerrain.SM_YarlungMeshTerrain");
@@ -48,11 +48,6 @@ struct FYarlungTerrainVertexSample
     float DisplacementCm = 0.0f;
 };
 
-float YarlungHeightValueToCm(uint16 Encoded)
-{
-    return FMath::Lerp(YarlungEncodedMinZ, YarlungEncodedMaxZ, static_cast<float>(Encoded) / 65535.0f);
-}
-
 float YarlungCubicBsplineInterp(float P0, float P1, float P2, float P3, float T)
 {
     const float OneMinusT = 1.0f - T;
@@ -61,12 +56,6 @@ float YarlungCubicBsplineInterp(float P0, float P1, float P2, float P3, float T)
     const float W2 = (-3.0f * T * T * T + 3.0f * T * T + 3.0f * T + 1.0f) / 6.0f;
     const float W3 = T * T * T / 6.0f;
     return P0 * W0 + P1 * W1 + P2 * W2 + P3 * W3;
-}
-
-float YarlungSmooth01(float Value)
-{
-    const float T = FMath::Clamp(Value, 0.0f, 1.0f);
-    return T * T * (3.0f - 2.0f * T);
 }
 
 float YarlungValueNoise(float X, float Y)
@@ -79,81 +68,11 @@ float YarlungSignedValueNoise(float X, float Y)
     return YarlungValueNoise(X, Y) * 2.0f - 1.0f;
 }
 
-// Coherent (spatially interpolated) lattice noise. Unlike YarlungValueNoise above
-// (a per-point hash = white noise), this has structure across its unit cell, which
-// is what fBm / ridged multifractal need to read as real terrain rather than grain.
-float YarlungLatticeHash(int32 X, int32 Y)
-{
-    uint32 H = static_cast<uint32>(X) * 374761393u + static_cast<uint32>(Y) * 668265263u;
-    H = (H ^ (H >> 13)) * 1274126177u;
-    H = H ^ (H >> 16);
-    return static_cast<float>(H & 0x00FFFFFFu) / static_cast<float>(0x01000000u);
-}
-
-float YarlungCoherentNoise2D(float X, float Y)
-{
-    const float Fx = FMath::FloorToFloat(X);
-    const float Fy = FMath::FloorToFloat(Y);
-    const int32 Ix = static_cast<int32>(Fx);
-    const int32 Iy = static_cast<int32>(Fy);
-    const float Tx = YarlungSmooth01(X - Fx);
-    const float Ty = YarlungSmooth01(Y - Fy);
-    const float A = YarlungLatticeHash(Ix, Iy);
-    const float B = YarlungLatticeHash(Ix + 1, Iy);
-    const float C = YarlungLatticeHash(Ix, Iy + 1);
-    const float D = YarlungLatticeHash(Ix + 1, Iy + 1);
-    return FMath::Lerp(FMath::Lerp(A, B, Tx), FMath::Lerp(C, D, Tx), Ty);
-}
-
-// Fractional Brownian motion: summed octaves -> rolling multi-scale relief. ~[-1,1].
-float YarlungFbm2D(float X, float Y, int32 Octaves, float Lacunarity, float Gain)
-{
-    float Sum = 0.0f;
-    float Amplitude = 0.5f;
-    float Frequency = 1.0f;
-    for (int32 Octave = 0; Octave < Octaves; ++Octave)
-    {
-        Sum += Amplitude * (YarlungCoherentNoise2D(X * Frequency, Y * Frequency) * 2.0f - 1.0f);
-        Frequency *= Lacunarity;
-        Amplitude *= Gain;
-    }
-    return Sum;
-}
-
-// Ridged multifractal: sharp ridge/gully structure (eroded-rock look), not rolling
-// hills. Each octave is weighted by the previous one, concentrating detail on ridges. ~[0,1].
-float YarlungRidged2D(float X, float Y, int32 Octaves, float Lacunarity, float Gain)
-{
-    float Sum = 0.0f;
-    float Amplitude = 0.5f;
-    float Frequency = 1.0f;
-    float Prev = 1.0f;
-    for (int32 Octave = 0; Octave < Octaves; ++Octave)
-    {
-        float N = YarlungCoherentNoise2D(X * Frequency, Y * Frequency);
-        N = 1.0f - FMath::Abs(2.0f * N - 1.0f);
-        N = N * N;
-        Sum += Amplitude * N * Prev;
-        Prev = N;
-        Frequency *= Lacunarity;
-        Amplitude *= Gain;
-    }
-    return Sum;
-}
-
-float YarlungRiverCenterY(float X)
-{
-    const float OffsetX = X - 95543.0f;
-    return -142330.0f
-        + 9000.0f * FMath::Sin(OffsetX * 0.00009f + 0.25f)
-        + 4200.0f * FMath::Sin(OffsetX * 0.00021f - 0.6f);
-}
-
 float YarlungHeightAtGrid(const TArray<uint16>& HeightData, int32 XIndex, int32 YIndex)
 {
     const int32 ClampedX = FMath::Clamp(XIndex, 0, YarlungHeightmapSize - 1);
     const int32 ClampedY = FMath::Clamp(YIndex, 0, YarlungHeightmapSize - 1);
-    return YarlungHeightValueToCm(HeightData[ClampedY * YarlungHeightmapSize + ClampedX]);
+    return YarlungTerrain::HeightValueToCm(HeightData[ClampedY * YarlungHeightmapSize + ClampedX]);
 }
 
 float YarlungHeightAtSourceGrid(const TArray<uint16>& HeightData, float SourceX, float SourceY)
@@ -242,70 +161,12 @@ float YarlungDistanceToTrackCm(const TArray<FYarlungTerrainTrackPoint>& TrackPoi
 float YarlungCorridorRockMask(const TArray<FYarlungTerrainTrackPoint>& TrackPoints, float X, float Y, float Height, const FVector& BaseNormal)
 {
     const float TrackDistance = YarlungDistanceToTrackCm(TrackPoints, FVector2D(X, Y));
-    const float NearFade = YarlungSmooth01((TrackDistance - 1800.0f) / 6200.0f);
-    const float FarFade = 1.0f - YarlungSmooth01((TrackDistance - 260000.0f) / 140000.0f);
+    const float NearFade = YarlungTerrain::Smooth01((TrackDistance - 1800.0f) / 6200.0f);
+    const float FarFade = 1.0f - YarlungTerrain::Smooth01((TrackDistance - 260000.0f) / 140000.0f);
     const float DistanceMask = NearFade * FarFade;
-    const float SlopeMask = YarlungSmooth01(((1.0f - BaseNormal.Z) - 0.13f) / 0.38f);
-    const float HeightMask = 1.0f - 0.55f * YarlungSmooth01((Height - 515000.0f) / 120000.0f);
+    const float SlopeMask = YarlungTerrain::Smooth01(((1.0f - BaseNormal.Z) - 0.13f) / 0.38f);
+    const float HeightMask = 1.0f - 0.55f * YarlungTerrain::Smooth01((Height - 515000.0f) / 120000.0f);
     return FMath::Clamp(DistanceMask * SlopeMask * HeightMask, 0.0f, 1.0f);
-}
-
-float YarlungTerrainReliefCm(float X, float Y, float Height, const FVector& BaseNormal, float TrackDistanceCm)
-{
-    // The 30 m DEM upsamples into smooth planar ramps (the "facets" + angular
-    // silhouette). Synthesize the missing sub-30 m octaves as REAL geometry:
-    // domain-warped ridged multifractal + sedimentary strata, gated to slopes, so it
-    // breaks the planar faces AND roughens the ridgeline. This adds information the
-    // DEM lacks (synthesis), it is not interpolation/smoothing of the DEM.
-    // Engage moderate slopes hard (a 20 deg ramp is slope~0.06): the big canyon
-    // faces are moderate grade and were left smooth by a softer gate. Truly flat
-    // ground (slope < ~8 deg) is still protected so the valley floor stays clean.
-    const float Slope = 1.0f - BaseNormal.Z;
-    const float SlopeGate = YarlungSmooth01((Slope - 0.0f) / 0.10f);
-    if (SlopeGate <= 0.001f)
-    {
-        return 0.0f;
-    }
-
-    // Keep the river channel / valley floor smooth so the water mesh still reads.
-    const float RiverDistance = FMath::Abs(Y - YarlungRiverCenterY(X));
-    const float RiverGate = YarlungSmooth01((RiverDistance - 22000.0f) / 24000.0f);
-    if (RiverGate <= 0.001f)
-    {
-        return 0.0f;
-    }
-
-    const float Height01 = FMath::Clamp(
-        (Height - YarlungEncodedMinZ) / (YarlungEncodedMaxZ - YarlungEncodedMinZ), 0.0f, 1.0f);
-    const float HeightGate = 1.0f - 0.30f * YarlungSmooth01((Height01 - 0.82f) / 0.14f);
-
-    // Domain warp breaks the grid-aligned regularity of the lattice noise.
-    const float WarpScale = 1.0f / 60000.0f;
-    const float WarpX = X + 13000.0f * YarlungFbm2D(X * WarpScale, Y * WarpScale, 2, 2.0f, 0.5f);
-    const float WarpY = Y + 13000.0f * YarlungFbm2D((X + 1733.0f) * WarpScale, (Y - 911.0f) * WarpScale, 2, 2.0f, 0.5f);
-
-    // ~240 m base octave, 5 octaves -> ~15 m finest (above the ~4 m grid Nyquist).
-    const float NoiseScale = 1.0f / 24000.0f;
-    const float Ridged = YarlungRidged2D(WarpX * NoiseScale, WarpY * NoiseScale, 5, 2.0f, 0.5f);
-    const float Fbm = YarlungFbm2D(WarpX * NoiseScale * 1.7f, WarpY * NoiseScale * 1.7f, 5, 2.0f, 0.5f);
-    // Sedimentary strata as geometry reads as contour-line ripples on a 4 m grid
-    // (height-banded sin), so it is left to the material normal map; the geometry is
-    // pure domain-warped ridged + fbm rock structure.
-    float Detail = (Ridged - 0.42f) * 1.9f + 0.40f * Fbm;
-    Detail = FMath::Clamp(Detail, -1.25f, 1.25f);
-
-    const float AmplitudeCm = FMath::Lerp(2500.0f, 7000.0f, SlopeGate);
-    float Displacement = SlopeGate * RiverGate * HeightGate * AmplitudeCm * Detail;
-
-    // Never push terrain UP within the immediate track corridor: the verified track
-    // clearance is computed against the base heightfield, not this mesh relief, so
-    // carving down there only ever increases clearance.
-    const float NearTrackUp = 1.0f - YarlungSmooth01((TrackDistanceCm - 4000.0f) / 12000.0f);
-    if (Displacement > 0.0f)
-    {
-        Displacement *= (1.0f - 0.85f * NearTrackUp);
-    }
-    return Displacement;
 }
 
 FYarlungTerrainVertexSample YarlungTerrainVertexSampleAtMeshGrid(
@@ -322,16 +183,17 @@ FYarlungTerrainVertexSample YarlungTerrainVertexSampleAtMeshGrid(
     const FVector BaseNormal = YarlungSmoothNormalAtMeshGrid(HeightData, XIndex, YIndex);
     const float TrackDistance = YarlungDistanceToTrackCm(TrackPoints, FVector2D(X, Y));
     const float RockMask = YarlungCorridorRockMask(TrackPoints, X, Y, BaseHeight, BaseNormal);
-    const float DisplacementCm = YarlungTerrainReliefCm(X, Y, BaseHeight, BaseNormal, TrackDistance);
+    const float DisplacementCm = YarlungTerrainRelief::ComputeReliefCm(
+        FVector2D(X, Y),
+        BaseHeight,
+        BaseNormal,
+        TrackDistance);
 
-    // Displace along the surface normal, not world-Z. Vertical displacement only
-    // roughens flat-ish ground (where up == normal); on the steep canyon faces it
-    // just slides points along the face and leaves it planar (the faceting we saw).
-    // Normal-direction displacement pushes steep faces in/out, so it actually
-    // breaks them. Displacement is coherent over ~240 m, so XY motion stays well
-    // under the grid spacing (no foldover).
     FYarlungTerrainVertexSample Sample;
-    Sample.Position = FVector(X, Y, BaseHeight) + BaseNormal * DisplacementCm;
+    Sample.Position = YarlungTerrainRelief::ApplyNormalDisplacement(
+        FVector(X, Y, BaseHeight),
+        BaseNormal,
+        DisplacementCm);
     Sample.RockMask = RockMask;
     Sample.DisplacementCm = DisplacementCm;
     return Sample;
@@ -358,10 +220,10 @@ FVector YarlungNormalFromCachedPositions(const TArray<FVector>& Positions, int32
 
 FLinearColor YarlungColorAtPosition(float X, float Y, float Height, float RockMask)
 {
-    const float Height01 = FMath::Clamp((Height - YarlungEncodedMinZ) / (YarlungEncodedMaxZ - YarlungEncodedMinZ), 0.0f, 1.0f);
-    const float RiverDistance = FMath::Abs(Y - YarlungRiverCenterY(X));
+    const float Height01 = YarlungTerrain::NormalizeEncodedHeightCm(Height);
+    const float RiverDistance = FMath::Abs(Y - YarlungTerrain::RiverCenterY(X));
     const float River = FMath::Clamp(1.0f - RiverDistance / 26000.0f, 0.0f, 1.0f);
-    const float Forest = YarlungSmooth01((RiverDistance - 26000.0f) / 90000.0f) * (1.0f - YarlungSmooth01((Height01 - 0.43f) / 0.20f));
+    const float Forest = YarlungTerrain::Smooth01((RiverDistance - 26000.0f) / 90000.0f) * (1.0f - YarlungTerrain::Smooth01((Height01 - 0.43f) / 0.20f));
     const float Noise = YarlungValueNoise(X, Y);
 
     FLinearColor Base(0.24f + Noise * 0.04f, 0.36f + Noise * 0.08f, 0.29f + Noise * 0.04f, 1.0f);
@@ -373,7 +235,7 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, float RockMa
     Base = FMath::Lerp(Base, Rock, FMath::Clamp(Height01 * 0.95f, 0.0f, 0.65f));
     Base = FMath::Lerp(Base, ForestColor, FMath::Clamp(Forest, 0.0f, 0.82f));
     Base = FMath::Lerp(Base, RiverColor, River * 0.72f);
-    Base = FMath::Lerp(Base, Snow, YarlungSmooth01((Height01 - 0.74f) / 0.11f));
+    Base = FMath::Lerp(Base, Snow, YarlungTerrain::Smooth01((Height01 - 0.74f) / 0.11f));
     const float RockBreakup = 0.5f + 0.5f * FMath::Sin(X * 0.0019f - Y * 0.0023f + Height * 0.0041f);
     const FLinearColor WetRock(0.22f + RockBreakup * 0.06f, 0.29f + RockBreakup * 0.06f, 0.27f + RockBreakup * 0.05f, 1.0f);
     Base = FMath::Lerp(Base, WetRock, FMath::Clamp(RockMask * 0.72f, 0.0f, 0.72f));
