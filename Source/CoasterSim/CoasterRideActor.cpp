@@ -10,11 +10,13 @@
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/VolumetricCloudComponent.h"
 #include "Engine/Scene.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/CommandLine.h"
+#include "HAL/IConsoleManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/Parse.h"
@@ -65,6 +67,47 @@ bool LoadGeneratedRiverAverageZCm(float& OutZCm)
 
     OutZCm = static_cast<float>(SumZ / static_cast<double>(Count));
     return true;
+}
+
+void SetConsoleVariableIfAvailable(const TCHAR* Name, int32 Value)
+{
+    if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Name))
+    {
+        CVar->Set(Value, ECVF_SetByCode);
+    }
+}
+
+void ConfigureYarlungCloudMaterial(UVolumetricCloudComponent* Clouds, UObject* Owner)
+{
+    if (!Clouds)
+    {
+        return;
+    }
+
+    UMaterialInterface* BaseMaterial = Clouds->GetMaterial();
+    if (!BaseMaterial)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Yarlung volumetric clouds have no material; sky will render cloudless."));
+        return;
+    }
+
+    UMaterialInstanceDynamic* CloudMID = UMaterialInstanceDynamic::Create(BaseMaterial, Owner);
+    if (!CloudMID)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Unable to create dynamic Yarlung cloud material instance."));
+        return;
+    }
+
+    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"), 0.46f);
+    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalDensity"), 0.14f);
+    CloudMID->SetScalarParameterValue(TEXT("Layout_CloudGlobalScale"), 7.5f);
+    CloudMID->SetScalarParameterValue(TEXT("CloudTextureWeight"), 0.55f);
+    CloudMID->SetScalarParameterValue(TEXT("Noise_Strength"), 0.28f);
+    CloudMID->SetScalarParameterValue(TEXT("Noise_Bias"), 0.08f);
+    CloudMID->SetVectorParameterValue(TEXT("Cloud_AlbedoColor"), FLinearColor(0.84f, 0.88f, 0.86f));
+
+    Clouds->SetMaterial(CloudMID);
+    UE_LOG(LogTemp, Display, TEXT("Configured Yarlung volumetric clouds: coverage=0.46 density=0.14 scale=7.5"));
 }
 
 }
@@ -153,14 +196,32 @@ ACoasterRideActor::ACoasterRideActor()
     SkyAtmosphere = CreateDefaultSubobject<USkyAtmosphereComponent>(TEXT("SkyAtmosphere"));
     SkyAtmosphere->SetupAttachment(SceneRoot);
 
+    VolumetricClouds = CreateDefaultSubobject<UVolumetricCloudComponent>(TEXT("VolumetricClouds"));
+    VolumetricClouds->SetupAttachment(SceneRoot);
+    VolumetricClouds->SetLayerBottomAltitude(4.10f);
+    VolumetricClouds->SetLayerHeight(1.60f);
+    VolumetricClouds->SetTracingStartMaxDistance(140.0f);
+    VolumetricClouds->SetTracingMaxDistance(120.0f);
+    VolumetricClouds->SetbUsePerSampleAtmosphericLightTransmittance(true);
+    VolumetricClouds->SetSkyLightCloudBottomOcclusion(0.28f);
+    VolumetricClouds->SetViewSampleCountScale(2.0f);
+    VolumetricClouds->SetShadowViewSampleCountScale(0.65f);
+    VolumetricClouds->SetGroundAlbedo(FColor(42, 58, 48));
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> CloudMaterial(
+        TEXT("/Engine/EngineSky/VolumetricClouds/m_SimpleVolumetricCloud_Inst.m_SimpleVolumetricCloud_Inst"));
+    if (CloudMaterial.Succeeded())
+    {
+        VolumetricClouds->SetMaterial(CloudMaterial.Object);
+    }
+
     ValleyFog = CreateDefaultSubobject<UExponentialHeightFogComponent>(TEXT("ValleyFog"));
     ValleyFog->SetupAttachment(SceneRoot);
     ValleyFog->SetRelativeLocation(FVector::ZeroVector);
-    ValleyFog->SetFogDensity(0.000020f);
-    ValleyFog->SetFogHeightFalloff(0.40f);
-    ValleyFog->SetFogMaxOpacity(0.035f);
-    ValleyFog->SetStartDistance(12000.0f);
-    ValleyFog->SetFogInscatteringColor(FLinearColor(0.78f, 0.88f, 1.0f));
+    ValleyFog->SetFogDensity(0.000050f);
+    ValleyFog->SetFogHeightFalloff(0.24f);
+    ValleyFog->SetFogMaxOpacity(0.16f);
+    ValleyFog->SetStartDistance(5000.0f);
+    ValleyFog->SetFogInscatteringColor(FLinearColor(0.62f, 0.72f, 0.82f));
     ValleyFog->SetVolumetricFog(false);
     ValleyFog->SetVolumetricFogScatteringDistribution(0.28f);
     ValleyFog->SetVolumetricFogExtinctionScale(0.02f);
@@ -209,6 +270,10 @@ void ACoasterRideActor::OnConstruction(const FTransform& Transform)
 void ACoasterRideActor::BeginPlay()
 {
     Super::BeginPlay();
+    SetConsoleVariableIfAvailable(TEXT("r.VolumetricCloud"), 1);
+    SetConsoleVariableIfAvailable(TEXT("r.VolumetricCloud.ShadowMap"), 1);
+    ConfigureYarlungCloudMaterial(VolumetricClouds, this);
+
     RebuildSpline();
     ApplyVisualMaterials();
     RebuildVisuals();
@@ -225,6 +290,10 @@ void ACoasterRideActor::BeginPlay()
     if (FParse::Param(CommandLine, TEXT("YarlungHideFog")))
     {
         ValleyFog->SetVisibility(false, true);
+    }
+    if (FParse::Param(CommandLine, TEXT("YarlungHideClouds")))
+    {
+        VolumetricClouds->SetVisibility(false, true);
     }
 
     SkyLight->RecaptureSky();

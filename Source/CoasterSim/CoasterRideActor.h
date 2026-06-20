@@ -11,6 +11,7 @@ class UExponentialHeightFogComponent;
 class UInstancedStaticMeshComponent;
 class USkyAtmosphereComponent;
 class USkyLightComponent;
+class UVolumetricCloudComponent;
 
 USTRUCT(BlueprintType)
 struct FCoasterTelemetry
@@ -82,6 +83,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, Category = "Lighting")
     TObjectPtr<UExponentialHeightFogComponent> ValleyFog;
+
+    UPROPERTY(VisibleAnywhere, Category = "Lighting")
+    TObjectPtr<UVolumetricCloudComponent> VolumetricClouds;
 
     UPROPERTY(VisibleAnywhere, Category = "Track Visuals")
     TObjectPtr<UInstancedStaticMeshComponent> LeftRail;
