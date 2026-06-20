@@ -8,6 +8,7 @@ YARLUNG_MACRO_PACKAGE_PATH = f"{PACKAGE_PATH}/YarlungMacro"
 TINT_MATERIAL_NAME = "M_CoasterTint"
 RIVER_WATER_MATERIAL_NAME = "M_YarlungRiverWater"
 RIVER_FOAM_MATERIAL_NAME = "M_YarlungRiverFoam"
+MESH_TERRAIN_MATERIAL_NAME = "M_YarlungMeshTerrain"
 LANDSCAPE_MATERIAL_NAME = "M_YarlungLandscapeGround"
 SUCCESS_MARKER = "material-generation-ok.txt"
 LEAFY_GRASS_SOURCE_DIR = "SourceAssets/PolyHaven/leafy_grass"
@@ -323,6 +324,40 @@ def create_translucent_vertex_color_material(name, opacity, roughness, specular)
     finalize_material(material)
 
 
+def create_opaque_vertex_color_material(name, roughness, specular):
+    material = create_material_asset(name, PACKAGE_PATH)
+    unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
+    material.set_editor_property("two_sided", True)
+
+    vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionVertexColor,
+        -620,
+        -160,
+    )
+    if not unreal.MaterialEditingLibrary.connect_material_property(
+        vertex_color,
+        "",
+        unreal.MaterialProperty.MP_BASE_COLOR,
+    ):
+        raise RuntimeError(f"Unable to connect {name} vertex BaseColor")
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "Roughness", roughness, -620, 160),
+        unreal.MaterialProperty.MP_ROUGHNESS,
+        f"{name} Roughness",
+    )
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "Specular", specular, -620, 340),
+        unreal.MaterialProperty.MP_SPECULAR,
+        f"{name} Specular",
+    )
+    set_optional_material_usage(material, "MATUSAGE_STATIC_MESH")
+    set_optional_material_usage(material, "MATUSAGE_NANITE")
+    finalize_material(material)
+
+
 def create_river_materials():
     create_translucent_vertex_color_material(
         RIVER_WATER_MATERIAL_NAME,
@@ -335,6 +370,14 @@ def create_river_materials():
         0.74,
         0.62,
         0.20,
+    )
+
+
+def create_mesh_terrain_material():
+    create_opaque_vertex_color_material(
+        MESH_TERRAIN_MATERIAL_NAME,
+        0.86,
+        0.06,
     )
 
 
@@ -544,6 +587,7 @@ def main():
     ensure_folder(YARLUNG_MACRO_PACKAGE_PATH)
     create_tint_material()
     create_river_materials()
+    create_mesh_terrain_material()
     leafy_grass_textures = import_textures(LEAFY_GRASS_PACKAGE_PATH, LEAFY_GRASS_SOURCE_DIR, LEAFY_GRASS_TEXTURES)
     aerial_grass_rock_textures = import_textures(
         AERIAL_GRASS_ROCK_PACKAGE_PATH,

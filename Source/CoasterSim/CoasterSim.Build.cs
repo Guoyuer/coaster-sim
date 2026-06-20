@@ -28,6 +28,9 @@ public class CoasterSim : ModuleRules
             PrivateDependencyModuleNames.AddRange(new[]
             {
                 "AssetRegistry",
+                "MeshConversion",
+                "MeshDescription",
+                "StaticMeshDescription",
                 "UnrealEd"
             });
         }

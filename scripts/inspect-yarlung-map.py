@@ -4,6 +4,8 @@ from pathlib import Path
 
 MAP_PATH = "/Game/Generated/YarlungLandscape/YarlungLandscape_Level"
 LANDSCAPE_MATERIAL_PATH = "/Game/Generated/Materials/M_YarlungLandscapeGround.M_YarlungLandscapeGround"
+MESH_TERRAIN_MATERIAL_PATH = "/Game/Generated/Materials/M_YarlungMeshTerrain.M_YarlungMeshTerrain"
+MESH_TERRAIN_STATIC_MESH_PATH = "/Game/Generated/YarlungLandscape/SM_YarlungMeshTerrain.SM_YarlungMeshTerrain"
 FORBIDDEN_RIDE_COMPONENTS = {
     "CanyonTerrainMesh",
     "SnowCaps",
@@ -38,9 +40,19 @@ def main():
         raise RuntimeError(f"Unable to load map: {MAP_PATH}")
 
     material = unreal.EditorAssetLibrary.load_asset(LANDSCAPE_MATERIAL_PATH)
+    mesh_terrain_material = unreal.EditorAssetLibrary.load_asset(MESH_TERRAIN_MATERIAL_PATH)
+    mesh_terrain_static_mesh = unreal.EditorAssetLibrary.load_asset(MESH_TERRAIN_STATIC_MESH_PATH)
     emit(f"[YARLUNG-INSPECT] material={object_path(material)}")
+    emit(f"[YARLUNG-INSPECT] mesh_terrain_material={object_path(mesh_terrain_material)}")
+    emit(f"[YARLUNG-INSPECT] mesh_terrain_static_mesh={object_path(mesh_terrain_static_mesh)}")
     if material:
         emit(f"[YARLUNG-INSPECT] material_class={material.get_class().get_name()}")
+    if not mesh_terrain_static_mesh:
+        raise RuntimeError(f"Missing Yarlung mesh terrain StaticMesh: {MESH_TERRAIN_STATIC_MESH_PATH}")
+    nanite_status = "<unavailable>"
+    if hasattr(mesh_terrain_static_mesh, "is_nanite_enabled"):
+        nanite_status = mesh_terrain_static_mesh.is_nanite_enabled()
+    emit(f"[YARLUNG-INSPECT] mesh_terrain_static_mesh_nanite={nanite_status}")
 
     world = unreal.EditorLevelLibrary.get_editor_world()
     actors = unreal.EditorLevelLibrary.get_all_level_actors()
@@ -51,9 +63,12 @@ def main():
 
     for actor in landscapes:
         actor_material = actor.get_editor_property("landscape_material")
-        emit(f"[YARLUNG-INSPECT] landscape={actor.get_actor_label()} material={object_path(actor_material)}")
+        hidden_in_game = actor.get_editor_property("hidden")
+        emit(f"[YARLUNG-INSPECT] landscape={actor.get_actor_label()} material={object_path(actor_material)} hidden={hidden_in_game}")
         if actor_material != material:
             raise RuntimeError(f"Landscape material mismatch: {object_path(actor_material)}")
+        if not hidden_in_game:
+            raise RuntimeError("Landscape must be hidden in game when mesh terrain is the visible terrain surface")
         components = actor.get_components_by_class(unreal.LandscapeComponent)
         emit(f"[YARLUNG-INSPECT] landscape_components={len(components)}")
         if not components:
@@ -69,6 +84,29 @@ def main():
                 raise RuntimeError(f"Landscape component {index} material mismatch: {object_path(component_material)}")
             if override_material:
                 raise RuntimeError(f"Landscape component {index} has unexpected override: {object_path(override_material)}")
+
+    mesh_terrain_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungMeshTerrainActor")]
+    if len(mesh_terrain_actors) != 1:
+        raise RuntimeError(f"Expected exactly one YarlungMeshTerrainActor, found {len(mesh_terrain_actors)}")
+    for actor in mesh_terrain_actors:
+        emit(f"[YARLUNG-INSPECT] mesh_terrain={actor.get_actor_label()} class={actor.get_class().get_name()}")
+        mesh_components = [
+            component
+            for component in actor.get_components_by_class(unreal.StaticMeshComponent)
+            if component.get_name() == "YarlungMeshTerrain"
+        ]
+        if len(mesh_components) != 1:
+            raise RuntimeError(f"Expected one YarlungMeshTerrain component, found {len(mesh_components)}")
+        for component in mesh_components:
+            static_mesh = component.get_editor_property("static_mesh")
+            if static_mesh != mesh_terrain_static_mesh:
+                raise RuntimeError(f"Yarlung mesh terrain component uses wrong mesh: {object_path(static_mesh)}")
+            material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
+            emit(
+                f"[YARLUNG-INSPECT] mesh_terrain_component={component.get_name()} "
+                f"class={component.get_class().get_name()} hidden={component.get_editor_property('hidden_in_game')} "
+                f"static_mesh={object_path(static_mesh)} materials={material_names}"
+            )
 
     ride_actors = [actor for actor in actors if actor.get_class().get_name().startswith("CoasterRideActor")]
     if len(ride_actors) != 1:
