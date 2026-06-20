@@ -52,6 +52,23 @@ float Saturate(float Value)
 {
     return FMath::Clamp(Value, 0.0f, 1.0f);
 }
+
+float RiverEnergy(const TArray<FYarlungRiverSample>& Samples, int32 Index)
+{
+    const int32 Prev = FMath::Max(Index - 1, 0);
+    const int32 Next = FMath::Min(Index + 1, Samples.Num() - 1);
+    const FVector Delta = Samples[Next].Center - Samples[Prev].Center;
+    const float HorizontalDistance = FMath::Max(FVector(Delta.X, Delta.Y, 0.0f).Size(), 1.0f);
+    const float Slope = FMath::Abs(Delta.Z) / HorizontalDistance;
+
+    const FVector PrevForward = SampleForward(Samples, Prev);
+    const FVector NextForward = SampleForward(Samples, Next);
+    const float Curvature = 1.0f - FMath::Clamp(FVector::DotProduct(PrevForward, NextForward), -1.0f, 1.0f);
+
+    const float BrokenSurface = 0.5f + 0.5f * FMath::Sin(Samples[Index].Flow * 47.0f + Index * 0.37f);
+    return Saturate(Slope * 70.0f + Curvature * 4.0f + BrokenSurface * 0.22f);
+}
+
 }
 
 AYarlungRiverActor::AYarlungRiverActor()
@@ -146,6 +163,7 @@ void AYarlungRiverActor::BuildWaterMesh(const TArray<FYarlungRiverSample>& Sampl
         const FYarlungRiverSample& Sample = Samples[Along];
         const FVector Forward = SampleForward(Samples, Along);
         const FVector Right = SampleRight(Samples, Along);
+        const float Energy = RiverEnergy(Samples, Along);
         for (int32 Across = 0; Across < AcrossValues.Num(); ++Across)
         {
             const float AcrossValue = AcrossValues[Across];
@@ -155,17 +173,23 @@ void AYarlungRiverActor::BuildWaterMesh(const TArray<FYarlungRiverSample>& Sampl
                 + 0.011f * FMath::Sin(Sample.Flow * 151.0f - AcrossValue * 4.1f);
             const float BankedAcross = AcrossValue + FMath::Sign(AcrossValue) * BankNoise * Saturate((EdgeWeight - 0.55f) / 0.45f);
             const float Ripple = (3.0f + CenterWeight * 11.0f) * FMath::Sin(Sample.Flow * 92.0f + AcrossValue * 3.2f)
-                + CenterWeight * 5.0f * FMath::Sin(Sample.Flow * 211.0f - AcrossValue * 6.4f);
+                + CenterWeight * 5.0f * FMath::Sin(Sample.Flow * 211.0f - AcrossValue * 6.4f)
+                + Energy * (5.0f + CenterWeight * 14.0f) * FMath::Sin(Sample.Flow * 383.0f + AcrossValue * 11.0f);
             Vertices.Add(Sample.Center + Right * (BankedAcross * Sample.HalfWidthCm) + FVector(0.0f, 0.0f, Ripple));
-            Normals.Add(FVector::UpVector);
+            const float FlowChop = Energy * (0.05f * FMath::Cos(Sample.Flow * 383.0f + AcrossValue * 11.0f)
+                + 0.035f * FMath::Cos(Sample.Flow * 211.0f - AcrossValue * 6.4f));
+            const float CrossChop = Energy * (0.08f * FMath::Cos(Sample.Flow * 383.0f + AcrossValue * 11.0f)
+                + 0.035f * FMath::Cos(Sample.Flow * 92.0f + AcrossValue * 3.2f));
+            Normals.Add((FVector::UpVector - Forward * FlowChop - Right * CrossChop).GetSafeNormal());
             UVs.Add(FVector2D(Sample.Flow * 28.0f, AcrossValue * 0.5f + 0.5f));
             const float BankFade = Saturate((EdgeWeight - 0.72f) / 0.28f);
             const float Alpha = FMath::Lerp(0.76f, 0.24f, BankFade);
+            const float MilkyWater = Saturate(Energy * (0.62f + CenterWeight * 0.42f));
             Colors.Add(FLinearColor(
-                0.12f + CenterWeight * 0.28f,
-                0.42f + CenterWeight * 0.24f,
-                0.46f + CenterWeight * 0.24f,
-                Alpha));
+                FMath::Lerp(0.12f + CenterWeight * 0.24f, 0.62f, MilkyWater),
+                FMath::Lerp(0.42f + CenterWeight * 0.22f, 0.80f, MilkyWater),
+                FMath::Lerp(0.46f + CenterWeight * 0.20f, 0.72f, MilkyWater),
+                FMath::Max(Alpha, 0.42f + MilkyWater * 0.20f)));
             Tangents.Add(FProcMeshTangent(Forward, false));
         }
     }
@@ -202,11 +226,13 @@ void AYarlungRiverActor::BuildFoamMesh(const TArray<FYarlungRiverSample>& Sample
             const FYarlungRiverSample& Sample = Samples[Along];
             const FVector Forward = SampleForward(Samples, Along);
             const FVector Right = SampleRight(Samples, Along);
+            const float Energy = RiverEnergy(Samples, Along);
             const float LaneNoise = FMath::Sin(Sample.Flow * 92.0f + Lane * 1.7f)
                 + 0.55f * FMath::Sin(Sample.Flow * 233.0f - Lane * 0.8f);
             const float Lateral = (FoamLanes[Lane] + LaneNoise * 0.030f) * Sample.HalfWidthCm;
             const float EdgeWeight = FMath::Abs(FoamLanes[Lane]);
             const float HalfWidth = FMath::Lerp(72.0f, 210.0f, EdgeWeight)
+                + Energy * FMath::Lerp(36.0f, 190.0f, EdgeWeight)
                 + 44.0f * FMath::Sin(Sample.Flow * 57.0f + Lane * 0.9f);
             const FVector Center = Sample.Center + Right * Lateral + FVector(0.0f, 0.0f, 34.0f);
             Vertices.Add(Center - Right * HalfWidth);
@@ -215,7 +241,7 @@ void AYarlungRiverActor::BuildFoamMesh(const TArray<FYarlungRiverSample>& Sample
             Normals.Add(FVector::UpVector);
             UVs.Add(FVector2D(Sample.Flow * 34.0f, 0.0f));
             UVs.Add(FVector2D(Sample.Flow * 34.0f, 1.0f));
-            const float Alpha = FMath::Lerp(0.46f, 0.86f, EdgeWeight);
+            const float Alpha = Saturate(FMath::Lerp(0.46f, 0.86f, EdgeWeight) + Energy * 0.28f);
             Colors.Add(FLinearColor(0.70f, 0.82f, 0.77f, Alpha * 0.62f));
             Colors.Add(FLinearColor(0.93f, 0.98f, 0.91f, Alpha));
             Tangents.Add(FProcMeshTangent(Forward, false));
