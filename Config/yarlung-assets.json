@@ -1,9 +1,7 @@
 {
   "scenery": {
     "material_usage_roots": [
-      "/Game/Fab/Materials",
-      "/Game/Megaplant_Library/Tree_Norway_Spruce/Materials",
-      "/Game/Megaplant_Library/Tree_Aleppo_Pine/Materials"
+      "/Game/Fab/Materials"
     ],
     "components": [
       {
@@ -53,25 +51,25 @@
       },
       {
         "name": "CanopyTreesA",
-        "mesh": "/Game/Megaplant_Library/Tree_Norway_Spruce/Instances/Branch_Norway_Spruce_01.Branch_Norway_Spruce_01",
+        "mesh": "",
         "kind": "canopy_tree",
-        "count": 280,
+        "count": 0,
         "seed": 71.0,
         "canopy_belt_seed": 131.0
       },
       {
         "name": "CanopyTreesB",
-        "mesh": "/Game/Megaplant_Library/Tree_Norway_Spruce/Instances/Branch_Norway_Spruce_05.Branch_Norway_Spruce_05",
+        "mesh": "",
         "kind": "canopy_tree",
-        "count": 280,
+        "count": 0,
         "seed": 83.0,
         "canopy_belt_seed": 149.0
       },
       {
         "name": "CanopyTreesC",
-        "mesh": "/Game/Megaplant_Library/Tree_Norway_Spruce/Instances/Branch_Norway_Spruce_Top_01.Branch_Norway_Spruce_Top_01",
+        "mesh": "",
         "kind": "canopy_tree",
-        "count": 280,
+        "count": 0,
         "seed": 97.0,
         "canopy_belt_seed": 167.0
       }

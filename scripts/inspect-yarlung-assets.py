@@ -71,8 +71,6 @@ def inspect_water_materials(config):
 
 def list_local_tree_meshes():
     roots = [
-        "/Game/Megaplant_Library/Tree_Norway_Spruce",
-        "/Game/Megaplant_Library/Tree_Aleppo_Pine",
         "/Game/PN_interactiveSpruceForest/Meshes",
         "/Game/PN_interactiveSpruceForest/ExampleContent/Winter/Meshes",
     ]
@@ -94,7 +92,6 @@ def list_new_asset_candidates():
     roots = [
         "/Game/Fab/Alaskan_Cliff_Rock_1_Free",
         "/Game/Fab/Megascans/3D/Nordic_Forest_Tree_Fallen_Medium_tkerbglda",
-        "/Game/ForestLandscape/Materials/defaultLandscape",
     ]
     for root in roots:
         if not unreal.EditorAssetLibrary.does_directory_exist(root):

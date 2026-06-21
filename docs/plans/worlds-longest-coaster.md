@@ -36,7 +36,7 @@
   - 世界→经纬：`world_to_lon_lat(x,y)`（`generate-yarlung-landscape-assets.py:184`）。
   - DEM bbox：lat 29.745–29.820N × lon 94.945–95.015E（大拐弯最深段）。
   - ⚠️ `river_center_y(x)` 是**合成 fallback 的解析河**，copernicus 真 DEM 路径**没有提取真实河中心线**——河 mask 也是按到解析中心线的横距近似。**真往返线路必须从真 `.r16` 提取真河谷底线（thalweg），不能直接用 `river_center_y`。**
-- **诊断先例**：`scripts/dump-yarlung-height-profile.py`（沿崖剖面 CSV/PNG）——净空校验器仿其结构。
+- **诊断基线**：`scripts/verify-track-clearance.py` 是当前净空/G 值硬门；旧一次性 height-profile 诊断脚本已退役。
 
 ---
 
