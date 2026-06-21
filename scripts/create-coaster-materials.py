@@ -422,7 +422,7 @@ def create_mesh_terrain_material(rock_textures):
         "",
         rock_diffuse,
         "",
-        create_constant(material, 0.12, -640, -20),
+        create_constant(material, 0.08, -640, -20),
         "",
         -360,
         -160,
@@ -430,7 +430,7 @@ def create_mesh_terrain_material(rock_textures):
     )
     # Keep broad vertex-color landform bands readable; the scanned albedo is only
     # a surface breakup layer because it photographs too pale on whole mountains.
-    brightness = create_scalar_parameter(material, "TerrainBrightness", 0.64, -440, 40)
+    brightness = create_scalar_parameter(material, "TerrainBrightness", 0.48, -440, 40)
     base_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
         unreal.MaterialExpressionMultiply,

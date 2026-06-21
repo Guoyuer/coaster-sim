@@ -254,7 +254,9 @@ void AYarlungSceneryActor::BuildScatter(const TArray<FYarlungSceneryTrackSample>
 
     constexpr int32 RockCount = 2200;
     constexpr int32 ClumpCount = 0;
-    constexpr int32 CliffFaceCount = 720;
+    // The current rock_face proxy meshes read as low-poly curtain walls in the
+    // hero POV. Keep them disabled until real authored/Nanite cliff assets land.
+    constexpr int32 CliffFaceCount = 0;
     constexpr int32 ShrubCount = 2600;
     constexpr float MinLateralCm = 2600.0f;
     constexpr float MaxLateralCm = 118000.0f;
