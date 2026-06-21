@@ -21,7 +21,7 @@ $MaterialScript = Join-Path $PSScriptRoot "create-coaster-materials.py"
 $ModelScript = Join-Path $PSScriptRoot "import-polyhaven-models.py"
 $InspectScript = Join-Path $PSScriptRoot "inspect-yarlung-map.py"
 $MaterialSuccessMarker = Join-Path $RepoRoot "Saved\material-generation-ok.txt"
-$LandscapeMaterialAsset = Join-Path $RepoRoot "Content\Generated\Materials\M_YarlungLandscapeGround.uasset"
+$MeshTerrainMaterialAsset = Join-Path $RepoRoot "Content\Generated\Materials\M_YarlungMeshTerrain.uasset"
 $ModelAssets = @(
     (Join-Path $RepoRoot "Content\Generated\Models\Boulder01\boulder_01_1k.uasset"),
     (Join-Path $RepoRoot "Content\Generated\Models\RockFace01\rock_face_01_1k.uasset"),
@@ -30,16 +30,6 @@ $ModelAssets = @(
     (Join-Path $RepoRoot "Content\Generated\Models\Shrub04\shrub_04_1k.uasset")
 )
 $HeightmapAsset = Join-Path $RepoRoot "Content\Generated\YarlungLandscape\YarlungTsangpo_1009.r16"
-$MacroTextureSources = @(
-    (Join-Path $RepoRoot "SourceAssets\Generated\YarlungLandscape\YarlungTsangpo_macro_albedo.tga"),
-    (Join-Path $RepoRoot "SourceAssets\Generated\YarlungLandscape\YarlungTsangpo_macro_masks.tga"),
-    (Join-Path $RepoRoot "SourceAssets\Generated\YarlungLandscape\YarlungTsangpo_macro_roughness.tga")
-)
-$MacroTextureAssets = @(
-    (Join-Path $RepoRoot "Content\Generated\Materials\YarlungMacro\T_YarlungMacroAlbedo.uasset"),
-    (Join-Path $RepoRoot "Content\Generated\Materials\YarlungMacro\T_YarlungMacroMasks.uasset"),
-    (Join-Path $RepoRoot "Content\Generated\Materials\YarlungMacro\T_YarlungMacroRoughness.uasset")
-)
 
 function Invoke-TimedStep {
     param(
@@ -108,7 +98,7 @@ if (-not $SkipAssetGeneration -and ($ForceAssetGeneration -or (Test-AnySourceNew
     Write-Host "[YARLUNG-TIME] skip generate landscape source assets: outputs are fresh"
 }
 
-if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOutput (@($MaterialScript) + $MacroTextureSources) (@($LandscapeMaterialAsset) + $MacroTextureAssets)))) {
+if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOutput @($MaterialScript) @($MeshTerrainMaterialAsset)))) {
     Invoke-TimedStep "import materials" {
         Remove-Item -LiteralPath $MaterialSuccessMarker -ErrorAction SilentlyContinue
 
@@ -119,14 +109,14 @@ if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOut
         if (-not (Test-Path -LiteralPath $MaterialSuccessMarker)) {
             throw "Coaster material generation did not complete successfully; missing marker $MaterialSuccessMarker"
         }
-        if (-not (Test-Path -LiteralPath $LandscapeMaterialAsset)) {
-            throw "Coaster material generation did not produce $LandscapeMaterialAsset"
+        if (-not (Test-Path -LiteralPath $MeshTerrainMaterialAsset)) {
+            throw "Coaster material generation did not produce $MeshTerrainMaterialAsset"
         }
     }
 } elseif (-not $SkipMaterials) {
     Write-Host "[YARLUNG-TIME] skip import materials: assets are fresh"
-    if (-not (Test-Path -LiteralPath $LandscapeMaterialAsset)) {
-        throw "Missing required landscape material asset: $LandscapeMaterialAsset"
+    if (-not (Test-Path -LiteralPath $MeshTerrainMaterialAsset)) {
+        throw "Missing required mesh terrain material asset: $MeshTerrainMaterialAsset"
     }
 }
 

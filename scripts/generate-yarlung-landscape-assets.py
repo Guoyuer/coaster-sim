@@ -622,59 +622,11 @@ def blend_rgb(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tup
     )
 
 
-def macro_albedo(x: float, y: float, height: float, river_y: float | None = None) -> tuple[int, int, int]:
-    center_y = river_center_y(x) if river_y is None else river_y
-    rock, forest, snow, river = masks(x, y, height, center_y)
-    lateral = abs(y - center_y)
-    n = noise01(x, y)
-
-    alluvial = smooth01((170000.0 - lateral) / 90000.0) * (1.0 - river / 255.0)
-    slope_wetness = 1.0 - smooth01((height01(height) - 0.42) / 0.45)
-    base = blend_rgb((23, 71, 46), (52, 101, 63), n)
-
-    rock_color = blend_rgb((58, 75, 72), (125, 139, 135), height01(height))
-    forest_color = blend_rgb((12, 67, 31), (37, 111, 48), n)
-    alluvial_color = blend_rgb((64, 97, 90), (112, 134, 119), n)
-    snow_color = blend_rgb((184, 194, 196), (231, 239, 238), snow / 255.0)
-    river_color = blend_rgb((43, 141, 148), (180, 216, 204), 0.38 + river / 510.0)
-
-    color = blend_rgb(base, rock_color, rock / 430.0)
-    color = blend_rgb(color, alluvial_color, alluvial * 0.58)
-    color = blend_rgb(color, forest_color, forest / 255.0)
-    color = blend_rgb(color, snow_color, snow / 255.0)
-    color = blend_rgb(color, river_color, river / 255.0)
-
-    humid_shade = 0.92 + 0.10 * slope_wetness + 0.05 * n
-    return tuple(max(0, min(255, int(channel * humid_shade))) for channel in color)
-
-
-def macro_roughness(x: float, y: float, height: float, river_y: float | None = None) -> tuple[int, int, int]:
-    center_y = river_center_y(x) if river_y is None else river_y
-    rock, forest, snow, river = masks(x, y, height, center_y)
-    lateral = abs(y - center_y)
-    alluvial = smooth01((170000.0 - lateral) / 90000.0) * (1.0 - river / 255.0)
-    value = 204
-    value = int(lerp(value, 174, rock / 255.0))
-    value = int(lerp(value, 226, forest / 255.0))
-    value = int(lerp(value, 128, alluvial))
-    value = int(lerp(value, 92, river / 255.0))
-    value = int(lerp(value, 188, snow / 255.0))
-    value = max(42, min(235, value))
-    return value, value, value
-
-
 def write_ppm(path: Path, pixels: list[tuple[int, int, int]]) -> None:
     with path.open("wb") as f:
         f.write(f"P6\n{SIZE} {SIZE}\n255\n".encode("ascii"))
         for r, g, b in pixels:
             f.write(bytes((r, g, b)))
-
-
-def write_tga(path: Path, pixels: list[tuple[int, int, int]], width: int, height: int) -> None:
-    with path.open("wb") as f:
-        f.write(struct.pack("<BBBHHBHHHHBB", 0, 0, 2, 0, 0, 0, 0, 0, width, height, 24, 0x20))
-        for r, g, b in pixels:
-            f.write(bytes((b, g, r)))
 
 
 def write_hillshade(path: Path, heights: list[float]) -> None:
@@ -699,7 +651,6 @@ def write_hillshade(path: Path, heights: list[float]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="Content/Generated/YarlungLandscape")
-    parser.add_argument("--texture-out", default="SourceAssets/Generated/YarlungLandscape")
     parser.add_argument("--dem-cache", default=str(DEM_CACHE_DIR))
     parser.add_argument("--track-guide", default=str(DEFAULT_TRACK_GUIDE_PATH))
     args = parser.parse_args()
@@ -708,8 +659,6 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = out_dir / "manifest.json"
     previous_manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
-    texture_out_dir = Path(args.texture_out)
-    texture_out_dir.mkdir(parents=True, exist_ok=True)
 
     source_heights, source_metadata = build_copernicus_height_grid(Path(args.dem_cache))
     source_heights = naturalize_height_grid(source_heights)
@@ -734,9 +683,6 @@ def main() -> None:
     height_values: list[int] = []
     preview: list[tuple[int, int, int]] = []
     mask_preview: list[tuple[int, int, int]] = []
-    macro_pixels: list[tuple[int, int, int]] = []
-    macro_masks: list[tuple[int, int, int]] = []
-    roughness_pixels: list[tuple[int, int, int]] = []
     stats = {"min_cm": 999999.0, "max_cm": -999999.0}
 
     for y_index in range(SIZE):
@@ -755,9 +701,6 @@ def main() -> None:
             preview.append(rgb_for_preview(x, y, height, river_y))
             rock, forest, snow, river = masks(x, y, height, river_y)
             mask_preview.append((river, forest, max(rock, snow)))
-            macro_pixels.append(macro_albedo(x, y, height, river_y))
-            macro_masks.append((river, forest, max(rock, snow)))
-            roughness_pixels.append(macro_roughness(x, y, height, river_y))
 
     with (out_dir / "YarlungTsangpo_1009.r16").open("wb") as f:
         f.write(struct.pack("<" + "H" * len(height_values), *height_values))
@@ -768,9 +711,6 @@ def main() -> None:
     write_hillshade(out_dir / "YarlungTsangpo_hillshade.png", [
         lerp(HEIGHT_MIN, HEIGHT_MAX, value / 65535.0) for value in height_values
     ])
-    write_tga(texture_out_dir / "YarlungTsangpo_macro_albedo.tga", macro_pixels, SIZE, SIZE)
-    write_tga(texture_out_dir / "YarlungTsangpo_macro_masks.tga", macro_masks, SIZE, SIZE)
-    write_tga(texture_out_dir / "YarlungTsangpo_macro_roughness.tga", roughness_pixels, SIZE, SIZE)
 
     manifest = {
         "name": "Yarlung Tsangpo cinematic canyon landscape",
@@ -778,9 +718,6 @@ def main() -> None:
         "river_csv": "YarlungRiver.csv",
         "preview": "YarlungTsangpo_preview.ppm",
         "masks_preview": "YarlungTsangpo_masks.ppm",
-        "macro_albedo": str(texture_out_dir / "YarlungTsangpo_macro_albedo.tga"),
-        "macro_masks": str(texture_out_dir / "YarlungTsangpo_macro_masks.tga"),
-        "macro_roughness": str(texture_out_dir / "YarlungTsangpo_macro_roughness.tga"),
         "resolution": [SIZE, SIZE],
         "format": "little-endian uint16 raw",
         "source": "copernicus",
@@ -815,13 +752,10 @@ def main() -> None:
         "- `YarlungTsangpo_hillshade.png`: real-scale DEM hillshade preview for bbox/orientation checks.\n"
         "- `YarlungTsangpo_masks.ppm`: RGB mask preview where red=river, green=forest, blue=rock/snow.\n"
         "- `YarlungRiver.csv`: DEM-thalweg river ribbon samples for the scenery river actor.\n"
-        "- `SourceAssets/Generated/YarlungLandscape/YarlungTsangpo_macro_albedo.tga`: UE-imported macro color map.\n"
-        "- `SourceAssets/Generated/YarlungLandscape/YarlungTsangpo_macro_masks.tga`: UE-imported river/forest/rock-snow mask.\n"
-        "- `SourceAssets/Generated/YarlungLandscape/YarlungTsangpo_macro_roughness.tga`: UE-imported roughness macro map.\n"
         "- `manifest.json`: import scale and layer notes.\n",
         encoding="utf-8",
     )
-    print(f"Generated {out_dir / 'YarlungTsangpo_1009.r16'} and macro textures ({SIZE}x{SIZE})")
+    print(f"Generated {out_dir / 'YarlungTsangpo_1009.r16'} ({SIZE}x{SIZE})")
 
 
 if __name__ == "__main__":

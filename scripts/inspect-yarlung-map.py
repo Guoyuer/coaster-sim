@@ -3,7 +3,6 @@ from pathlib import Path
 
 
 MAP_PATH = "/Game/Generated/YarlungLandscape/YarlungLandscape_Level"
-LANDSCAPE_MATERIAL_PATH = "/Game/Generated/Materials/M_YarlungLandscapeGround.M_YarlungLandscapeGround"
 MESH_TERRAIN_MATERIAL_PATH = "/Game/Generated/Materials/M_YarlungMeshTerrain.M_YarlungMeshTerrain"
 CORRIDOR_TERRAIN_STATIC_MESH_PATH = "/Game/Generated/YarlungLandscape/SM_YarlungCorridorTerrain.SM_YarlungCorridorTerrain"
 FORBIDDEN_RIDE_COMPONENTS = {
@@ -39,14 +38,10 @@ def main():
     if not unreal.EditorLoadingAndSavingUtils.load_map(MAP_PATH):
         raise RuntimeError(f"Unable to load map: {MAP_PATH}")
 
-    material = unreal.EditorAssetLibrary.load_asset(LANDSCAPE_MATERIAL_PATH)
     mesh_terrain_material = unreal.EditorAssetLibrary.load_asset(MESH_TERRAIN_MATERIAL_PATH)
     corridor_terrain_static_mesh = unreal.EditorAssetLibrary.load_asset(CORRIDOR_TERRAIN_STATIC_MESH_PATH)
-    emit(f"[YARLUNG-INSPECT] material={object_path(material)}")
     emit(f"[YARLUNG-INSPECT] mesh_terrain_material={object_path(mesh_terrain_material)}")
     emit(f"[YARLUNG-INSPECT] corridor_terrain_static_mesh={object_path(corridor_terrain_static_mesh)}")
-    if material:
-        emit(f"[YARLUNG-INSPECT] material_class={material.get_class().get_name()}")
     if not corridor_terrain_static_mesh:
         raise RuntimeError(f"Missing Yarlung corridor terrain StaticMesh: {CORRIDOR_TERRAIN_STATIC_MESH_PATH}")
     corridor_nanite_status = "<unavailable>"

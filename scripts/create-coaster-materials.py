@@ -2,34 +2,18 @@ import unreal
 
 
 PACKAGE_PATH = "/Game/Generated/Materials"
-LEAFY_GRASS_PACKAGE_PATH = f"{PACKAGE_PATH}/PolyHaven/LeafyGrass"
 AERIAL_GRASS_ROCK_PACKAGE_PATH = f"{PACKAGE_PATH}/PolyHaven/AerialGrassRock"
-YARLUNG_MACRO_PACKAGE_PATH = f"{PACKAGE_PATH}/YarlungMacro"
 TINT_MATERIAL_NAME = "M_CoasterTint"
 RIVER_WATER_MATERIAL_NAME = "M_YarlungRiverWater"
 RIVER_FOAM_MATERIAL_NAME = "M_YarlungRiverFoam"
 MESH_TERRAIN_MATERIAL_NAME = "M_YarlungMeshTerrain"
-LANDSCAPE_MATERIAL_NAME = "M_YarlungLandscapeGround"
 SUCCESS_MARKER = "material-generation-ok.txt"
-LEAFY_GRASS_SOURCE_DIR = "SourceAssets/PolyHaven/leafy_grass"
-LEAFY_GRASS_TEXTURES = {
-    "T_LeafyGrass_Diffuse": ("leafy_grass_diff_4k.jpg", True, unreal.TextureCompressionSettings.TC_DEFAULT),
-    "T_LeafyGrass_Normal": ("leafy_grass_nor_dx_4k.jpg", False, unreal.TextureCompressionSettings.TC_NORMALMAP),
-    "T_LeafyGrass_Rough": ("leafy_grass_rough_4k.jpg", False, unreal.TextureCompressionSettings.TC_DEFAULT),
-    "T_LeafyGrass_AO": ("leafy_grass_ao_4k.jpg", False, unreal.TextureCompressionSettings.TC_DEFAULT),
-}
 AERIAL_GRASS_ROCK_SOURCE_DIR = "SourceAssets/PolyHaven/aerial_grass_rock"
 AERIAL_GRASS_ROCK_TEXTURES = {
     "T_AerialGrassRock_Diffuse": ("aerial_grass_rock_diff_2k.jpg", True, unreal.TextureCompressionSettings.TC_DEFAULT),
     "T_AerialGrassRock_Normal": ("aerial_grass_rock_nor_gl_2k.jpg", False, unreal.TextureCompressionSettings.TC_NORMALMAP),
     "T_AerialGrassRock_Rough": ("aerial_grass_rock_rough_2k.jpg", False, unreal.TextureCompressionSettings.TC_DEFAULT),
     "T_AerialGrassRock_AO": ("aerial_grass_rock_ao_2k.jpg", False, unreal.TextureCompressionSettings.TC_DEFAULT),
-}
-YARLUNG_MACRO_SOURCE_DIR = "SourceAssets/Generated/YarlungLandscape"
-YARLUNG_MACRO_TEXTURES = {
-    "T_YarlungMacroAlbedo": ("YarlungTsangpo_macro_albedo.tga", True, unreal.TextureCompressionSettings.TC_DEFAULT),
-    "T_YarlungMacroMasks": ("YarlungTsangpo_macro_masks.tga", False, unreal.TextureCompressionSettings.TC_DEFAULT),
-    "T_YarlungMacroRoughness": ("YarlungTsangpo_macro_roughness.tga", False, unreal.TextureCompressionSettings.TC_DEFAULT),
 }
 
 
@@ -485,207 +469,17 @@ def create_mesh_terrain_material(rock_textures):
     finalize_material(material)
 
 
-def create_landscape_material(rock_textures, grass_textures, macro_textures):
-    material = create_material_asset(LANDSCAPE_MATERIAL_NAME, PACKAGE_PATH)
-    unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
-    macro_coordinates = create_landscape_coords(material, -1460, -40, 1009.0)
-    # Keep detail UVs intentionally broad. Tiny tiling on a 1:1 Himalayan heightfield
-    # reintroduces shimmer/moire in first-person motion.
-    detail_coordinates = create_landscape_coords(material, -1460, 360, 140.0)
-
-    macro_albedo = create_texture_sample(
-        material,
-        macro_textures["T_YarlungMacroAlbedo"],
-        -1160,
-        -420,
-        macro_coordinates,
-    )
-    macro_masks = create_texture_sample(
-        material,
-        macro_textures["T_YarlungMacroMasks"],
-        -1160,
-        -120,
-        macro_coordinates,
-    )
-    macro_roughness = create_texture_sample(
-        material,
-        macro_textures["T_YarlungMacroRoughness"],
-        -1160,
-        120,
-        macro_coordinates,
-    )
-
-    rock_diffuse = create_texture_sample(
-        material,
-        rock_textures["T_AerialGrassRock_Diffuse"],
-        -1160,
-        520,
-        detail_coordinates,
-    )
-    grass_diffuse = create_texture_sample(
-        material,
-        grass_textures["T_LeafyGrass_Diffuse"],
-        -1160,
-        740,
-        detail_coordinates,
-    )
-    detail_base = create_lerp(
-        material,
-        rock_diffuse,
-        "",
-        grass_diffuse,
-        "",
-        macro_masks,
-        "G",
-        -800,
-        620,
-        "landscape detail base",
-    )
-    final_base = create_lerp(
-        material,
-        macro_albedo,
-        "",
-        detail_base,
-        "",
-        create_scalar_parameter(material, "DetailColorStrength", 0.34, -800, 360),
-        "",
-        -520,
-        -260,
-        "landscape macro/detail base",
-    )
-
-    connect_material_property(
-        material,
-        final_base,
-        unreal.MaterialProperty.MP_BASE_COLOR,
-        "landscape BaseColor",
-    )
-
-    rock_normal = create_texture_sample(
-        material,
-        rock_textures["T_AerialGrassRock_Normal"],
-        -520,
-        520,
-        detail_coordinates,
-    )
-    grass_normal = create_texture_sample(
-        material,
-        grass_textures["T_LeafyGrass_Normal"],
-        -520,
-        760,
-        detail_coordinates,
-    )
-    detail_normal = create_lerp(
-        material,
-        rock_normal,
-        "",
-        grass_normal,
-        "",
-        macro_masks,
-        "G",
-        -180,
-        640,
-        "landscape detail normal",
-    )
-    connect_material_property(material, detail_normal, unreal.MaterialProperty.MP_NORMAL, "landscape Normal")
-
-    rock_roughness = create_texture_sample(
-        material,
-        rock_textures["T_AerialGrassRock_Rough"],
-        -520,
-        1000,
-        detail_coordinates,
-    )
-    grass_roughness = create_texture_sample(
-        material,
-        grass_textures["T_LeafyGrass_Rough"],
-        -520,
-        1200,
-        detail_coordinates,
-    )
-    detail_roughness = create_lerp(
-        material,
-        rock_roughness,
-        "R",
-        grass_roughness,
-        "R",
-        macro_masks,
-        "G",
-        -180,
-        1100,
-        "landscape detail roughness",
-    )
-    final_roughness = create_lerp(
-        material,
-        macro_roughness,
-        "R",
-        detail_roughness,
-        "",
-        create_scalar_parameter(material, "DetailRoughnessStrength", 0.60, -180, 1360),
-        "",
-        120,
-        1120,
-        "landscape macro/detail roughness",
-    )
-    connect_material_property(material, final_roughness, unreal.MaterialProperty.MP_ROUGHNESS, "landscape Roughness")
-
-    rock_ao = create_texture_sample(
-        material,
-        rock_textures["T_AerialGrassRock_AO"],
-        120,
-        520,
-        detail_coordinates,
-    )
-    grass_ao = create_texture_sample(
-        material,
-        grass_textures["T_LeafyGrass_AO"],
-        120,
-        740,
-        detail_coordinates,
-    )
-    ambient_occlusion = create_lerp(
-        material,
-        rock_ao,
-        "R",
-        grass_ao,
-        "R",
-        macro_masks,
-        "G",
-        420,
-        640,
-        "landscape detail ao",
-    )
-    connect_material_property(material, ambient_occlusion, unreal.MaterialProperty.MP_AMBIENT_OCCLUSION, "landscape Ambient Occlusion")
-    connect_material_property(
-        material,
-        create_constant(material, 0.06, -260, 620),
-        unreal.MaterialProperty.MP_SPECULAR,
-        "landscape Specular",
-    )
-
-    finalize_material(material)
-
-
 def main():
     ensure_folder(PACKAGE_PATH)
-    ensure_folder(LEAFY_GRASS_PACKAGE_PATH)
     ensure_folder(AERIAL_GRASS_ROCK_PACKAGE_PATH)
-    ensure_folder(YARLUNG_MACRO_PACKAGE_PATH)
     create_tint_material()
     create_river_materials()
-    leafy_grass_textures = import_textures(LEAFY_GRASS_PACKAGE_PATH, LEAFY_GRASS_SOURCE_DIR, LEAFY_GRASS_TEXTURES)
     aerial_grass_rock_textures = import_textures(
         AERIAL_GRASS_ROCK_PACKAGE_PATH,
         AERIAL_GRASS_ROCK_SOURCE_DIR,
         AERIAL_GRASS_ROCK_TEXTURES,
     )
-    yarlung_macro_textures = import_textures(
-        YARLUNG_MACRO_PACKAGE_PATH,
-        YARLUNG_MACRO_SOURCE_DIR,
-        YARLUNG_MACRO_TEXTURES,
-    )
     create_mesh_terrain_material(aerial_grass_rock_textures)
-    create_landscape_material(aerial_grass_rock_textures, leafy_grass_textures, yarlung_macro_textures)
     marker_path = unreal.Paths.convert_relative_path_to_full(
         unreal.Paths.project_saved_dir() + SUCCESS_MARKER
     )
