@@ -493,7 +493,7 @@ void AYarlungSceneryActor::AddCanopyBelt(
 
                 const float AlongJitterCm = FMath::Lerp(-2200.0f, 2200.0f, Hash01(SampleIndex * 3.717f + BandIndex + Seed, 2.0f));
                 const float LateralJitterCm = FMath::Lerp(-3600.0f, 3600.0f, Hash01(SampleIndex * 4.513f + BandIndex + Seed, 5.0f));
-                const float LateralCm = FMath::Max(22000.0f, Belt.LateralBandsCm[BandIndex] + LateralJitterCm);
+                const float LateralCm = FMath::Max(0.0f, Belt.LateralBandsCm[BandIndex] + LateralJitterCm);
                 const float SignedOffsetCm = Side * LateralCm;
                 const FVector Location2D = Center + Forward * AlongJitterCm + Right * SignedOffsetCm;
 

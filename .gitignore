@@ -29,6 +29,10 @@ SourceAssets/DEM/
 # should describe required paths rather than committing multi-GB third-party assets.
 Content/Fab/
 Content/Megaplant_Library/
+Content/ForestLandscape/
+Content/PN_interactiveSpruceForest/
+ForestLandscape.png
+Config/yarlung-assets.local.json
 
 # Python bytecode
 scripts/__pycache__/

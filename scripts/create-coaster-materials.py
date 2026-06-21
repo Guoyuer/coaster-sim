@@ -22,7 +22,9 @@ AERIAL_GRASS_ROCK_TEXTURES = {
 
 
 def yarlung_asset_config():
-    path = Path(unreal.Paths.project_config_dir()) / "yarlung-assets.json"
+    config_dir = Path(unreal.Paths.project_config_dir())
+    local_path = config_dir / "yarlung-assets.local.json"
+    path = local_path if local_path.exists() else config_dir / "yarlung-assets.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 

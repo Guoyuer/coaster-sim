@@ -4,11 +4,12 @@ from pathlib import Path
 import unreal
 
 
-CONFIG_PATH = Path(unreal.Paths.project_config_dir()) / "yarlung-assets.json"
-
-
 def load_config():
-    return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    config_dir = Path(unreal.Paths.project_config_dir())
+    local_path = config_dir / "yarlung-assets.local.json"
+    path = local_path if local_path.exists() else config_dir / "yarlung-assets.json"
+    print(f"[ASSET-CONFIG] {path}")
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def describe_asset(path):
@@ -69,13 +70,39 @@ def inspect_water_materials(config):
 
 
 def list_local_tree_meshes():
-    for root in ["/Game/Megaplant_Library/Tree_Norway_Spruce", "/Game/Megaplant_Library/Tree_Aleppo_Pine"]:
+    roots = [
+        "/Game/Megaplant_Library/Tree_Norway_Spruce",
+        "/Game/Megaplant_Library/Tree_Aleppo_Pine",
+        "/Game/PN_interactiveSpruceForest/Meshes",
+        "/Game/PN_interactiveSpruceForest/ExampleContent/Winter/Meshes",
+    ]
+    for root in roots:
         if not unreal.EditorAssetLibrary.does_directory_exist(root):
             continue
         for path in unreal.EditorAssetLibrary.list_assets(root, recursive=True, include_folder=False):
             obj = unreal.EditorAssetLibrary.load_asset(path)
             if isinstance(obj, (unreal.StaticMesh, unreal.SkeletalMesh)):
-                print(f"[TREEMESH] {obj.get_class().get_name():<14} {path}")
+                info = f"[TREEMESH] {obj.get_class().get_name():<14} {path}"
+                if isinstance(obj, unreal.StaticMesh):
+                    bounds = obj.get_bounds().box_extent
+                    nanite = obj.get_editor_property("nanite_settings").enabled
+                    info += f" extent_cm=({bounds.x:.0f},{bounds.y:.0f},{bounds.z:.0f}) nanite={nanite}"
+                print(info)
+
+
+def list_new_asset_candidates():
+    roots = [
+        "/Game/Fab/Alaskan_Cliff_Rock_1_Free",
+        "/Game/Fab/Megascans/3D/Nordic_Forest_Tree_Fallen_Medium_tkerbglda",
+        "/Game/ForestLandscape/Materials/defaultLandscape",
+    ]
+    for root in roots:
+        if not unreal.EditorAssetLibrary.does_directory_exist(root):
+            continue
+        for path in unreal.EditorAssetLibrary.list_assets(root, recursive=True, include_folder=False):
+            obj = unreal.EditorAssetLibrary.load_asset(path)
+            if isinstance(obj, (unreal.StaticMesh, unreal.MaterialInterface)):
+                print(f"[NEW-ASSET] {obj.get_class().get_name():<24} {path}")
 
 
 def main():
@@ -83,6 +110,7 @@ def main():
     inspect_scenery_assets(config)
     inspect_water_materials(config)
     list_local_tree_meshes()
+    list_new_asset_candidates()
 
 
 main()
