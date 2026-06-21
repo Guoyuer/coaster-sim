@@ -1,6 +1,6 @@
 # 重定位设计：世界最长的实景过山车（World's-Longest Scenic Coaster）
 
-> 状态：设计 + §9 开放项已全部用户拍板（2026-06-19），spec 定稿 → 转 writing-plans 先出 P0/P1 实现计划。
+> 状态：设计 + §9 开放项已全部用户拍板（2026-06-19）；2026-06-21 用户更新轨道拓扑自由度，spec 改为风景优先的开放式 scenic layout。
 > 关联：定位上游于 `photoreal-overhaul.md`（视觉）/`photoreal-acceptance.md`（验收）/`AGENTS.md`（操作）。
 > 本文是 **codex-ready 实现 spec**：定义目标、原则、架构、三大子系统接口/算法/参数、实现顺序与验收增量。具体控制点坐标**由生成器从 DEM 算出，不在本文硬编码**。
 
@@ -8,15 +8,15 @@
 
 ## 1. 定位与指导原则
 
-**一句话**：把现在「峡谷里的 ~600m 灰盒小环」重定位为 **世界最长（~5,000m）的第一人称实景过山车**——沿真实尺度的雅鲁藏布大拐弯峡谷布设的**沿江往返（out-and-back）**线路，**真物理动力学**驱动，照片级画质。
+**一句话**：把现在「峡谷里的 ~600m 灰盒小环」重定位为 **世界最长（~5,000m）的第一人称实景过山车**——在真实尺度的雅鲁藏布大拐弯峡谷中布设一条**风景优先的开放式 scenic layout**，可沿江、跨江、高架、俯冲、overbank 或短暂翻滚，只要通过净空/G 值门禁并服务第一人称照片级构图。
 
 **硬指标 / 治理优先级（冲突时按此裁决）**：
 1. **安全/舒适 G 限**（硬约束，永不让步）——见 §4 舒适包络。
 2. **长度**：`TrackLengthCm` ≥ 250,000cm（2,500m，必破纪录 Steel Dragon 2000 = 2,479m）；**目标 ~500,000cm（5,000m）**。这是身份指标，硬底。
-3. **风景优先**：当风景与乘坐刺激冲突时，**风景赢**（贴江高弯/对岸崖壁/雪峰构图优先于多压一个 airtime 丘）。
+3. **风景优先**：当风景与乘坐刺激冲突时，**风景赢**（跨江俯视、贴崖高弯、对岸崖壁、雪峰构图优先于多压一个 airtime 丘）。
 4. **乘坐体验**：在 1–3 约束内，做成一条真正好玩、节奏对、有俯冲/airtime 的过山车。
 
-**拓扑（已定）**：沿江往返。出程 ~2.5km 重力俯冲、贴江下行；最深拐弯处掉头；返程 ~2.5km 在更高一级台地/栈道上爬升回站（靠 Lift/Launch 补能）。闭合回站。跨江 8 字留作**未来增强**，本期不做。
+**拓扑（2026-06-21 更新：开放式 scenic layout）**：轨道不再被限定为沿江往返。雅鲁藏布江/河谷底线是视觉锚点和空间参照，不是轨道必须贴着走的几何约束。当前范围允许跨江、斜穿峡谷、高架俯视、贴崖 overbank、俯冲/airtime、短暂 roll/inversion，以及类似 8 字的构图路线；唯一硬门是净空、舒适 G、闭环长度与第一人称空间合同。轨道本质上是 camera choreography tool：为了让画面同时看到江水、湿岩、密林、远山，可以主动离开河线、抬高或横跨河谷。
 
 **不变量**：第一人称 on-rails、单一真实 DEM、不穿山、照片级目标不变；本重定位**替换轨道/走廊范围**，并相应扩大 photoreal 走廊预算。
 
@@ -44,7 +44,8 @@
 
 ```
 [离线] 轨道生成器 (Python)                     [离线] 净空+舒适校验器 (Python)
- thalweg 提取 → 出/返程几何 → 重采样           密采样轨道 vs .r16 → min净空/坡度/曲率/估算G
+ DEM/river anchors → scenic 控制点/候选路线 → 重采样
+                                                 密采样轨道 vs .r16 → min净空/坡度/曲率/估算G
         │  emit                                        ▲ gate（不过则 build fail）
         ▼                                              │
    Content/Generated/YarlungLandscape/YarlungTrack.csv ─┘   ← 单一真相源（生成+提交）
@@ -79,26 +80,27 @@
 **输入**：naturalized `.r16`（高度场）、世界坐标系常量、可调参数（见下）。
 **输出**：`Content/Generated/YarlungLandscape/YarlungTrack.csv` + manifest `track` 块。
 
-### A1. 河谷底线（thalweg）提取
+### A1. 河谷底线（thalweg）与 scenic anchors 提取
 1. 把 `.r16` 解码为 `height_cm[y][x]`（`Lerp(260000,730000,raw/65535)`）。
 2. 找全局/区域最低点作为种子（谷底）。
 3. 沿河谷主轴（本段大致沿 X，但有大拐弯须跟真实走向）做**最小代价谷底追踪**：在一个横向搜索带内，逐步推进时选「局部横剖面最低 + 与上一步方向连续」的点（贪心 least-cost / 或逐列 min-in-corridor），得到有序谷底折线。
 4. 重采样为等弧长点、宽核平滑（去抖动但保大走向），得到 `centerline[]`（世界 cm）。
 5. **验证**：把 centerline 叠加到 `YarlungTsangpo_hillshade.png` 输出预览 PNG，人眼确认贴合真实河道（仿 hillshade 验收先例）。
+6. 从 DEM/river 派生 scenic anchors：高处俯视点、可跨江点、对岸湿岩入镜点、远山方向、森林坡带、站台候选 bench。这些 anchor 用来驱动开放式 route solver，而不是把轨道锁死在 thalweg offset 上。
 
-### A2. 站台与往返结构
-- **站台/起点**：选 centerline 上游一端一段近平直处。Station 段短、低速。
-- **出程 Outbound（沿 centerline 下行 ~2.5km 弧长）**：
-  - 平面：跟 centerline，向**最上镜的一岸**横移一个偏移 `outbound_offset`（贴江但不在水里），跟江湾走弯。
-  - 高程：`z = max(terrain_at_point + air_clearance, descent_profile_z)`；`descent_profile_z` 是一条总体下行、叠加若干 **airtime 丘**（小起伏）的曲线，使重力供能、出程末端速度最高。受 §坡度/曲率舒适约束裁剪。
-- **掉头 Turnaround**：在最深/最戏剧拐弯处做一个大半径水平弯（半径满足横向 G 限），可抬升一点做缓冲。
-- **返程 Return（~2.5km 爬升回站）**：
-  - 平面：横移到**更高一级台地/坡肩**（`return_offset` 比 outbound 更远离江、更高），给俯视江面+出程轨道的新构图。
-  - 高程：`z = max(terrain_at_bench + air_clearance, climb_profile_z)`，总体爬升回站台高度；含一段 **Launch/Lift** 区补能量。
-- **闭合**：Return 末端平滑接回 Station 起点（闭环）。
+### A2. 站台与开放式 scenic route 结构
+- **站台/起点**：选稳定 bench 或坡肩，优先给出站后第一帧可读的峡谷尺度。Station 段短、低速。
+- **控制点骨架**：route solver 至少考虑这些候选段，而不是固定 outbound/return offset：
+  - 高处俯视段：轨道可在峡谷坡肩或高架上运行，让谷底江水进入第一人称视锥。
+  - 跨江段：允许斜跨河谷或跨江桥式段，制造同帧江水 + 对岸崖壁 + 森林坡。
+  - 贴崖/overbank 段：沿湿岩或森林边缘做大半径倾斜弯，优先保证横向 G 经 banking 后可控。
+  - 俯冲/airtime 段：用真实高度差制造速度与节奏，但坡度、竖曲线和 G 值必须由校验器硬门。
+  - 回站补能段：用 Lift/Launch/Brake 闭合能量，不要求几何上沿原路返回。
+- **闭合**：所有候选路线必须平滑接回 Station 起点（闭环），并保持 `TrackLengthCm` 身份指标。
+- **重要反例**：不要把旧 thalweg-offset 生成器简单加正弦/S 曲线当成开放式路线。2026-06-21 快速实验已证明这种做法会产生过小曲率半径、极端坡度/G 值，并且仍不能稳定让水进入视锥。下一版应是 control-point/scenic scoring/优化式生成器。
 
 ### A3. 分段标注
-生成器按弧长给每段贴 `section` 标签并记录 `section_distances_m`：`Station → Lift → Outbound → Turnaround → Return → Launch → Brake → (Station)`。运行时 `GetSectionName` 改为**按距离查表**，不再按 ratio 写死。
+生成器按弧长给每段贴 `section` 标签并记录 `section_distances_m`。推荐语义为 `Station/Lift/Scenic/Crossing/Drop/Overbank/Launch/Brake` 等风景与动力学标签；旧 `Outbound/Turnaround/Return` 只作为兼容标签，不再表达主拓扑。运行时 `GetSectionName` 改为**按距离查表**，不再按 ratio 写死。
 
 ### A4. 舒适与几何约束（生成时强制裁剪）
 - **最大坡度** `max_grade_pct`（如 ≤ ~60% 给 Lift，自由段更缓）。
@@ -107,7 +109,7 @@
 - 任何裁剪后**重新平滑**，避免 C1 折点（沿用 B-spline 思路）。
 
 ### A5. 可调参数（manifest 记录，便于复跑）
-`target_length_m=5000`、`out_back_split=0.5`、`air_clearance_m`（如 8–15m）、`outbound_offset_m`、`return_offset_m`、`return_bench_rise_m`、`max_grade_pct`、`R_min_m`、`design_speed_mps`、`vert_g_limits`、`lat_g_max`、控制点重采样间距。
+`target_length_m=5000`、`route_style=scenic_freeform`、`station_anchor`、`scenic_control_points`、`crossing_candidates`、`air_clearance_m`、`bridge_clearance_m`、`overbank_limit_deg`、`roll_accent_segments`、`max_grade_pct`、`R_min_m`、`design_speed_mps`、`vert_g_limits`、`lat_g_max`、控制点重采样间距。旧 `out_back_split/outbound_offset/return_offset` 只能作为兼容参数或 baseline，不再是主约束。
 
 ---
 
@@ -157,15 +159,15 @@
    - 由样条在该距离的曲率 `κ`（或半径 `R=1/κ`）与当前速度 `v` 求**抵消横向 G 的倾斜** `θ = atan(v² / (g·R))`，限幅 `≤ bank_max`（如 70°），并沿弧长**限速率**（避免 banking 抖动）。
    - 也可用 CSV 的 `roll_deg` 作基准、运行时按真实 `v` 微调。
    - 目标：使 `Telemetry.LateralG` 在设计速度下接近 0；偏差作为舒适验证量。
-4. **物理调参**：为长往返重设 `LiftTargetSpeedMps/LaunchTargetSpeedMps/BrakeTargetSpeedMps` 与速度 Clamp 上限，使出程靠重力自然提速、返程靠 Launch 回站、进站 Brake 收住；保留能量法不变。
+4. **物理调参**：为开放式长线重设 `LiftTargetSpeedMps/LaunchTargetSpeedMps/BrakeTargetSpeedMps` 与速度 Clamp 上限，使俯冲/airtime/高架/跨江段有节奏变化，并靠 Lift/Launch/Brake 闭合能量；保留能量法不变。
 5. **遥测门禁（可选自检）**：运行时若 `|LateralG|/VerticalG` 越包络，记日志（便于回归发现生成器漏网）。
 
 ---
 
 ## 7. 对 photoreal 计划与验收的影响
 
-- **走廊扩张**：照片级「走廊」从 ~150m 扩到 **~3km 河道长 ×（出程+返程两条带）**。`photoreal-overhaul.md` S-A「预算只锁走廊」不变，但走廊体积大增——`photoreal-progress.md` 阶段 A–F 的范围需按新走廊重述（尤其 A2 地形/轨道、A3 scatter、F 沿轨铺开）。
-- **英雄段**：不再是单一 `WaitSeconds 12`。沿 5km 选**若干**代表性临江高弯帧（出程俯冲段、掉头、返程高台俯视）固定为多个验收时间点。
+- **走廊扩张**：照片级「走廊」从 ~150m 扩到 **~5km scenic camera corridor**，覆盖跨江、高处俯视、贴崖、俯冲与回站补能段的第一人称视锥。`photoreal-overhaul.md` S-A「预算只锁走廊」不变，但走廊体积大增——`photoreal-progress.md` 阶段 A–F 的范围需按新走廊重述（尤其 A2 地形/轨道、A3 scatter、F 沿轨铺开）。
+- **英雄段**：不再是单一 `WaitSeconds 12`。沿 5km 选**若干**代表性第一人称帧（跨江、俯冲、高处俯视、贴崖 overbank、远山开阔段）固定为多个验收时间点。
 - **A2 验收口径**：在现「中远景轮廓/不穿山/贴地」之上，**新增**：① `TrackLengthCm` 达标（≥2,500m，目标~5,000m）；② 全环净空校验器 PASS（闭环外审硬门槛）；③ 全环 G 在舒适包络内。
 - **`photoreal-acceptance.md` 增量**（§2 量规 + §3 出口）：
   - 新维度 **D9 乘坐体验**：节奏/airtime/速度变化/G 舒适（量规 1–5）。
@@ -178,9 +180,9 @@
 ## 8. 实现顺序（供 writing-plans 拆步）
 
 - **P0（C++ 行为保持式重构，C++ 前置）**：§6.0 切出 `UCoasterTrackComponent` + `ECoasterSection` + banking 纯函数，瘦身 ride actor。**零行为变更**。出口：编译过、现短环 offscreen smoke 与重构前逐帧一致、各模块单一职责。**与 P1 可并行**（P0 改 C++、P1 写 Python，互不依赖）。
-- **P1（基础，离线，无 UE）**：子系统 A 轨道生成器 + 数据契约 CSV/manifest + 子系统 B 校验器。出口：生成一条贴真 DEM、过净空+舒适门禁、长度~5km 的 `YarlungTrack.csv`，centerline 叠 hillshade 人眼确认贴江。
+- **P1（基础，离线，无 UE）**：子系统 A 轨道生成器 + 数据契约 CSV/manifest + 子系统 B 校验器。出口：生成一条贴真 DEM、过净空+舒适门禁、长度~5km 的 `YarlungTrack.csv`，并通过 spatial contract 证明至少一个英雄帧稳定看见江水 + 对岸湿岩 + 森林坡/远山。centerline 叠 hillshade 仍用于确认河道 anchor，但不要求轨道贴江。
 - **P2（运行时接入）**：C++ `LoadGeneratedTrack` + 距离分段 + RebuildSpline。**依赖 P0（干净边界）+ P1（CSV）**。出口：PIE/offscreen 跑通变长轨道，`TrackLengthCm` 达标，车能跑完闭环不穿山（用 P1 校验器复核）。
-- **P3（乘坐打磨）**：曲率 banking 接真值 + 物理调参 + 运行时 G 自检。出口：全环 `Telemetry` G 在包络内，出程俯冲/返程爬升/airtime 节奏成立。
+- **P3（乘坐打磨）**：曲率 banking 接真值 + 物理调参 + 运行时 G 自检。出口：全环 `Telemetry` G 在包络内，俯冲、跨江、高架、overbank、airtime 与补能节奏成立。
 - **P4（走廊照片化）**：按新 5km 走廊重述 photoreal A–F，选多帧英雄段；**含环境建模（river/foam/rapids/boulders）从 ride actor 迁出到 scenery/PCG**（兑现 2026-06-18 决策，P0 故意未并入）。
 - **P5（验收收口）**：`photoreal-acceptance.md` 增 D9/D10 + 阶段 A 硬门；多帧打分。
 
@@ -191,8 +193,8 @@
 ## 9. 开放项裁定（2026-06-19 用户已拍板）
 
 1. ✅ **舒适包络 = 更刺激**：见 §5 更新值（垂直 `[-1.5,+5.5]`、横向 `≤2.5`、纵向 `≤2.5`，airtime 丘 ejector `[-1.2,+0.2]`）。
-2. ✅ **双轨入镜 = 接受**：偶尔瞄到自己另一条轨道可接受；`return_offset` 仍按风景/高度差选，但**不为「不可见」设硬约束**，P4 不卡这条。
+2. ✅ **双轨/跨江轨道入镜 = 接受**：偶尔瞄到自己另一段轨道、跨江桥段或高架回线可接受；路线间距/高度差按风景和 G 值选择，但**不为「不可见」设硬约束**，P4 不卡这条。
 3. ✅ **thalweg = 自动化**：生成器贪心追踪谷底 + 自动叠 hillshade 校验（A1.5），**不预设手工锚点**；仅当自动结果明显跑偏时再回退人工干预。
 4. ✅ **数据载体 = CSV**（简单、可 diff）；若后续运行时加载有性能/打包顾虑再改生成 header。
-5. ✅ **跨江 8 字推迟**：方案 B 留作未来增强，本期不做。
+5. ✅ **跨江/8 字/overbank 放开（2026-06-21 更新）**：用户明确轨道不必沿河，横跨河、翻滚、大起伏都可纳入当前方案。实现仍必须通过净空/G 值/第一人称空间合同，不用旧 thalweg-offset hack 硬弯。
 6. ✅ **spec 落点 = `docs/plans/`** + 在 `AGENTS.md` §1 表与 `photoreal-overhaul.md` 顶部加引用（让 Codex 迭代循环可发现）。

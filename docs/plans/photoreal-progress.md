@@ -7,12 +7,13 @@
 ## 当前裁决
 
 - **总体视觉：FAIL**。目标仍是第一人称 5km 雅鲁藏布/林芝风景过山车，画面要接近 `docs/refs/local/02_fp_yarlung_coaster_canyon.png` 和 `docs/refs/local/03_fp_mountain_coaster_valley.png`，不是"比原型好"。
-- **当前技术路线**：只做第一人称视锥/轨道走廊；不回到 square full-map heightfield；不恢复旧 8 点短环；不靠全图 fallback。
+- **当前技术路线**：只做第一人称视锥/轨道走廊；轨道是风景叙事/相机编排工具，不再限定沿江往返，可跨江、高架俯视、贴崖 overbank、俯冲或短暂翻滚；不回到 square full-map heightfield；不恢复旧 8 点短环；不靠全图 fallback。
 - **当前高收益方向（2026-06-21 改定：冲 AAA 照片级，走 Megascans-first）**：引擎已 AAA-ready（Lumen/Nanite/VSM/VT 全开），瓶颈是内容资产。旧程序化 canyon-wall / procedural river actor 已从默认链路删除；不再给它们加 mask/材质/补丁。主线转向资产化：Nanite 岩壁散布、instanced 森林树冠、多层地表材质、UE Water 真实江水/结构。计划与资产清单见 `docs/plans/aaa-asset-pipeline.md`。
 - **当前无人值守入口**：先跑 `.\scripts\yarlung-agent-status.ps1`，再按推荐命令执行 `.\scripts\iterate-yarlung.ps1`。每轮必须看 contact sheet 图片后再写结论。
 
 ## 最新记录
 
+- **2026-06-21 轨道拓扑放宽为开放式 scenic layout（决策同步；代码未改）**：用户明确“过山车轨迹不一定要沿河，横跨河、翻滚都行，别太被限制”。裁决：雅鲁藏布江/河谷底线从“必须贴着走的线路约束”降级为视觉 anchor；轨道可以主动跨江、抬高、贴崖、overbank、俯冲、airtime 或短暂 roll/inversion，只要过净空/G 值/闭环长度/第一人称空间合同。已同步 `worlds-longest-coaster.md` 与 `photoreal-overhaul.md`，把旧“沿江往返 out-and-back”为主的描述改为风景优先开放式 scenic route。诊断补充：本轮曾快速试过把旧 thalweg-offset 生成器加 S/crossing 曲线，结果要么 `min_radius` 极小、横向 G/坡度超限，要么仍 `visible_samples=0/5` 看不到水；该方向已回滚，不保留为默认。下一步不要继续硬弯旧 offset 生成器，应做真正的 control-point/scenic scoring route generator：用 DEM/river 派生高处俯视点、跨江点、贴崖点、远山方向和站台 bench，生成多候选路线并由 `verify-track-clearance.py` + `inspect-yarlung-spatial-contract.py` gate。
 - **2026-06-21 本地大资产覆盖层 + 英雄走廊诊断（OK/FAIL 混合；默认视觉仍 FAIL）**：用户确认大资产可以留本地、不上 GitHub；已把 `Content/PN_interactiveSpruceForest/`、`Content/ForestLandscape/`、`ForestLandscape.png`、`Config/yarlung-assets.local.json` 加入 ignore，并让 C++/材质脚本/资产巡检优先读取本地 `Config/yarlung-assets.local.json`，不存在时回退 tracked `Config/yarlung-assets.json`。Asset Registry 已确认 PN spruce whole-tree StaticMesh 可用；`YarlungSceneryActor` 去掉 canopy belt 里硬编码的 `22000cm` 最近树带限制，改为尊重配置。验证：`python -m json.tool Config\yarlung-assets.local.json` PASS；`git diff --check` PASS；C++ Build PASS；`hero-nearforest-v1/v2` 与 `hero-route-search-v1` 均完成 Actor import + screenshots + Read contact sheet。肉眼结论：本地树/岩壁资产接线成功，`hero-nearforest-v1` 证明近中景森林/岩壁能进入画面，但尺度/密度过头成黑墙；`hero-nearforest-v2` 更可控但早段仍是空旷黄坡；`hero-route-search-v1` 最干净的是 t240，但仍无江水主体。关键诊断：当前地图不是要整体缩小，问题是照片级预算被公里级裸坡稀释；`inspect-yarlung-spatial-contract.py` 仍为 `visible_samples=0/5`。试过高架/偏移参数（如 `clearance=300m` 及 100-140m 组合）能过或部分过轨道 gate，但江水仍在相机视锥外或触发 comfort/grade violations；未把这些未过参数留作默认。下一步：先设计“英雄段空间合同”（轨道横向/高度/相机俯仰/时间点），让至少一个第一人称帧稳定看见江水 + 对岸湿岩 + 森林坡，再继续堆资产。
 - **2026-06-21 UE 5.8 `Rename` deprecation warning 修复（OK，repo 质量提升；视觉不变）**：按“修 warning”裁决，清掉 `YarlungLandscapeImportCommandlet.cpp` 生成 corridor terrain mesh 时的 UE 5.8 deprecated flag：替换旧 asset 前显式 `ResetLoaders(MeshPackage)`，并把 `REN_ForceNoResetLoaders` 改为 `REN_AllowPackageLinkerMismatch`，符合 UE 5.8 对 `Rename()` 的新语义，不再依赖未来会移除的隐式 loader reset。验证：`git diff --check` PASS；C++ Build PASS 且不再出现 `Rename will no longer call ResetLoaders`；`.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -RestoreGeneratedMap -NamePrefix rename-warning-fix-smoke` PASS，commandlet 结束 `Success - 0 error(s), 0 warning(s)`，manifest=`Saved\Diagnostics\rename-warning-fix-smoke-run.json`，RiskGate=UNKNOWN（有意跳过截图），生成 `.umap` 已自动还原。
 - **2026-06-21 `YarlungSceneryActor` placement gate 收口（OK，复杂度下降；视觉不变）**：继续执行代码/repo 精简，把 `AddScatterRule()` 与 `AddCanopyBelt()` 里重复的 placement 判定收进 `TryResolvePlacement()`：terrain bounds、river clearance、track/terrain height sampling、`YarlungCorridorProfile::AuthoredHeightCm()`、height range 与 slope gate 现在由同一处负责；rock/cliff/canopy 仍保留各自的随机、yaw、scale 与 transform 策略，参数和预期行为不变。验证：`git diff --check` PASS；C++ Build PASS；`.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -RestoreGeneratedMap -NamePrefix scenery-placement-helper-smoke` PASS，manifest=`Saved\Diagnostics\scenery-placement-helper-smoke-run.json`，RiskGate=UNKNOWN（有意跳过截图），生成 `.umap` 已自动还原。下一步代码清理候选：继续把 scenery placement 抽成独立模块/测试面，或拆 terrain surface coloring。
@@ -49,7 +50,7 @@
 | 阶段 | 状态 | 当前判断 |
 |---|---:|---|
 | 0 参照/英雄段 | ✅ | 英雄段与 L1-L3 local refs 已确定；本地 refs 不入库。 |
-| A 真实地形/路线基础 | ✅ | DEM/长轨道/走廊基础可运行；不再用旧短环。 |
+| A 真实地形/路线基础 | 🟨 | DEM/长轨道/走廊基础可运行；不再用旧短环。但 2026-06-21 用户放宽拓扑后，当前沿江/offset 生成器不再是目标形态；需要 scenic control-point route generator 让英雄帧稳定看见江水/湿岩/森林/远山。 |
 | B 光照/曝光/大气基础 | 🟨 | 物理日光/曝光有基础，但画面仍受山体资产和成像层拖累。 |
 | C 山体/峡谷几何 | 🟦 | 旧程序化 canyon-wall 已删除；当前靠 DEM corridor terrain + Megascans scatter，仍缺真实连续 Nanite 岩壁和远山层次；最新 cliff belt/材质微调实验被拒绝，不能靠大 slab 或单 heightfield 调色解决。 |
 | D 江水/轨道/车 | 🟨 | 轨道已管轨化且支撑比例修正；隐藏 `TrainBody` placeholder 已删除；当前无真实车体，待 authored cockpit/train 与 UE Water 材质升级。 |
@@ -69,7 +70,8 @@
 3. **主线（AAA）= 资产导入/资产路径修正，见 `docs/plans/aaa-asset-pipeline.md`**：
    - **【当前优先】** 先补 HISM/ISM 可用的整树针叶/冷杉/云杉 StaticMesh，或明确改成可使用现有树资产的 PCG/foliage actor 路径；否则山体只能停留在 branch-clump 近似。
    - **【当前优先】** 选择坡面友好的模块化 cliff/rock wall（多尺寸、可旋转、非单块巨板），沿峡谷两侧 kitbash；不要恢复旧 `YarlungCanyonWallActor`，也不要用大 slab 硬盖坡。
-   - 山体读成真实密林+灰绿湿岩后，再回到轨道高度/大起伏/俯视河道构图；当前高处轨道物理 gate 未过，先不投入。
+   - **【路线解锁】** 轨道不必沿河。下一轮应先做 scenic route generator / route candidate solver：从 DEM/river 派生高处俯视、跨江、贴崖、远山方向等 anchors，生成多候选路线，用 `verify-track-clearance.py` 过净空/G 值，再用 spatial contract 选能稳定入镜江水的英雄段。不要继续用旧 thalweg-offset 正弦硬弯。
+   - 山体读成真实密林+灰绿湿岩后，再扩大轨道高度/大起伏/俯视河道构图；但路线设计本身已经允许跨江、翻滚和更大起伏，只受 gate 约束。
    - 资产落地后 agent 全自动接线：Nanite 岩壁散布 → instanced/PCG 森林树冠（替换 branch-clump） → 多层地形材质 → UE Water 江水升级 → authored cockpit/train → 成像收尾。
    - 不要恢复旧 `YarlungCanyonWallActor` / `YarlungRiverActor` 程序化分支；不要回到 square full-map fallback。
 4. **验收要求**：每次必须打开 `Saved\Diagnostics\<name>.png` contact sheet，并把命令、manifest、risk gate、肉眼 verdict、下一步写回本文件。
