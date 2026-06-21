@@ -89,7 +89,6 @@ AYarlungSceneryActor::AYarlungSceneryActor()
     if (BoulderMesh.Succeeded())
     {
         RockOutcrops->SetStaticMesh(BoulderMesh.Object);
-        UnderstoryClumps->SetStaticMesh(BoulderMesh.Object);
     }
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> RockFaceAMesh(TEXT("/Game/Generated/Models/RockFace01/rock_face_01_1k.rock_face_01_1k"));
@@ -252,12 +251,12 @@ void AYarlungSceneryActor::BuildScatter(const TArray<FYarlungSceneryTrackSample>
     ForestShrubsA->ClearInstances();
     ForestShrubsB->ClearInstances();
 
-    constexpr int32 RockCount = 2200;
+    constexpr int32 RockCount = 0;
     constexpr int32 ClumpCount = 0;
     // The current rock_face proxy meshes read as low-poly curtain walls in the
     // hero POV. Keep them disabled until real authored/Nanite cliff assets land.
     constexpr int32 CliffFaceCount = 0;
-    constexpr int32 ShrubCount = 2600;
+    constexpr int32 ShrubCount = 0;
     constexpr float MinLateralCm = 2600.0f;
     constexpr float MaxLateralCm = 118000.0f;
 
@@ -338,7 +337,7 @@ void AYarlungSceneryActor::BuildScatter(const TArray<FYarlungSceneryTrackSample>
                 : Hash01(Index * 4.121f + Seed, 97.0f) * 360.0f;
             const float ScaleBase = bLargeRock
                 ? FMath::Lerp(2.4f, 9.5f, Hash01(Index * 6.617f, 13.0f))
-                : (bCliffFace ? FMath::Lerp(18.0f, 56.0f, Hash01(Index * 6.617f + Seed, 13.0f)) : FMath::Lerp(7.5f, 24.0f, Hash01(Index * 6.617f + Seed, 13.0f)));
+                : (bCliffFace ? FMath::Lerp(18.0f, 56.0f, Hash01(Index * 6.617f + Seed, 13.0f)) : FMath::Lerp(6.5f, 22.0f, Hash01(Index * 6.617f + Seed, 13.0f)));
             const FVector Scale = bLargeRock
                 ? FVector(ScaleBase * FMath::Lerp(0.7f, 1.8f, Hash01(Index * 9.0f, 1.0f)), ScaleBase, ScaleBase * FMath::Lerp(0.45f, 1.15f, Hash01(Index * 7.0f, 2.0f)))
                 : (bCliffFace

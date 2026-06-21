@@ -422,7 +422,7 @@ def create_mesh_terrain_material(rock_textures):
         "",
         rock_diffuse,
         "",
-        create_constant(material, 0.08, -640, -20),
+        create_constant(material, 0.025, -640, -20),
         "",
         -360,
         -160,

@@ -6,6 +6,7 @@
 #include "YarlungRiverActor.h"
 #include "YarlungSceneryActor.h"
 #include "YarlungMeshTerrainActor.h"
+#include "YarlungCorridorProfile.h"
 #include "YarlungTerrainProfile.h"
 #include "YarlungTerrainRelief.h"
 #include "YarlungTrackCsv.h"
@@ -108,66 +109,63 @@ FVector YarlungSmoothNormalAtWorldXY(const TArray<uint16>& HeightData, float X, 
     return FVector(Left - Right, Down - Up, SampleSpacingCm * 4.0f).GetSafeNormal();
 }
 
-float YarlungCorridorRockMask(const TArray<YarlungViewCorridor::FTrackPoint>& TrackPoints, float X, float Y, float Height, const FVector& BaseNormal)
+float YarlungCanyonWetRockMask(float X, float Y, float Height, const FVector& BaseNormal)
 {
-    const float TrackDistance = YarlungViewCorridor::DistanceToTrackCm(TrackPoints, FVector2D(X, Y));
-    const float NearFade = YarlungTerrain::Smooth01((TrackDistance - 1800.0f) / 6200.0f);
-    const float FarFade = 1.0f - YarlungTerrain::Smooth01((TrackDistance - 260000.0f) / 140000.0f);
-    const float DistanceMask = NearFade * FarFade;
     const float SlopeMask = YarlungTerrain::Smooth01(((1.0f - BaseNormal.Z) - 0.13f) / 0.38f);
     const float HeightMask = 1.0f - 0.55f * YarlungTerrain::Smooth01((Height - 515000.0f) / 120000.0f);
-    return FMath::Clamp(DistanceMask * SlopeMask * HeightMask, 0.0f, 1.0f);
+    const float RiverDistance = FMath::Abs(Y - YarlungTerrain::RiverCenterY(X));
+    const float DistanceMask = YarlungTerrain::Smooth01((RiverDistance - 28000.0f) / 95000.0f)
+        * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 320000.0f) / 120000.0f));
+    const float Strata = 0.5f + 0.5f * FMath::Sin(X * 0.0019f - Y * 0.0023f + Height * 0.0041f);
+    return FMath::Clamp(DistanceMask * SlopeMask * HeightMask * (0.72f + Strata * 0.42f), 0.0f, 1.0f);
 }
 
-float YarlungCorridorLandformDeltaCm(const FVector2D& Center, float SignedOffsetCm, float BaseHeight)
+float YarlungRavineMask(float X, float Y)
 {
-    const float AbsOffset = FMath::Abs(SignedOffsetCm);
-    const float WallMask = YarlungTerrain::Smooth01((AbsOffset - 16000.0f) / 42000.0f)
-        * (1.0f - YarlungTerrain::Smooth01((AbsOffset - 85000.0f) / 12000.0f));
-    if (WallMask <= 0.001f)
-    {
-        return 0.0f;
-    }
-
-    const float Height01 = YarlungTerrain::NormalizeEncodedHeightCm(BaseHeight);
-    const float HeightMask = 1.0f - 0.55f * YarlungTerrain::Smooth01((Height01 - 0.52f) / 0.22f);
-    const float Side = SignedOffsetCm >= 0.0f ? 1.0f : -1.0f;
-    const float Along = Center.X * 0.00047f + Center.Y * 0.00031f;
-    const float Across = AbsOffset * 0.000055f;
-
-    const float Buttress =
-        0.62f * FMath::Sin(Along + Side * 0.9f)
-        + 0.38f * FMath::Sin(Along * 1.73f - Across * 0.7f + Side * 1.6f);
-    const float RavineSignal = 0.5f + 0.5f * FMath::Sin(Along * 2.45f + Across * 1.35f + Side * 0.35f);
-    const float Ravine = FMath::Pow(FMath::Clamp(RavineSignal, 0.0f, 1.0f), 5.0f);
-    const float Talus = YarlungTerrain::Smooth01((AbsOffset - 22000.0f) / 26000.0f)
-        * (1.0f - YarlungTerrain::Smooth01((AbsOffset - 68000.0f) / 24000.0f));
-
-    const float Delta = Buttress * 1850.0f - Ravine * 2100.0f - Talus * 650.0f;
-    return WallMask * HeightMask * Delta;
+    const float RiverDistance = FMath::Abs(Y - YarlungTerrain::RiverCenterY(X));
+    const float Along = X / 210000.0f + Y / 567000.0f;
+    const float Across = RiverDistance / 86000.0f;
+    const float Signal = 0.5f + 0.5f * FMath::Sin(Along * 11.2f + Across * 2.65f - 0.9f);
+    return FMath::Pow(FMath::Clamp(Signal, 0.0f, 1.0f), 5.0f);
 }
 
-FLinearColor YarlungColorAtPosition(float X, float Y, float Height, float RockMask)
+FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVector& Normal, float RockMask)
 {
     const float Height01 = YarlungTerrain::NormalizeEncodedHeightCm(Height);
     const float RiverDistance = FMath::Abs(Y - YarlungTerrain::RiverCenterY(X));
-    const float River = FMath::Clamp(1.0f - RiverDistance / YarlungTerrain::Config().RiverMaskHalfWidthCm, 0.0f, 1.0f);
-    const float Forest = YarlungTerrain::Smooth01((RiverDistance - 18000.0f) / 115000.0f) * (1.0f - YarlungTerrain::Smooth01((Height01 - 0.60f) / 0.26f));
+    const float Slope = 1.0f - Normal.GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector).Z;
+    const float MidSlope = YarlungTerrain::Smooth01((Slope - 0.08f) / 0.24f);
+    const float SteepSlope = YarlungTerrain::Smooth01((Slope - 0.22f) / 0.30f);
+    const float ForestElevation = 1.0f - 0.62f * YarlungTerrain::Smooth01((Height01 - 0.76f) / 0.18f);
+    const float ForestDistance = YarlungTerrain::Smooth01((RiverDistance - 14000.0f) / 92000.0f)
+        * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 390000.0f) / 170000.0f));
+    const float BroadCanopyPatch = 0.5f + 0.5f * FMath::Sin(X * 0.00088f - Y * 0.00116f + Height * 0.0011f);
+    const float FineCanopyPatch = YarlungValueNoise(X * 1.7f, Y * 1.7f);
+    const float CanopyMask = YarlungTerrain::Smooth01((BroadCanopyPatch * 0.72f + FineCanopyPatch * 0.28f - 0.22f) / 0.48f);
+    const float Forest = FMath::Clamp(
+        ForestDistance * ForestElevation * FMath::Lerp(0.72f, 1.04f, MidSlope) * FMath::Lerp(0.58f, 1.0f, CanopyMask),
+        0.0f,
+        1.0f);
+    const float Ravine = MidSlope * YarlungRavineMask(X, Y);
+    const float RavineStreak = FMath::Pow(
+        FMath::Clamp(0.5f + 0.5f * FMath::Sin(X * 0.0025f - Y * 0.0014f + Height * 0.0038f), 0.0f, 1.0f),
+        4.0f);
     const float Noise = YarlungValueNoise(X, Y);
 
-    FLinearColor Base(0.075f + Noise * 0.020f, 0.145f + Noise * 0.035f, 0.120f + Noise * 0.025f, 1.0f);
-    const FLinearColor Rock(0.105f + Height01 * 0.035f, 0.145f + Height01 * 0.035f, 0.140f + Height01 * 0.030f, 1.0f);
-    const FLinearColor ForestColor(0.018f + Noise * 0.026f, 0.115f + Noise * 0.080f, 0.048f + Noise * 0.035f, 1.0f);
-    const FLinearColor RiverColor(0.50f, 0.78f, 0.74f, 1.0f);
-    const FLinearColor Snow(0.58f, 0.64f, 0.63f, 1.0f);
+    const FLinearColor DeepForest(0.012f + Noise * 0.010f, 0.064f + Noise * 0.032f, 0.026f + Noise * 0.020f, 1.0f);
+    const FLinearColor SunForest(0.032f + Noise * 0.018f, 0.110f + Noise * 0.052f, 0.048f + Noise * 0.030f, 1.0f);
+    const FLinearColor WeatheredRock(0.074f + Height01 * 0.038f, 0.080f + Height01 * 0.034f, 0.074f + Height01 * 0.030f, 1.0f);
+    const FLinearColor WetRock(0.034f + Noise * 0.028f, 0.046f + Noise * 0.032f, 0.042f + Noise * 0.030f, 1.0f);
+    const FLinearColor Scree(0.118f + Noise * 0.038f, 0.116f + Noise * 0.036f, 0.102f + Noise * 0.032f, 1.0f);
+    const FLinearColor RavineColor(0.010f, 0.022f, 0.020f, 1.0f);
+    const FLinearColor Snow(0.66f, 0.70f, 0.69f, 1.0f);
 
-    Base = FMath::Lerp(Base, Rock, FMath::Clamp(Height01 * 0.50f, 0.0f, 0.36f));
-    Base = FMath::Lerp(Base, ForestColor, FMath::Clamp(Forest, 0.0f, 0.82f));
-    Base = FMath::Lerp(Base, RiverColor, River * 0.12f);
-    Base = FMath::Lerp(Base, Snow, 0.12f * YarlungTerrain::Smooth01((Height01 - 0.992f) / 0.018f));
-    const float RockBreakup = 0.5f + 0.5f * FMath::Sin(X * 0.0019f - Y * 0.0023f + Height * 0.0041f);
-    const FLinearColor WetRock(0.095f + RockBreakup * 0.035f, 0.135f + RockBreakup * 0.045f, 0.130f + RockBreakup * 0.040f, 1.0f);
-    Base = FMath::Lerp(Base, WetRock, FMath::Clamp(RockMask * 0.68f, 0.0f, 0.68f));
+    FLinearColor Base = FMath::Lerp(DeepForest, SunForest, CanopyMask * (1.0f - SteepSlope * 0.45f));
+    Base = FMath::Lerp(WeatheredRock, Base, Forest);
+    Base = FMath::Lerp(Base, WetRock, FMath::Clamp(RockMask * 0.82f + SteepSlope * RavineStreak * 0.22f, 0.0f, 0.90f));
+    Base = FMath::Lerp(Base, Scree, FMath::Clamp(SteepSlope * (1.0f - Forest) * (0.12f + RavineStreak * 0.16f), 0.0f, 0.26f));
+    Base = FMath::Lerp(Base, RavineColor, FMath::Clamp(Ravine * 0.58f, 0.0f, 0.68f));
+    Base = FMath::Lerp(Base, Snow, 0.18f * YarlungTerrain::Smooth01((Height01 - 0.992f) / 0.016f));
     return Base;
 }
 
@@ -198,6 +196,49 @@ bool LoadYarlungTerrainTrackPoints(TArray<YarlungViewCorridor::FTrackPoint>& Out
     }
 
     return true;
+}
+
+bool FindNearestTrackProfileFrame(
+    const TArray<YarlungViewCorridor::FTrackPoint>& TrackPoints,
+    const FVector2D& Position,
+    FVector2D& OutCenter,
+    float& OutSignedOffsetCm)
+{
+    if (TrackPoints.Num() < 2)
+    {
+        return false;
+    }
+
+    float BestSquared = TNumericLimits<float>::Max();
+    FVector2D BestCenter = TrackPoints[0].Position;
+    FVector2D BestTangent = FVector2D(1.0f, 0.0f);
+
+    for (int32 Index = 0; Index < TrackPoints.Num(); ++Index)
+    {
+        const FVector2D A = TrackPoints[Index].Position;
+        const FVector2D B = TrackPoints[(Index + 1) % TrackPoints.Num()].Position;
+        const FVector2D AB = B - A;
+        const float LengthSquared = AB.SizeSquared();
+        if (LengthSquared <= KINDA_SMALL_NUMBER)
+        {
+            continue;
+        }
+
+        const float T = FMath::Clamp(FVector2D::DotProduct(Position - A, AB) / LengthSquared, 0.0f, 1.0f);
+        const FVector2D Closest = A + AB * T;
+        const float Squared = FVector2D::DistSquared(Position, Closest);
+        if (Squared < BestSquared)
+        {
+            BestSquared = Squared;
+            BestCenter = Closest;
+            BestTangent = AB.GetSafeNormal();
+        }
+    }
+
+    const FVector2D Relative = Position - BestCenter;
+    OutCenter = BestCenter;
+    OutSignedOffsetCm = BestTangent.X * Relative.Y - BestTangent.Y * Relative.X;
+    return BestSquared < TNumericLimits<float>::Max();
 }
 
 // Continuous canyon base mesh. The track-view corridor is still the visual
@@ -258,15 +299,27 @@ void ComputeBaseTerrainPositions(
             const FVector BaseNormal = YarlungSmoothNormalAtWorldXY(HeightData, Position2D.X, Position2D.Y);
             const float TrackDistance = YarlungViewCorridor::DistanceToTrackCm(TrackPoints, Position2D);
             const float ViewCorridorMask = YarlungViewCorridor::ComputeMask(TrackPoints, Position2D);
+            FVector2D ProfileCenter = Position2D;
+            float SignedOffsetCm = 0.0f;
+            const bool bHasProfileFrame = FindNearestTrackProfileFrame(TrackPoints, Position2D, ProfileCenter, SignedOffsetCm);
+            const float TrackBaseHeight = bHasProfileFrame
+                ? YarlungHeightAtWorldXY(HeightData, ProfileCenter.X, ProfileCenter.Y)
+                : BaseHeight;
+            const float ProfileHeight = bHasProfileFrame
+                ? YarlungCorridorProfile::AuthoredHeightCm(ProfileCenter, SignedOffsetCm, TrackBaseHeight, BaseHeight)
+                : BaseHeight;
+            const float ProfileBlend = FMath::Clamp(ViewCorridorMask, 0.0f, 1.0f)
+                * YarlungTerrain::Smooth01((TrackDistance - 30000.0f) / 52000.0f);
+            const float AuthoredProfileHeight = BaseHeight + (ProfileHeight - BaseHeight) * 0.48f;
             const float DisplacementCm = YarlungTerrainRelief::ComputeReliefCm(
                 Position2D,
-                BaseHeight,
+                AuthoredProfileHeight,
                 BaseNormal,
                 TrackDistance,
                 ViewCorridorMask);
 
             const int32 VertexIndex = BaseTerrainVertexIndex(XIndex, YIndex, SampleCount);
-            const float Height = BaseHeight + DisplacementCm;
+            const float Height = FMath::Lerp(BaseHeight, AuthoredProfileHeight, ProfileBlend) + DisplacementCm;
             Positions[VertexIndex] = FVector(Position2D.X, Position2D.Y, Height + 25.0f);
             Us[VertexIndex] = static_cast<float>(XIndex) / static_cast<float>(SampleCount - 1);
             Vs[VertexIndex] = static_cast<float>(YIndex) / static_cast<float>(SampleCount - 1);
@@ -311,8 +364,8 @@ void ComputeBaseTerrainNormalsAndColors(
             Normals[VertexIndex] = Normal.IsNearlyZero() ? FVector::UpVector : Normal;
             const FVector& Position = Positions[VertexIndex];
             const FVector BaseNormal = YarlungSmoothNormalAtWorldXY(HeightData, Position.X, Position.Y);
-            const float RockMask = YarlungCorridorRockMask(TrackPoints, Position.X, Position.Y, Position.Z, BaseNormal);
-            Colors[VertexIndex] = YarlungColorAtPosition(Position.X, Position.Y, Position.Z, RockMask);
+            const float RockMask = YarlungCanyonWetRockMask(Position.X, Position.Y, Position.Z, BaseNormal);
+            Colors[VertexIndex] = YarlungColorAtPosition(Position.X, Position.Y, Position.Z, Normals[VertexIndex], RockMask);
         }
     }
 }
@@ -386,6 +439,56 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
     ComputeBaseTerrainPositions(HeightData, TrackPoints, Positions, Us, Vs, Stats);
     ComputeBaseTerrainNormalsAndColors(HeightData, TrackPoints, Positions, Normals, Colors);
 
+    FLinearColor MinColor(
+        TNumericLimits<float>::Max(),
+        TNumericLimits<float>::Max(),
+        TNumericLimits<float>::Max(),
+        1.0f);
+    FLinearColor MaxColor(
+        TNumericLimits<float>::Lowest(),
+        TNumericLimits<float>::Lowest(),
+        TNumericLimits<float>::Lowest(),
+        1.0f);
+    FVector3d SumColor = FVector3d::ZeroVector;
+    int32 NonWhiteColorCount = 0;
+    int32 DarkGreenColorCount = 0;
+    for (const FLinearColor& Color : Colors)
+    {
+        MinColor.R = FMath::Min(MinColor.R, Color.R);
+        MinColor.G = FMath::Min(MinColor.G, Color.G);
+        MinColor.B = FMath::Min(MinColor.B, Color.B);
+        MaxColor.R = FMath::Max(MaxColor.R, Color.R);
+        MaxColor.G = FMath::Max(MaxColor.G, Color.G);
+        MaxColor.B = FMath::Max(MaxColor.B, Color.B);
+        SumColor += FVector3d(Color.R, Color.G, Color.B);
+        if (!Color.Equals(FLinearColor::White, 0.001f))
+        {
+            ++NonWhiteColorCount;
+        }
+        if (Color.G > Color.R * 1.35f && Color.G > Color.B * 1.15f && Color.G < 0.20f)
+        {
+            ++DarkGreenColorCount;
+        }
+    }
+    const FVector3d AvgColor = VertexCount > 0 ? SumColor / static_cast<double>(VertexCount) : FVector3d::ZeroVector;
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("Yarlung terrain source color stats: min=(%.3f,%.3f,%.3f) avg=(%.3f,%.3f,%.3f) max=(%.3f,%.3f,%.3f) nonwhite=%d/%d dark_green=%d/%d"),
+        MinColor.R,
+        MinColor.G,
+        MinColor.B,
+        AvgColor.X,
+        AvgColor.Y,
+        AvgColor.Z,
+        MaxColor.R,
+        MaxColor.G,
+        MaxColor.B,
+        NonWhiteColorCount,
+        VertexCount,
+        DarkGreenColorCount,
+        VertexCount);
+
     FPolygonGroupID PolygonGroup = Builder.AppendPolygonGroup(TEXT("YarlungCorridorTerrain"));
     TArray<FVertexID> Vertices;
     Vertices.Reserve(VertexCount);
@@ -444,6 +547,20 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
     StaticMesh->PostEditChange();
     StaticMesh->MarkPackageDirty();
     FAssetRegistryModule::AssetCreated(StaticMesh);
+
+    bool bHasRenderColorVertexData = false;
+    if (const FStaticMeshRenderData* RenderData = StaticMesh->GetRenderData())
+    {
+        if (RenderData->LODResources.Num() > 0)
+        {
+            bHasRenderColorVertexData = RenderData->LODResources[0].bHasColorVertexData;
+        }
+    }
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("Yarlung terrain render color buffer: has_color_vertex_data=%s"),
+        bHasRenderColorVertexData ? TEXT("true") : TEXT("false"));
 
     if (!UEditorLoadingAndSavingUtils::SavePackages({ MeshPackage }, false))
     {

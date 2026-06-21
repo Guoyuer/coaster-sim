@@ -159,10 +159,10 @@ ACoasterRideActor::ACoasterRideActor()
     RideCamera->PostProcessSettings.bOverride_CameraISO = true;
     RideCamera->PostProcessSettings.CameraISO = 100.0f;
     RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-    // Pivot cut #2: the previous +0.95 bias left the 120000-lux daylight scene
-    // ~1 stop hot, blowing dark rock/terrain toward white and washing out the
-    // new atmospheric perspective. Calibrate down toward physical daylight.
-    RideCamera->PostProcessSettings.AutoExposureBias = -0.25f;
+    // Reference-matched daylight: the canyon needs bright sky but dark forested
+    // slopes. The old -0.25 bias still washed the mountain albedo into pale
+    // mint; -1.05 keeps sunlit cloud/sky readable while restoring hillside mass.
+    RideCamera->PostProcessSettings.AutoExposureBias = -1.05f;
     RideCamera->PostProcessSettings.bOverride_FilmSlope = true;
     RideCamera->PostProcessSettings.FilmSlope = 0.86f;
     RideCamera->PostProcessSettings.bOverride_FilmToe = true;
@@ -182,9 +182,9 @@ ACoasterRideActor::ACoasterRideActor()
     SkyLight = CreateDefaultSubobject<USkyLightComponent>(TEXT("SkyLight"));
     SkyLight->SetupAttachment(SceneRoot);
     // Real-time-capture skylight: intensity is a multiplier on the captured
-    // physical sky. 3.0 over-filled shadows, flattening the scene. ~1.1 keeps
-    // ambient physically plausible and restores cinematic shadow contrast.
-    SkyLight->SetIntensity(1.1f);
+    // physical sky. 1.1 still over-filled the gorge and erased forest/rock
+    // separation; 0.45 preserves the hard sun/shadow contrast seen in refs.
+    SkyLight->SetIntensity(0.45f);
     SkyLight->SetRealTimeCapture(true);
 
     SunLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("SunLight"));
@@ -529,6 +529,7 @@ void ACoasterRideActor::RequestCurrentBatchScreenshot()
     UE_LOG(LogTemp, Display, TEXT("Yarlung batch screenshot %d/%d at t=%.2fs -> %s"), BatchScreenshotIndex + 1, BatchScreenshotTimes.Num(), BatchScreenshotTimes[BatchScreenshotIndex], *StandardFilename);
     FScreenshotRequest::RequestScreenshot(StandardFilename, false, false);
 }
+
 void ACoasterRideActor::RebuildSpline()
 {
     const FString GeneratedTrackPath = FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungTrack.csv");

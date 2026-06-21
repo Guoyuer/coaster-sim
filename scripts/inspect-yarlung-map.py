@@ -142,12 +142,13 @@ def main():
                 f"class={component.get_class().get_name()} hidden={component.get_editor_property('hidden_in_game')} "
                 f"materials={material_names} instances={instance_count}"
             )
-        if rock_instances < 500:
-            raise RuntimeError(f"Yarlung rock scatter is too sparse: {rock_instances} instances")
-        if cliff_face_instances < 400:
-            raise RuntimeError(f"Yarlung cliff-face asset scatter is too sparse: {cliff_face_instances} instances")
-        if forest_shrub_instances < 1000:
-            raise RuntimeError(f"Yarlung forest shrub asset scatter is too sparse: {forest_shrub_instances} instances")
+        if rock_instances != 0:
+            raise RuntimeError(f"Known-bad boulder proxy scatter must stay disabled: {rock_instances} instances")
+        if cliff_face_instances != 0:
+            raise RuntimeError(f"Known-bad cliff-face proxy scatter must stay disabled: {cliff_face_instances} instances")
+        if forest_shrub_instances != 0:
+            raise RuntimeError(f"Known-bad shrub proxy scatter must stay disabled: {forest_shrub_instances} instances")
+        emit("[YARLUNG-INSPECT] proxy_scenery_disabled=true real_forest_and_cliff_assets_required=true")
 
     cliff_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungCliffActor")]
     if cliff_actors:
