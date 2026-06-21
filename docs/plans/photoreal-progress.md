@@ -13,6 +13,7 @@
 
 ## 最新记录
 
+- **2026-06-21 macro canyon profile v2**：重新对照 `docs/refs/local/02_fp_yarlung_coaster_canyon.png` 与 `03_fp_mountain_coaster_valley.png`，确认目标不是"更高的 smooth wall"，而是山腰第一人称视角下的河谷纵深、森林覆盖山体、灰岩/湿岩崖面、远山层次。尝试 `mountain-macro-profile-v1` 后出现刀切暗缝和大块泥山；v2 改成更宽的山脊/浅冲沟，并增强 terrain vertex color 的森林覆盖。最终验证以已重建材质的 `mountain-macro-profile-v2-material-reset.png` 为准：RiskGate=FAIL，worst=`t90`，risk=1.599，washed=0.252，green=0.150，flat=0.601，edge=0.031。肉眼结论：比基线更有山体尺度和绿量，但仍明显是程序化大面山皮，缺真实树冠颗粒、岩壁破碎、河谷开阔构图；不能按阶段 C 完成。下一步必须转向真实/半真实资产层或重排山腰视线，不能继续只调 profile。
 - **2026-06-21 dead source asset cleanup**：删除运行时已死的 source 输入资产：`SourceAssets/PolyHaven/leafy_grass/*.jpg` 与 `SourceAssets/Generated/YarlungLandscape/YarlungTsangpo_macro_*.tga`（约 72MB tracked files）。这些只服务旧 `M_YarlungLandscapeGround` / macro TGA / LeafyGrass 链，live 代码不再引用。同步更新 `photoreal-overhaul.md` 当前架构说明为 corridor static mesh + live material/scenery actor 路线；`worlds-longest-coaster.md` 去掉 macro generated-asset 表述；旧 bug log 加 historical note。验证：`rg` 确认 live `scripts/Source/Config/AGENTS` 无已删资产引用（剩余命中为历史 docs/reviews）；`python -m py_compile` 相关脚本 PASS；`yarlung-agent-status.ps1` PASS。视觉未重评，山体照片级仍 FAIL。
 - **2026-06-21 P0/P1 repo hygiene**：旧 145KB `photoreal-progress.md` 已压缩为当前仪表盘，完整历史移到 `docs/plans/archive/photoreal-progress-pre-p0p1-cleanup-2026-06-21.md`；旧半自动 `auto-iterate/AUTOSTATE/Claude verifier` spec 移到 `docs/superpowers/archive/2026-06-18-auto-iterate-design.md` 并标为 historical；根目录两张参考图副本已删除，保留 gitignored `docs/refs/local/` 版本；`yarlung-agent-status.ps1` 增加 dirty 分组，能区分 generated tracked dirty、local-only refs、source/docs dirty、other dirty。验证：`Config/yarlung-iteration.json` JSON parse PASS；`yarlung-agent-status.ps1` 文本 PASS；`yarlung-agent-status.ps1 -Json` PASS；`iterate-yarlung.ps1 -Mode ScreenshotOnly -Preset Quick -SkipCapture -NamePrefix p0p1-cleanup-smoke` PASS（RiskGate=UNKNOWN，产出 manifest/handoff）。视觉未重评，当前山体照片级仍 FAIL。
 - **2026-06-20/21 Codex unattended scaffold v2**：`Config/yarlung-iteration.json` 统一默认模式、Quick/Standard/Route/Hero/Final preset、risk gate 阈值、L1-L3 本地参考锚点；`scripts/iterate-yarlung.ps1` 读取 config，输出 `run.json` + `handoff.md` + `RiskGate=OK|WARN|FAIL|UNKNOWN`。最近 smoke：`scaffold-harness-shot-v2` 已 Read，RiskGate=WARN，视觉仍灰盒/假山体。
@@ -41,7 +42,7 @@
    .\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Standard -Build -NamePrefix <short-name>
    ```
    如果改变 terrain mesh/vertex color/displacement，改用 `-Mode Terrain`。
-3. **下一刀视觉建议**：在现有 corridor-only 快循环上做大尺度 canyon wall / forest / wet cliff 资产层，目标是多时点第一人称帧都能读成真实峡谷山体。不要回到 square full-map fallback。
+3. **下一刀视觉建议**：停止单纯 profile/vertex-color 微调，做真实/半真实山体资产层或山腰视线重排：森林树冠 massing、湿岩/灰岩 cliff mesh、河谷开阔视线、远山层次。目标是多时点第一人称帧都能读成参考图那种真实峡谷山体。不要回到 square full-map fallback。
 4. **验收要求**：每次必须打开 `Saved\Diagnostics\<name>.png` contact sheet，并把命令、manifest、risk gate、肉眼 verdict、下一步写回本文件。
 
 ## 独立外审索引

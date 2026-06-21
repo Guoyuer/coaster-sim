@@ -138,13 +138,13 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
     const float MidSlope = YarlungTerrain::Smooth01((Slope - 0.08f) / 0.24f);
     const float SteepSlope = YarlungTerrain::Smooth01((Slope - 0.22f) / 0.30f);
     const float ForestElevation = 1.0f - 0.62f * YarlungTerrain::Smooth01((Height01 - 0.76f) / 0.18f);
-    const float ForestDistance = YarlungTerrain::Smooth01((RiverDistance - 14000.0f) / 92000.0f)
-        * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 390000.0f) / 170000.0f));
+    const float ForestDistance = YarlungTerrain::Smooth01((RiverDistance - 9000.0f) / 76000.0f)
+        * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 430000.0f) / 190000.0f));
     const float BroadCanopyPatch = 0.5f + 0.5f * FMath::Sin(X * 0.00088f - Y * 0.00116f + Height * 0.0011f);
     const float FineCanopyPatch = YarlungValueNoise(X * 1.7f, Y * 1.7f);
     const float CanopyMask = YarlungTerrain::Smooth01((BroadCanopyPatch * 0.72f + FineCanopyPatch * 0.28f - 0.22f) / 0.48f);
     const float Forest = FMath::Clamp(
-        ForestDistance * ForestElevation * FMath::Lerp(0.72f, 1.04f, MidSlope) * FMath::Lerp(0.58f, 1.0f, CanopyMask),
+        ForestDistance * ForestElevation * FMath::Lerp(0.82f, 1.16f, MidSlope) * FMath::Lerp(0.72f, 1.0f, CanopyMask),
         0.0f,
         1.0f);
     const float Ravine = MidSlope * YarlungRavineMask(X, Y);
@@ -153,9 +153,9 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
         4.0f);
     const float Noise = YarlungValueNoise(X, Y);
 
-    const FLinearColor DeepForest(0.012f + Noise * 0.010f, 0.064f + Noise * 0.032f, 0.026f + Noise * 0.020f, 1.0f);
-    const FLinearColor SunForest(0.032f + Noise * 0.018f, 0.110f + Noise * 0.052f, 0.048f + Noise * 0.030f, 1.0f);
-    const FLinearColor WeatheredRock(0.074f + Height01 * 0.038f, 0.080f + Height01 * 0.034f, 0.074f + Height01 * 0.030f, 1.0f);
+    const FLinearColor DeepForest(0.010f + Noise * 0.010f, 0.052f + Noise * 0.036f, 0.022f + Noise * 0.020f, 1.0f);
+    const FLinearColor SunForest(0.026f + Noise * 0.020f, 0.122f + Noise * 0.068f, 0.042f + Noise * 0.036f, 1.0f);
+    const FLinearColor WeatheredRock(0.064f + Height01 * 0.032f, 0.072f + Height01 * 0.034f, 0.070f + Height01 * 0.030f, 1.0f);
     const FLinearColor WetRock(0.034f + Noise * 0.028f, 0.046f + Noise * 0.032f, 0.042f + Noise * 0.030f, 1.0f);
     const FLinearColor Scree(0.118f + Noise * 0.038f, 0.116f + Noise * 0.036f, 0.102f + Noise * 0.032f, 1.0f);
     const FLinearColor RavineColor(0.010f, 0.022f, 0.020f, 1.0f);

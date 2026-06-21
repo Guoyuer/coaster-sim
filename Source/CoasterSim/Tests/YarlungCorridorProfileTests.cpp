@@ -41,11 +41,12 @@ bool FYarlungCorridorProfileAuthoredHeightTest::RunTest(const FString& Parameter
     const float BaseHeight = 346000.0f;
 
     const float NearHeight = YarlungCorridorProfile::AuthoredHeightCm(Center, 24000.0f, TrackBaseHeight, BaseHeight);
-    const float WallHeight = YarlungCorridorProfile::AuthoredHeightCm(Center, 90000.0f, TrackBaseHeight, BaseHeight);
-    const float RaisedBaseWallHeight = YarlungCorridorProfile::AuthoredHeightCm(Center, 90000.0f, TrackBaseHeight, BaseHeight + 50000.0f);
+    const float WallHeight = YarlungCorridorProfile::AuthoredHeightCm(Center, 150000.0f, TrackBaseHeight, BaseHeight);
+    const float RaisedBaseWallHeight = YarlungCorridorProfile::AuthoredHeightCm(Center, 150000.0f, TrackBaseHeight, BaseHeight + 50000.0f);
 
     TestTrue(TEXT("Authored corridor height is finite"), FMath::IsFinite(NearHeight) && FMath::IsFinite(WallHeight));
-    TestTrue(TEXT("Authored profile remains DEM-led instead of becoming a track-height wall"), FMath::Abs(WallHeight - BaseHeight) <= 7000.0f);
+    TestTrue(TEXT("Far corridor profile creates visible canyon-scale wall relief"), WallHeight - BaseHeight >= 28000.0f);
+    TestTrue(TEXT("Far corridor profile avoids implausible track-height hard walls"), WallHeight - BaseHeight <= 108000.0f);
     TestTrue(TEXT("Near track remains close to the sampled DEM surface"), FMath::Abs(NearHeight - BaseHeight) <= 7000.0f);
     TestTrue(
         TEXT("Authored profile preserves broad DEM elevation deltas"),
