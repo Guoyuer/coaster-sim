@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "CoasterRideCapture.h"
 #include "GameFramework/Actor.h"
 #include "CoasterRideActor.generated.h"
 
@@ -137,10 +138,7 @@ private:
     void RebuildSpline();
     void RebuildVisuals();
     void AdvanceRide(float DeltaSeconds);
-    bool ConfigureBatchScreenshotsFromCommandLine();
-    void TickBatchScreenshots();
     void PositionRideForCommandLineSeconds(float StartSeconds);
-    void RequestCurrentBatchScreenshot();
     void UpdateFirstPersonCamera();
     void SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const;
 
@@ -150,16 +148,5 @@ private:
     float CurrentSpeedCms = 0.0f;
     float TrackLengthCm = 1.0f;
 
-    bool bBatchScreenshotsActive = false;
-    TArray<float> BatchScreenshotTimes;
-    FString BatchScreenshotOutputDir;
-    FString BatchScreenshotPrefix = TEXT("visual-survey");
-    int32 BatchScreenshotResX = 1920;
-    int32 BatchScreenshotResY = 1080;
-    int32 BatchScreenshotIndex = 0;
-    int32 BatchScreenshotStage = 0;
-    int32 BatchScreenshotFramesRemaining = 0;
-    int32 BatchScreenshotSettleFrames = 4;
-    int32 BatchScreenshotPostFrames = 8;
-
+    CoasterRideCapture::FState BatchCapture;
 };
