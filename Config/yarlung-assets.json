@@ -37,7 +37,7 @@
       },
       {
         "name": "ForestShrubsA",
-        "mesh": "/Game/Generated/Models/Shrub03/shrub_03_1k.shrub_03_1k",
+        "mesh": "",
         "kind": "shrub",
         "count": 0,
         "seed": 43.0,
@@ -45,7 +45,7 @@
       },
       {
         "name": "ForestShrubsB",
-        "mesh": "/Game/Generated/Models/Shrub04/shrub_04_1k.shrub_04_1k",
+        "mesh": "",
         "kind": "shrub",
         "count": 0,
         "seed": 59.0,

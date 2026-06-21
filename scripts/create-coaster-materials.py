@@ -5,20 +5,12 @@ import unreal
 
 
 PACKAGE_PATH = "/Game/Generated/Materials"
-AERIAL_GRASS_ROCK_PACKAGE_PATH = f"{PACKAGE_PATH}/PolyHaven/AerialGrassRock"
 TINT_MATERIAL_NAME = "M_CoasterTint"
 MESH_TERRAIN_MATERIAL_NAME = "M_YarlungMeshTerrain"
 WATER_RIVER_MATERIAL_INSTANCE_NAME = "MI_YarlungWaterRiver"
 WATER_SURFACE_MATERIAL_NAME = "M_YarlungWaterSurface"
 UE_WATER_RIVER_PARENT_PATH = "/Water/Materials/WaterSurface/Water_Material_River.Water_Material_River"
 SUCCESS_MARKER = "material-generation-ok.txt"
-AERIAL_GRASS_ROCK_SOURCE_DIR = "SourceAssets/PolyHaven/aerial_grass_rock"
-AERIAL_GRASS_ROCK_TEXTURES = {
-    "T_AerialGrassRock_Diffuse": ("aerial_grass_rock_diff_2k.jpg", True, unreal.TextureCompressionSettings.TC_DEFAULT),
-    "T_AerialGrassRock_Normal": ("aerial_grass_rock_nor_gl_2k.jpg", False, unreal.TextureCompressionSettings.TC_NORMALMAP),
-    "T_AerialGrassRock_Rough": ("aerial_grass_rock_rough_2k.jpg", False, unreal.TextureCompressionSettings.TC_DEFAULT),
-    "T_AerialGrassRock_AO": ("aerial_grass_rock_ao_2k.jpg", False, unreal.TextureCompressionSettings.TC_DEFAULT),
-}
 
 
 def yarlung_asset_config():
@@ -85,13 +77,6 @@ def connect_material_property(material, expression, material_property, label):
         raise RuntimeError(f"Unable to connect {label}")
 
 
-def connect_detail_texture(material, texture, x, y, coordinates, material_property, label):
-    """Sample a PBR detail texture and wire it straight to a material output."""
-    sample = create_texture_sample(material, texture, x, y, coordinates)
-    connect_material_property(material, sample, material_property, label)
-    return sample
-
-
 def create_vector_parameter(material, name, value, x, y):
     expression = unreal.MaterialEditingLibrary.create_material_expression(
         material,
@@ -138,116 +123,10 @@ def create_constant(material, value, x, y):
     return expression
 
 
-def create_texture_sample(material, texture, x, y, coordinates=None):
-    expression = unreal.MaterialEditingLibrary.create_material_expression(
-        material,
-        unreal.MaterialExpressionTextureSample,
-        x,
-        y,
-    )
-    expression.set_editor_property("texture", texture)
-    if coordinates is not None:
-        connected = False
-        for input_name in ("Coordinates", "UVs"):
-            connected = unreal.MaterialEditingLibrary.connect_material_expressions(
-                coordinates,
-                "",
-                expression,
-                input_name,
-            )
-            if connected:
-                break
-        if not connected:
-            raise RuntimeError(f"Unable to connect texture coordinates for {texture.get_name()}")
-    return expression
-
-
-def create_landscape_coords(material, x, y, mapping_scale=1009.0):
-    expression = unreal.MaterialEditingLibrary.create_material_expression(
-        material,
-        unreal.MaterialExpressionLandscapeLayerCoords,
-        x,
-        y,
-    )
-    expression.set_editor_property("mapping_type", unreal.TerrainCoordMappingType.TCMT_XY)
-    expression.set_editor_property("custom_uv_type", unreal.LandscapeCustomizedCoordType.LCCT_NONE)
-    expression.set_editor_property("mapping_scale", mapping_scale)
-    expression.set_editor_property("mapping_rotation", 0.0)
-    expression.set_editor_property("mapping_pan_u", 0.0)
-    expression.set_editor_property("mapping_pan_v", 0.0)
-    return expression
-
-
-def create_texture_coordinate(material, x, y, u_tiling, v_tiling):
-    expression = unreal.MaterialEditingLibrary.create_material_expression(
-        material,
-        unreal.MaterialExpressionTextureCoordinate,
-        x,
-        y,
-    )
-    expression.set_editor_property("coordinate_index", 0)
-    expression.set_editor_property("u_tiling", u_tiling)
-    expression.set_editor_property("v_tiling", v_tiling)
-    return expression
-
-
-def create_lerp(material, a_expression, a_output, b_expression, b_output, alpha_expression, alpha_output, x, y, label):
-    expression = unreal.MaterialEditingLibrary.create_material_expression(
-        material,
-        unreal.MaterialExpressionLinearInterpolate,
-        x,
-        y,
-    )
-    connections = [
-        (a_expression, a_output, "A"),
-        (b_expression, b_output, "B"),
-        (alpha_expression, alpha_output, "Alpha"),
-    ]
-    for source, output_name, input_name in connections:
-        if not unreal.MaterialEditingLibrary.connect_material_expressions(source, output_name, expression, input_name):
-            raise RuntimeError(f"Unable to connect {label} {input_name}")
-    return expression
-
-
 def finalize_material(material):
     unreal.MaterialEditingLibrary.layout_material_expressions(material)
     unreal.MaterialEditingLibrary.recompile_material(material)
     unreal.EditorAssetLibrary.save_loaded_asset(material)
-
-
-def import_texture(package_path, source_dir, name, filename, srgb, compression):
-    asset_path = f"{package_path}/{name}"
-    source = unreal.Paths.convert_relative_path_to_full(
-        unreal.Paths.project_dir() + f"{source_dir}/{filename}"
-    )
-
-    if not unreal.Paths.file_exists(source):
-        raise RuntimeError(f"Missing PBR texture source: {source}")
-
-    task = unreal.AssetImportTask()
-    task.set_editor_property("filename", source)
-    task.set_editor_property("destination_path", package_path)
-    task.set_editor_property("destination_name", name)
-    task.set_editor_property("replace_existing", True)
-    task.set_editor_property("automated", True)
-    task.set_editor_property("save", True)
-    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
-
-    texture = unreal.EditorAssetLibrary.load_asset(asset_path)
-    if texture is None:
-        raise RuntimeError(f"Unable to load imported texture: {asset_path}")
-
-    texture.set_editor_property("srgb", srgb)
-    texture.set_editor_property("compression_settings", compression)
-    unreal.EditorAssetLibrary.save_loaded_asset(texture)
-    return texture
-
-
-def import_textures(package_path, source_dir, texture_settings):
-    textures = {}
-    for name, settings in texture_settings.items():
-        textures[name] = import_texture(package_path, source_dir, name, *settings)
-    return textures
 
 
 def create_tint_material():
@@ -399,7 +278,7 @@ def create_yarlung_water_surface_material():
     return material
 
 
-def create_mesh_terrain_material(rock_textures):
+def create_mesh_terrain_material():
     material = create_material_asset(MESH_TERRAIN_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     material.set_editor_property("two_sided", False)
@@ -410,41 +289,14 @@ def create_mesh_terrain_material(rock_textures):
         -940,
         -180,
     )
-    # Finer tiling than the old 18x so the scanned grain reads as surface texture
-    # in the near/mid corridor instead of a ~400m-per-tile smear.
-    detail_coordinates = create_texture_coordinate(material, -940, 240, 48.0, 48.0)
-    rock_diffuse = create_texture_sample(
-        material,
-        rock_textures["T_AerialGrassRock_Diffuse"],
-        -640,
-        -220,
-        detail_coordinates,
-    )
-    # Detail-albedo x macro-landform-color. The old graph hid the scanned albedo
-    # at a 2.5% lerp, leaving a flat vertex-color surface that read as greybox
-    # (flat_block ~0.6-0.8 regardless of camera). Multiplying the rock/grass grain
-    # by the humid vertex-color bands keeps the broad landform palette while
-    # restoring the high-frequency surface variation that kills the greybox read.
-    # The product (rock ~0.4 x vertex ~0.12 ~= 0.05) is lifted by AlbedoGain back
-    # into wet-gorge rock albedo range (~0.08-0.13) without photographing pale.
-    macro_tint = unreal.MaterialEditingLibrary.create_material_expression(
-        material,
-        unreal.MaterialExpressionMultiply,
-        -400,
-        -200,
-    )
-    if not unreal.MaterialEditingLibrary.connect_material_expressions(rock_diffuse, "", macro_tint, "A"):
-        raise RuntimeError("Unable to connect mesh terrain macro tint A")
-    if not unreal.MaterialEditingLibrary.connect_material_expressions(vertex_color, "", macro_tint, "B"):
-        raise RuntimeError("Unable to connect mesh terrain macro tint B")
-    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 2.6, -400, 40)
+    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 1.35, -640, 40)
     base_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
         unreal.MaterialExpressionMultiply,
-        -200,
+        -380,
         -160,
     )
-    if not unreal.MaterialEditingLibrary.connect_material_expressions(macro_tint, "", base_color, "A"):
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(vertex_color, "", base_color, "A"):
         raise RuntimeError("Unable to connect mesh terrain base color A")
     if not unreal.MaterialEditingLibrary.connect_material_expressions(albedo_gain, "", base_color, "B"):
         raise RuntimeError("Unable to connect mesh terrain base color B")
@@ -455,15 +307,18 @@ def create_mesh_terrain_material(rock_textures):
     ):
         raise RuntimeError("Unable to connect mesh terrain rock BaseColor")
 
-    connect_detail_texture(
-        material, rock_textures["T_AerialGrassRock_Normal"], -640, 120, detail_coordinates,
-        unreal.MaterialProperty.MP_NORMAL, "mesh terrain Normal")
-    connect_detail_texture(
-        material, rock_textures["T_AerialGrassRock_Rough"], -640, 360, detail_coordinates,
-        unreal.MaterialProperty.MP_ROUGHNESS, "mesh terrain Roughness")
-    connect_detail_texture(
-        material, rock_textures["T_AerialGrassRock_AO"], -640, 580, detail_coordinates,
-        unreal.MaterialProperty.MP_AMBIENT_OCCLUSION, "mesh terrain Ambient Occlusion")
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "TerrainRoughness", 0.84, -640, 220),
+        unreal.MaterialProperty.MP_ROUGHNESS,
+        "mesh terrain Roughness",
+    )
+    connect_material_property(
+        material,
+        create_scalar_parameter(material, "TerrainAmbientOcclusion", 0.92, -640, 400),
+        unreal.MaterialProperty.MP_AMBIENT_OCCLUSION,
+        "mesh terrain Ambient Occlusion",
+    )
 
     connect_material_property(
         material,
@@ -502,17 +357,11 @@ def enable_imported_material_usages():
 
 def main():
     ensure_folder(PACKAGE_PATH)
-    ensure_folder(AERIAL_GRASS_ROCK_PACKAGE_PATH)
     enable_imported_material_usages()
     create_tint_material()
     create_yarlung_water_material_instance()
     create_yarlung_water_surface_material()
-    aerial_grass_rock_textures = import_textures(
-        AERIAL_GRASS_ROCK_PACKAGE_PATH,
-        AERIAL_GRASS_ROCK_SOURCE_DIR,
-        AERIAL_GRASS_ROCK_TEXTURES,
-    )
-    create_mesh_terrain_material(aerial_grass_rock_textures)
+    create_mesh_terrain_material()
     marker_path = unreal.Paths.convert_relative_path_to_full(
         unreal.Paths.project_saved_dir() + SUCCESS_MARKER
     )

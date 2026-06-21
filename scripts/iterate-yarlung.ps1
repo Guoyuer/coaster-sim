@@ -93,27 +93,23 @@ $ModeImportFlags = @{
         "SkipAssetGeneration",
         "SkipTrackGeneration",
         "SkipMaterials",
-        "SkipModels",
         "SkipTerrainMeshBuild"
     )
     Material = @(
         "SkipAssetGeneration",
         "SkipTrackGeneration",
         "ForceMaterials",
-        "SkipModels",
         "SkipTerrainMeshBuild"
     )
     Terrain = @(
         "SkipAssetGeneration",
         "SkipTrackGeneration",
-        "SkipMaterials",
-        "SkipModels"
+        "SkipMaterials"
     )
     Full = @(
         "ForceAssetGeneration",
         "ForceTrackGeneration",
-        "ForceMaterials",
-        "ForceModels"
+        "ForceMaterials"
     )
 }
 

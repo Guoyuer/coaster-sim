@@ -90,8 +90,7 @@
       "Content/Generated/YarlungLandscape/YarlungTsangpo_1009.r16",
       "Content/Generated/YarlungLandscape/YarlungTsangpo_hillshade.png",
       "Content/Generated/YarlungLandscape/manifest.json",
-      "Content/Generated/Materials/",
-      "Content/Generated/Models/"
+      "Content/Generated/Materials/"
     ],
     "rule": "Generated assets may be committed only when the producing source/script change is in the same task or the run evidence explicitly says they were regenerated intentionally."
   }
