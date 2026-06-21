@@ -14,7 +14,10 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Engine/Scene.h"
+#include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
+#include "HAL/PlatformMisc.h"
+#include "HAL/FileManager.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/CommandLine.h"
@@ -22,6 +25,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/Parse.h"
+#include "UnrealClient.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -322,11 +326,17 @@ void ACoasterRideActor::BeginPlay()
 
     SkyLight->RecaptureSky();
     StartRideFromCommandLine(0.34f, 18.0f);
+    ConfigureBatchScreenshotsFromCommandLine();
 }
 
 void ACoasterRideActor::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
+    if (bBatchScreenshotsActive)
+    {
+        TickBatchScreenshots();
+        return;
+    }
     AdvanceRide(DeltaSeconds);
 }
 
@@ -347,6 +357,14 @@ void ACoasterRideActor::StartRideAt(float TrackRatio, float SpeedMps)
     SampleFrame(CurrentDistanceCm, Location, Rotation, Forward, Right, Up);
     TrainRoot->SetRelativeLocationAndRotation(Location, Rotation);
     UpdateFirstPersonCamera();
+
+    Telemetry.SpeedMps = CurrentSpeedCms / CmPerMeter;
+    Telemetry.HeightMeters = Location.Z / CmPerMeter;
+    Telemetry.TrackDistanceMeters = CurrentDistanceCm / CmPerMeter;
+    Telemetry.VerticalG = 1.0f;
+    Telemetry.LateralG = 0.0f;
+    Telemetry.LongitudinalG = 0.0f;
+    Telemetry.SectionName = UCoasterTrackComponent::SectionName(TrackSpline->GetSectionAtDistance(CurrentDistanceCm));
 }
 
 void ACoasterRideActor::StartRideFromCommandLine(float DefaultTrackRatio, float DefaultSpeedMps)
@@ -376,6 +394,141 @@ void ACoasterRideActor::StartRideFromCommandLine(float DefaultTrackRatio, float 
     StartRideAt(TrackRatio, SpeedMps);
 }
 
+bool ACoasterRideActor::ConfigureBatchScreenshotsFromCommandLine()
+{
+    const TCHAR* CommandLine = FCommandLine::Get();
+    FString TimesValue;
+    if (!FParse::Value(CommandLine, TEXT("YarlungBatchShotTimes="), TimesValue))
+    {
+        return false;
+    }
+
+    TimesValue.ReplaceInline(TEXT(","), TEXT("+"));
+    TimesValue.ReplaceInline(TEXT(";"), TEXT("+"));
+    TArray<FString> Tokens;
+    TimesValue.ParseIntoArray(Tokens, TEXT("+"), true);
+    for (FString& Token : Tokens)
+    {
+        Token.TrimStartAndEndInline();
+        if (!Token.IsEmpty())
+        {
+            BatchScreenshotTimes.Add(FCString::Atof(*Token));
+        }
+    }
+
+    if (BatchScreenshotTimes.Num() == 0)
+    {
+        UE_LOG(LogTemp, Error, TEXT("YarlungBatchShotTimes was provided but contained no usable times: %s"), *TimesValue);
+        return false;
+    }
+
+    BatchScreenshotOutputDir = FPaths::ProjectSavedDir() / TEXT("OffscreenShots");
+    FParse::Value(CommandLine, TEXT("YarlungBatchShotDir="), BatchScreenshotOutputDir);
+    FParse::Value(CommandLine, TEXT("YarlungBatchShotPrefix="), BatchScreenshotPrefix);
+    FParse::Value(CommandLine, TEXT("YarlungBatchShotResX="), BatchScreenshotResX);
+    FParse::Value(CommandLine, TEXT("YarlungBatchShotResY="), BatchScreenshotResY);
+    FParse::Value(CommandLine, TEXT("YarlungBatchShotSettleFrames="), BatchScreenshotSettleFrames);
+    FParse::Value(CommandLine, TEXT("YarlungBatchShotPostFrames="), BatchScreenshotPostFrames);
+
+    BatchScreenshotResX = FMath::Max(BatchScreenshotResX, 320);
+    BatchScreenshotResY = FMath::Max(BatchScreenshotResY, 180);
+    BatchScreenshotSettleFrames = FMath::Clamp(BatchScreenshotSettleFrames, 1, 60);
+    BatchScreenshotPostFrames = FMath::Clamp(BatchScreenshotPostFrames, 1, 120);
+    FPaths::NormalizeDirectoryName(BatchScreenshotOutputDir);
+    IFileManager::Get().MakeDirectory(*BatchScreenshotOutputDir, true);
+
+    BatchScreenshotIndex = 0;
+    BatchScreenshotStage = 0;
+    BatchScreenshotFramesRemaining = 0;
+    bBatchScreenshotsActive = true;
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("Yarlung batch screenshots enabled: count=%d prefix=%s output=%s res=%dx%d settle=%d post=%d"),
+        BatchScreenshotTimes.Num(),
+        *BatchScreenshotPrefix,
+        *BatchScreenshotOutputDir,
+        BatchScreenshotResX,
+        BatchScreenshotResY,
+        BatchScreenshotSettleFrames,
+        BatchScreenshotPostFrames);
+    return true;
+}
+
+void ACoasterRideActor::TickBatchScreenshots()
+{
+    if (BatchScreenshotIndex >= BatchScreenshotTimes.Num())
+    {
+        bBatchScreenshotsActive = false;
+        FPlatformMisc::RequestExit(false);
+        return;
+    }
+
+    if (BatchScreenshotStage == 0)
+    {
+        PositionRideForCommandLineSeconds(BatchScreenshotTimes[BatchScreenshotIndex]);
+        BatchScreenshotFramesRemaining = BatchScreenshotSettleFrames;
+        BatchScreenshotStage = 1;
+        return;
+    }
+
+    if (BatchScreenshotStage == 1)
+    {
+        --BatchScreenshotFramesRemaining;
+        if (BatchScreenshotFramesRemaining > 0)
+        {
+            return;
+        }
+        RequestCurrentBatchScreenshot();
+        BatchScreenshotFramesRemaining = BatchScreenshotPostFrames;
+        BatchScreenshotStage = 2;
+        return;
+    }
+
+    --BatchScreenshotFramesRemaining;
+    if (BatchScreenshotFramesRemaining > 0)
+    {
+        return;
+    }
+
+    ++BatchScreenshotIndex;
+    BatchScreenshotStage = 0;
+}
+
+void ACoasterRideActor::PositionRideForCommandLineSeconds(float StartSeconds)
+{
+    float TrackRatio = 0.34f;
+    float SpeedMps = 18.0f;
+    const TCHAR* CommandLine = FCommandLine::Get();
+    FParse::Value(CommandLine, TEXT("CoasterStartRatio="), TrackRatio);
+    FParse::Value(CommandLine, TEXT("CoasterStartSpeed="), SpeedMps);
+
+    const float ClampedRatio = FMath::Clamp(TrackRatio, 0.0f, 0.999f);
+    const float StartDistanceCm = TrackLengthCm * ClampedRatio;
+    const float AdvanceCm = FMath::Max(SpeedMps, NumericalStallFloorMps) * CmPerMeter * StartSeconds;
+    float AdvancedRatio = FMath::Fmod((StartDistanceCm + AdvanceCm) / TrackLengthCm, 1.0f);
+    if (AdvancedRatio < 0.0f)
+    {
+        AdvancedRatio += 1.0f;
+    }
+    StartRideAt(AdvancedRatio, SpeedMps);
+}
+
+void ACoasterRideActor::RequestCurrentBatchScreenshot()
+{
+    if (BatchScreenshotIndex >= BatchScreenshotTimes.Num())
+    {
+        return;
+    }
+
+    const int32 TimeLabel = FMath::RoundToInt(BatchScreenshotTimes[BatchScreenshotIndex]);
+    const FString Filename = BatchScreenshotOutputDir / FString::Printf(TEXT("%s-t%d.png"), *BatchScreenshotPrefix, TimeLabel);
+    FString StandardFilename = Filename;
+    FPaths::MakeStandardFilename(StandardFilename);
+    UE_LOG(LogTemp, Display, TEXT("Yarlung batch screenshot %d/%d at t=%.2fs -> %s"), BatchScreenshotIndex + 1, BatchScreenshotTimes.Num(), BatchScreenshotTimes[BatchScreenshotIndex], *StandardFilename);
+    FScreenshotRequest::RequestScreenshot(StandardFilename, false, false);
+}
 void ACoasterRideActor::RebuildSpline()
 {
     const FString GeneratedTrackPath = FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungTrack.csv");
