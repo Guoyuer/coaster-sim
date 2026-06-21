@@ -2,6 +2,8 @@
 
 This records the visual/asset bugs found during the Yarlung Tsangpo canyon iteration on June 18, 2026.
 
+> Historical note: several entries below refer to the retired Landscape macro material chain (`M_YarlungLandscapeGround`, `YarlungMacro`, `LeafyGrass`, and helper inspection scripts). As of the 2026-06-20/21 corridor-mesh cleanup, runtime terrain uses `SM_YarlungCorridorTerrain` + `M_YarlungMeshTerrain`; the old macro/LeafyGrass source assets have been removed. Keep this file as bug history, not as current implementation guidance.
+
 ## Open
 
 ### Visual target still below photo-real / 3A bar

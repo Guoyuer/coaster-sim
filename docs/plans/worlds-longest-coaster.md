@@ -31,7 +31,7 @@
 - **净空现状**：全环不穿山保证由 `scripts/verify-track-clearance.py` 的生成即校验门禁承担；旧 no-op clearance-cut 代码已删除，不再靠运行时/导入侧硬挖山兜底。
 - **坐标系/编码**（生成器与 commandlet 一致）：
   - 世界网格 `SIZE=1009`，`X∈[-337778.43, 337778.43]cm`（≈6.76km），`Y∈[-416981.55, 416981.55]cm`（≈8.34km），原点居中。
-  - Landscape 在原点，`Scale=(XYScaleX≈670.2, XYScaleY≈827.3, ZScale≈917.97)`，`SectionSizeQuads=63`。
+  - 历史 Landscape 导入曾使用原点 `Scale=(XYScaleX≈670.2, XYScaleY≈827.3, ZScale≈917.97)`、`SectionSizeQuads=63`；当前运行时可见地形已切到 generated corridor static mesh，但高度编码和世界 bounds 仍沿用同一数据契约。
   - 高度编码：`.r16` 16-bit，`HeightCm = Lerp(260000, 730000, raw16/65535)`（即海拔 2600–7300m）。
   - 世界→经纬：`world_to_lon_lat(x,y)`（`generate-yarlung-landscape-assets.py:184`）。
   - DEM bbox：lat 29.745–29.820N × lon 94.945–95.015E（大拐弯最深段）。
@@ -68,7 +68,7 @@
 
 同时生成器更新 `manifest.json` 增加 `track` 块：`{length_m, control_point_count, out_back_split_m, min_clearance_m, min_curve_radius_m, max_grade_pct, est_max_vert_g, est_max_lat_g, section_distances_m:{...}}`。
 
-> 决策 D1：**长轨道不再硬编码进 `.h`**。~5km 在合理控制点间距下约 80–160 点，且必须可从 DEM 再生。改为生成+提交的 CSV，符合现有「generated assets」模式（`.r16`/macro/manifest 都是生成提交的）。Yarlung 运行时路径必须加载 `YarlungTrack.csv`；旧 `DefaultTrackControlPoints()` / `YarlungCoasterProfile.h` 已删除，不能作为 fallback 重新引入。
+> 决策 D1：**长轨道不再硬编码进 `.h`**。~5km 在合理控制点间距下约 80–160 点，且必须可从 DEM 再生。改为生成+提交的 CSV，符合现有「generated assets」模式（`.r16`/preview/masks/river CSV/manifest/track CSV 是生成提交的；旧 macro TGA 链已删除）。Yarlung 运行时路径必须加载 `YarlungTrack.csv`；旧 `DefaultTrackControlPoints()` / `YarlungCoasterProfile.h` 已删除，不能作为 fallback 重新引入。
 
 ---
 

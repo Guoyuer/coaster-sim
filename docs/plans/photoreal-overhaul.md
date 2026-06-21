@@ -46,7 +46,7 @@
 ```powershell
 .\scripts\import-yarlung-landscape.ps1 -Build
 ```
-该脚本顺序：① `generate-yarlung-landscape-assets.py` 生成高度图 `.r16` + macro 贴图 → ② `create-coaster-materials.py` 建材质 → ③ `import-polyhaven-models.py` 导模型 → ④ `-run=YarlungLandscapeImport` commandlet 重建 `.umap`。
+该脚本顺序：① `generate-yarlung-landscape-assets.py` 生成高度图 `.r16` / preview / masks / river CSV → ② `create-coaster-materials.py` 建当前运行时材质 → ③ `import-polyhaven-models.py` 导模型 → ④ `-run=YarlungLandscapeImport` commandlet 重建 `.umap` 与 corridor scenery。
 - **关卡 (.umap) 是 commandlet 生成物，不是手摆的。** 要往关卡加/删 actor，改 `YarlungLandscapeImportCommandlet.cpp` 再重跑，否则手改会被下次导入覆盖。
 - headless UE 脚本即使内部报错也可能返回 exit code 0 → 必须用 success-marker / 资产存在性校验兜底（已有先例，保持）。
 
@@ -63,33 +63,36 @@
 ## 1. 当前架构速览
 
 ```
-generate-yarlung-landscape-assets.py  ──> YarlungTsangpo_1009.r16 (程序化高度图) + macro_*.tga
-create-coaster-materials.py           ──> M_YarlungLandscapeGround / M_CoasterTint / 导入 PBR 贴图
+Config/yarlung-terrain.json           ──> C++/Python 共享地形常量
+generate-yarlung-landscape-assets.py  ──> YarlungTsangpo_1009.r16 + preview/masks + YarlungRiver.csv
+generate-yarlung-track.py             ──> YarlungTrack.csv + manifest track block
+create-coaster-materials.py           ──> M_YarlungMeshTerrain / river / coaster / imported live PBR textures
 import-polyhaven-models.py            ──> /Game/Generated/Models/*  (PolyHaven 1k/2k 小道具)
-YarlungLandscapeImportCommandlet.cpp  ──> 读 .r16 → spawn ALandscape + spawn ACoasterRideActor → 存 .umap
-CoasterGameMode::BeginPlay            ──> 运行时若无 ride actor 再 spawn 一个
-ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 + 天空/云/远山/河/植被/巨石(全部环境)
+YarlungLandscapeImportCommandlet.cpp  ──> 读 .r16/CSV → build SM_YarlungCorridorTerrain + spawn scenery actors → 存 .umap
+ACoasterRideActor                     ──> 运行时仿真、轨道/车/支撑、相机/HUD；不再承载永久环境美术
 ```
 
-**历史结构性 bug（已部分清理）**：早期真实地形 = commandlet spawn 的 `ALandscape`（高度来自 `.r16`），影子地形 = `CoasterRideActor.cpp` 内解析函数，用来摆巨石/植被/支撑脚，导致两份高度场不一致。当前 ride actor 已清掉旧 boulder/scenery 影子地形，支撑脚读 `YarlungTrack.csv terrain_z`；剩余环境内容应继续放在独立 scenery actor / generated level 管线。
+**当前地形事实（2026-06-21）**：运行时可见地形是 generated corridor static mesh `SM_YarlungCorridorTerrain`，不是 `ALandscape`；旧 full-map mesh / Landscape / `M_YarlungLandscapeGround` / macro TGA 链已退役。生成资产仍要经 commandlet，不手摆；环境内容继续放在独立 scenery actor / generated level 管线。
+
+**历史结构性 bug（已清理，保留为教训）**：早期真实地形 = commandlet spawn 的 `ALandscape`（高度来自 `.r16`），影子地形 = `CoasterRideActor.cpp` 内解析函数，用来摆巨石/植被/支撑脚，导致两份高度场不一致。当前共享常量、CSV loader、river CSV、支撑脚 terrain_z 已收敛；不要重新引入影子地形或宏观材质双链。
 
 ---
 
 ## 2. 核心发现（按严重度，含 file:line）
 
 - **S1（最高，天花板）几何全是引擎基本体 + 顶点色程序化四边形**：轨道/枕木/支撑/车 = `/Engine/BasicShapes/Cube` 拉伸（`CoasterRideActor.cpp:232-243`、`RebuildVisuals():382`）；天空 = 顶点色 `BuildSkyDome():490`；云 = 扁平椭圆 `BuildCloudLayer():541`；远山 = 朝相机平面 `BuildDistantRidges():598`；河/泡沫/激流 = 顶点色 ribbon `BuildRiverRibbon():813`/`:856`/`:899`；用调试材质 `VertexColorMaterial`/`BasicShapeMaterial_Inst`（`:294-300`）。这些正是 `docs/bugs/2026-06-18-visual-pipeline-bugs.md` 判定要删的 low-ceiling 覆盖几何。
-- **S2 两套地形高度场冲突**（见 §1）。
-- **S3 材质平涂/借贴图**：`M_CoasterTint`（`create-coaster-materials.py:196`）单色平涂；Landscape 材质（`:226`）单张 macro albedo 当 BaseColor、**没接法线**、AO 借自无关贴图——文档明令禁止的"单张照片当整座山"。
-- **S4 物理天空与假天穹并存 + 光照非物理**：`SkyAtmosphere`（`:157`）与假天穹/假云冲突；太阳 `SetIntensity(32.0)`（`:152`）量级可疑，又用曝光锁 min=max=1.0（`:121-124`）硬拉 → 能量比非物理，PBR 响应整体假。无体积云。项目级 Lumen/VSM/Nanite 已开（`Config/DefaultEngine.ini`）——地基对，缺上层。
-- **S5 植被密度不足/阴影开销错配**：520 树/3400 草等 ISM 解析摆放（`BuildVegetationScatter():691`，数量 `:752-756`），达不到林芝密林；草开 `CastShadow=true`（`:223`）很贵。
-- **S6 美术内容生成在 C++ 里**：每改一点画面要重编 C++，迭代慢；git 历史反复缠斗暖色 albedo/雾/moire 即此症状。
+- **S2（当前主瓶颈）山体仍不像真实峡谷**：corridor mesh 路线消除了 full-map fallback 和 Landscape LOD 路径，但画面仍容易读成灰绿程序化山皮。下一步应上作者化 canyon wall / wet cliff / forest canopy / atmospheric layers，而不是恢复 macro Landscape 链。
+- **S3 轨道/车/支撑仍偏灰盒**：`ACoasterRideActor` 仍承担运行时轨道/车/支撑几何，视觉上还不是真实钢结构/PBR 资产；但相对山体不是第一优先级。
+- **S4 江水仍低保真**：`AYarlungRiverActor` 已独立并沿 DEM thalweg，但材质/flow/depth/reflection 仍不足。
+- **S5 植被密度与资产质量不足**：需要真实 forest canopy / shrubs / cliff vegetation 资产层；不要用 boulder/shrub proxy 充林芝密林。
+- **S6 文档与资产链必须保持同步**：旧 Landscape macro/LeafyGrass source assets 已删除；任何新 agent 不应寻找 `M_YarlungLandscapeGround` 或 `macro_*.tga` 作为当前路线。
 
 ---
 
 ## 3. 执行硬规则
 
-1. **High-ceiling only**：真实 DEM 地形、分层 Landscape 材质、Nanite 资产、物理天空/体积云、TSR/Lumen。**禁止**临时覆盖几何、顶点色色块、一次性色彩微调来掩盖资产问题（`CONTEXT.md` "Visual Iteration Rule"）。
-2. **单一真相源**：地形以导入的 `ALandscape` 为准，删除 actor 内影子地形/假天空/假云/假远山。
+1. **High-ceiling only**：真实 DEM 大轮廓、corridor Nanite/StaticMesh 地形、作者化山体/岩壁/植被资产、物理天空/体积云、TSR/Lumen。**禁止**临时覆盖几何、顶点色色块、一次性色彩微调来掩盖资产问题（`CONTEXT.md` "Visual Iteration Rule"）。
+2. **单一真相源**：地形以 generated corridor mesh + `.r16`/CSV 数据契约为准；不要恢复 `ALandscape` 运行时路径、full-map fallback、actor 内影子地形、假天空、假云、假远山。
 3. **造景迁出 C++（硬决策）**：环境美术作者化到关卡/资产（经 commandlet 添加），`ACoasterRideActor` 最终只保留仿真 + 轨道/车几何。不要再往 `RebuildEnvironment` 里加美术。
 4. **走廊优先 + 远中景优先**（S-A/S-B）：预算按"相机视锥扫到的体积"和"远中景画意"分配。
 5. **每步高分辨率 FP 截图验收 + Read 看图 + 对照参考照片**。证据先于结论。
@@ -111,7 +114,7 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 - **A1 删假环境几何**：从 `CoasterRideActor.cpp`/`.h` 删除 `BuildSkyDome`/`BuildCloudLayer`/`BuildDistantRidges` 及对应组件 (`SkyDomeMesh`/`CloudLayerMesh`/`DistantRidgeMesh`) 和 `VertexColorMaterial` 绑定。河流(`BuildRiver*`)先留占位，D 阶段换真实水体。保留仿真与轨道/车几何。
   - 验收：编译通过；FP 截图不再有方块云/顶点色天穹/平面远山；天空交给 `SkyAtmosphere`（可能暂时偏暗，B 修）。
 - **A2 真实 DEM 地形（如画轮廓的来源）— 真实尺度，不压缩**（2026-06-18 决策）：
-  - **尺度方案=真实尺度子区域**：裁取约 **5–10 km** 的一段壮观真实峡谷，按**接近 1:1** 导成**公里级 UE Landscape**（UE 跑公里级地形正常）。**禁止**把整条峡谷压进现有 164×187m 的玩具尺度——那会让崖壁只剩 ~43m、远山变成贴轨小丘，第一人称读成桌面沙盘，丢掉"如画"壮阔感（压缩倍率水平~212×/垂直~114×，已验证不可接受）。
+  - **尺度方案=真实尺度子区域**：裁取约 **5–10 km** 的一段壮观真实峡谷，按**接近 1:1** 导成公里级 corridor 世界。当前运行时不再用 `ALandscape`，而是 commandlet 生成的 corridor static mesh；尺度原则不变。**禁止**把整条峡谷压进现有 164×187m 的玩具尺度——那会让崖壁只剩 ~43m、远山变成贴轨小丘，第一人称读成桌面沙盘，丢掉"如画"壮阔感（压缩倍率水平~212×/垂直~114×，已验证不可接受）。
   - **垂直保持真实尺度**：崖壁几百米量级，抬头能看到压过来的峡谷墙与真正"远"的雪山。
   - **过山车作为峡谷里的小型设施**：占地约 150m 的早期短环已被世界最长约 5km 沿江往返线路取代。轨道样条坐标由生成器写入 `YarlungTrack.csv`，并让样条穿过取景好的临江高弯。
   - **选定子区域（2026-06-18 用户拍板）=大拐弯最深峡谷段**，南迦巴瓦与加拉白垒之间（世界最深，最大深度 6009m）。险峻+如画。
@@ -124,7 +127,7 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
   - **照片向自然化（2026-06-19 转向）**：若 DEM 近景陡崖或轨道净空切槽在 FP 帧中读成水平货架/人工墙，允许并应当 naturalize heightfield、改轨道 Z/XY、重塑走廊地形。DEM 保留中远景大轮廓；近景以照片自然性为准。
   - **轨道适配地形**：不要硬挖一条峡谷槽。优先根据自然地形重新计算轨道高度/路径，使轨道不穿山、离地合理、近景坡面自然；全环净空用校验器硬门禁闭环。
   - 验收：英雄段 FP 帧里对岸崖壁/远山轮廓接近参照照片的真实山形与**尺度感**（壮阔，不是小土坡），不再是平滑解析坡；轨道附近不能出现人工水平台阶墙/硬切槽。
-- **A3 scatter 改查真实地形，并迁出 ride actor**：用 Landscape 真表面点+法线放置巨石/植被，替换对解析 `YarlungLandscapeHeight()` 的依赖。首选在 `YarlungLandscapeImportCommandlet.cpp` 或专门的 generated scenery/PCG 管线中生成关卡内容；若必须用运行时 `LineTraceSingleByChannel`（高空向下打 `ECC_WorldStatic`），也要封装到独立 scenery actor，不要继续写进 `ACoasterRideActor::RebuildEnvironment`。注意 Landscape 碰撞就绪时序（commandlet 离屏环境与 PIE/运行时都要验证）。最终删除影子地形函数。
+- **A3 scatter 改查真实地形，并迁出 ride actor**：用 corridor mesh / `.r16` / track CSV 的同一数据契约放置巨石/植被，替换对解析 `YarlungLandscapeHeight()` 的依赖。首选在 `YarlungLandscapeImportCommandlet.cpp` 或专门的 generated scenery/PCG 管线中生成关卡内容；若必须用运行时 `LineTraceSingleByChannel`（高空向下打 `ECC_WorldStatic`），也要封装到独立 scenery actor，不要继续写进 `ACoasterRideActor::RebuildEnvironment`。注意 commandlet 离屏环境与 PIE/运行时都要验证。最终删除影子地形函数。
   - 验收：植被/巨石与地表无缝贴合，无浮空/半埋；`Yarlung scatter instances` 计数 > 0。
 
 ### 阶段 B — 物理天空 + 光照标定 + 大气透视（远景画意主力）
@@ -133,9 +136,9 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 - **B2 光照物理量级标定**：方向光设为物理日光量级（lux），`SkyLight` 匹配；**去掉曝光硬锁**改 Manual 合理 EV 或带合理 min/max 的自适应；在正确光照下重调 ACES filmic 曲线（代码已有 `FilmSlope/Toe/Shoulder`，`:127-132`）。把 Lumen GI + VSM 的效果验证出来。
   - 验收：晴天直射的阴影/高光对比可信；地表有 GI 反弹；金属有方向性高光。
 
-### 阶段 C — 分层 Nanite 地表材质（中近景崖壁/坡面）
-- **C1 分层地表材质**：改 `create_landscape_material`（`create-coaster-materials.py:226`）：macro 决定远景色/覆盖，叠 Megascans/扫描 PBR 做近景 normal/roughness/AO/breakup，按坡度/高度分层（河岸/森林/岩石/雪/湿度带）。**把法线接回**但做宏观/微观尺度分离避免重现 moire（bug 日志教训）。可选 Nanite 位移(Tessellation)做近景地表起伏。AO 用各图层自己的，别再借 `aerial_grass_rock`。
-  - 验收：崖壁/坡面有高频岩石细节与法线起伏，颜色冷灰绿（非橙）；远看无可见平铺。
+### 阶段 C — 山体/峡谷资产化（中近景崖壁/坡面）
+- **C1 corridor terrain material / asset layer**：继续改 live 的 `M_YarlungMeshTerrain` 生成逻辑与 scenery actor，而不是恢复 `create_landscape_material` / `M_YarlungLandscapeGround` / macro TGA。远中景需要大尺度 canyon wall / mountainside 形体，近中景叠 Megascans/扫描 PBR 做 normal/roughness/AO/breakup，按坡度/高度/湿度分层（河岸/森林/岩石/雪/湿岩带）。法线和位移必须宏观/微观尺度分离，避免重现 moire（bug 日志教训）。必要时用独立 Nanite cliff/forest asset 接管掠射崖面。
+  - 验收：崖壁/坡面有真实岩石/植被形体和法线起伏，颜色冷灰绿（非橙）；远看无可见平铺；第一人称全程不出现 heightfield 台阶/大块幕墙。
 
 ### 阶段 D — 真实资产替换（江水 > 轨道/车）
 - **D1 真实江水（远中景主角，优先）**：UE Water 插件或自定义水体材质——深度、折射、流动法线、Lumen/SSR 反射、湍流泡沫，乳白—青绿色（`CONTEXT.md`）。替换顶点色 ribbon。
@@ -167,7 +170,7 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 ## 6. 风险与坑
 - **headless exit code 0 假成功** → 保留 marker + 资产校验。
 - **.umap 是生成物** → 关卡 actor 改动走 commandlet，别手摆。
-- **碰撞时序**：A3 射线放置依赖 Landscape 碰撞就绪；commandlet 离屏环境与运行时时序不同，分别验证。
+- **碰撞/采样时序**：A3 射线或采样放置依赖 corridor mesh / generated level 就绪；commandlet 离屏环境与运行时时序不同，分别验证。
 - **moire 回归**：C1 接法线务必尺度分离。
 - **曝光放开后**早期截图可能过曝/欠曝，属预期，按物理量级标定后再判。
 - **DEM 对齐**：A2 真实 DEM 的世界尺度/朝向要和现有轨道走廊对齐，否则轨道飞出地形或穿山。
@@ -179,7 +182,7 @@ ACoasterRideActor                     ──> C++ 里生成：轨道/车/支撑 
 - 关卡导入 commandlet：`Source/CoasterSim/YarlungLandscapeImportCommandlet.cpp`
 - GameMode：`Source/CoasterSim/CoasterGameMode.cpp`
 - 材质/贴图生成：`scripts/create-coaster-materials.py`
-- 高度图/macro 生成：`scripts/generate-yarlung-landscape-assets.py`
+- 高度图/river/mask 生成：`scripts/generate-yarlung-landscape-assets.py`
 - 模型导入：`scripts/import-polyhaven-models.py`
 - 管线编排：`scripts/import-yarlung-landscape.ps1`
 - 画面验证：`scripts/offscreen-shot.ps1`
