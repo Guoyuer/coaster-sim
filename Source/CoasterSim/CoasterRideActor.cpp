@@ -1,6 +1,7 @@
 #include "CoasterRideActor.h"
 
 #include "CoasterBanking.h"
+#include "CoasterRideCamera.h"
 #include "CoasterTrackVisuals.h"
 #include "CoasterTrackComponent.h"
 #include "YarlungAtmosphere.h"
@@ -12,7 +13,6 @@
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/VolumetricCloudComponent.h"
-#include "Engine/Scene.h"
 #include "Engine/Engine.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -40,56 +40,7 @@ ACoasterRideActor::ACoasterRideActor()
 
     RideCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("RideCamera"));
     RideCamera->SetupAttachment(TrainRoot);
-    RideCamera->SetRelativeLocation(FVector(-146.0f, 0.0f, 372.0f));
-    // Both hero refs (02/03) look distinctly DOWN into the gorge at the river and
-    // valley floor (~-15 to -25 deg), not across at the near hillside. The old
-    // -4 deg framed flat pale mid-slope terrain that reads as greybox; pitching
-    // down swaps it for the textured near canyon wall + valley depth.
-    RideCamera->SetRelativeRotation(FRotator(-7.5f, 0.0f, 0.0f));
-    RideCamera->SetFieldOfView(86.0f);
-    RideCamera->bUsePawnControlRotation = false;
-    RideCamera->PostProcessSettings.bOverride_MotionBlurAmount = true;
-    RideCamera->PostProcessSettings.MotionBlurAmount = 0.025f;
-    RideCamera->PostProcessSettings.bOverride_VignetteIntensity = true;
-    RideCamera->PostProcessSettings.VignetteIntensity = 0.18f;
-    RideCamera->PostProcessSettings.bOverride_ColorSaturation = true;
-    RideCamera->PostProcessSettings.ColorSaturation = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
-    RideCamera->PostProcessSettings.bOverride_ColorContrast = true;
-    RideCamera->PostProcessSettings.ColorContrast = FVector4(1.02f, 1.02f, 1.02f, 1.0f);
-    RideCamera->PostProcessSettings.bOverride_ColorGamma = true;
-    RideCamera->PostProcessSettings.ColorGamma = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
-    RideCamera->PostProcessSettings.bOverride_ColorGain = true;
-    RideCamera->PostProcessSettings.ColorGain = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
-    RideCamera->PostProcessSettings.bOverride_WhiteTemp = true;
-    RideCamera->PostProcessSettings.WhiteTemp = 6500.0f;
-    RideCamera->PostProcessSettings.bOverride_AutoExposureMethod = true;
-    RideCamera->PostProcessSettings.AutoExposureMethod = AEM_Manual;
-    RideCamera->PostProcessSettings.bOverride_AutoExposureApplyPhysicalCameraExposure = true;
-    RideCamera->PostProcessSettings.AutoExposureApplyPhysicalCameraExposure = true;
-    RideCamera->PostProcessSettings.bOverride_CameraShutterSpeed = true;
-    RideCamera->PostProcessSettings.CameraShutterSpeed = 500.0f;
-    RideCamera->PostProcessSettings.bOverride_CameraISO = true;
-    RideCamera->PostProcessSettings.CameraISO = 100.0f;
-    RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-    // Reference-matched daylight: the canyon needs bright sky but dark forested
-    // slopes. The old -0.25 bias still washed the mountain albedo into pale
-    // mint; -1.05 keeps sunlit cloud/sky readable while restoring hillside mass.
-    RideCamera->PostProcessSettings.AutoExposureBias = -1.05f;
-    RideCamera->PostProcessSettings.bOverride_FilmSlope = true;
-    RideCamera->PostProcessSettings.FilmSlope = 0.86f;
-    RideCamera->PostProcessSettings.bOverride_FilmToe = true;
-    RideCamera->PostProcessSettings.FilmToe = 0.22f;
-    RideCamera->PostProcessSettings.bOverride_FilmShoulder = true;
-    RideCamera->PostProcessSettings.FilmShoulder = 0.42f;
-    RideCamera->PostProcessSettings.bOverride_FilmGrainIntensity = true;
-    RideCamera->PostProcessSettings.FilmGrainIntensity = 0.035f;
-    RideCamera->PostProcessSettings.bOverride_SceneFringeIntensity = true;
-    RideCamera->PostProcessSettings.SceneFringeIntensity = 0.05f;
-    // A landscape coaster's hero subject is the km-distant canyon, not anything
-    // 42m away. The old DoF focused at 4200cm actively blurred the vista — the
-    // opposite of an epic cinematic wide shot. Keep the whole frame sharp.
-    RideCamera->PostProcessSettings.bOverride_DepthOfFieldEnabled = true;
-    RideCamera->PostProcessSettings.DepthOfFieldEnabled = false;
+    CoasterRideCamera::Configure(RideCamera);
 
     SkyLight = CreateDefaultSubobject<USkyLightComponent>(TEXT("SkyLight"));
     SkyLight->SetupAttachment(SceneRoot);
@@ -358,10 +309,7 @@ void ACoasterRideActor::AdvanceRide(float DeltaSeconds)
 
 void ACoasterRideActor::UpdateFirstPersonCamera()
 {
-    RideCamera->SetRelativeLocation(FVector(-146.0f, 0.0f, 372.0f));
-    // Keep in sync with the constructor: this runs every frame and governs the
-    // running-shot framing. Look down into the gorge to match hero refs 02/03.
-    RideCamera->SetRelativeRotation(FRotator(-7.5f, 0.0f, 0.0f));
+    CoasterRideCamera::ApplyRigTransform(RideCamera);
 }
 
 void ACoasterRideActor::SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const
