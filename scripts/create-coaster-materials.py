@@ -130,7 +130,7 @@ def finalize_material(material):
 
 
 def create_tint_material():
-    material = create_material_asset(TINT_MATERIAL_NAME, PACKAGE_PATH)
+    material = create_material_asset(TINT_MATERIAL_NAME, PACKAGE_PATH, replace_existing=True)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
 
     connect_material_property(
@@ -242,7 +242,7 @@ def create_yarlung_water_material_instance():
 
 
 def create_yarlung_water_surface_material():
-    material = create_material_asset(WATER_SURFACE_MATERIAL_NAME, PACKAGE_PATH)
+    material = create_material_asset(WATER_SURFACE_MATERIAL_NAME, PACKAGE_PATH, replace_existing=True)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
     material.set_editor_property("two_sided", True)
@@ -279,7 +279,7 @@ def create_yarlung_water_surface_material():
 
 
 def create_mesh_terrain_material():
-    material = create_material_asset(MESH_TERRAIN_MATERIAL_NAME, PACKAGE_PATH)
+    material = create_material_asset(MESH_TERRAIN_MATERIAL_NAME, PACKAGE_PATH, replace_existing=True)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     material.set_editor_property("two_sided", False)
 

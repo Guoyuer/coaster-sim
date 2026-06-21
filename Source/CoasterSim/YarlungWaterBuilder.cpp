@@ -100,10 +100,6 @@ bool SpawnYarlungWater(UWorld* World)
     }
     RiverComponent->bAffectsLandscape = false;
     RiverComponent->ShapeDilation = WaterConfig.ShapeDilation;
-    if (UStaticMesh* DefaultRiverMesh = UWaterSubsystem::StaticClass()->GetDefaultObject<UWaterSubsystem>()->DefaultRiverMesh)
-    {
-        RiverComponent->SetWaterMeshOverride(DefaultRiverMesh);
-    }
 #if WITH_EDITOR
     RiverComponent->SetWaterBodyStaticMeshEnabled(true);
 #endif

@@ -18,6 +18,7 @@ from yarlung_track_lib import (
     moving_average_points,
     polyline_length,
     resample_polyline,
+    sample_closed_catmull,
     write_track_csv,
 )
 
@@ -54,6 +55,35 @@ def cumulative_distances(points: list[tuple[float, float, float]]) -> list[float
     for a, b in zip(points, points[1:]):
         distances.append(distances[-1] + math.dist(a, b))
     return distances
+
+
+def clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def point_at_distance(
+    points: list[tuple[float, float, float]],
+    distances: list[float],
+    distance_cm: float,
+) -> tuple[float, float, float, int]:
+    if not points:
+        raise ValueError("cannot sample an empty polyline")
+    target = clamp(distance_cm, 0.0, distances[-1])
+    segment = 0
+    while segment + 1 < len(distances) and distances[segment + 1] < target:
+        segment += 1
+    if segment + 1 >= len(points):
+        return points[-1][0], points[-1][1], points[-1][2], len(points) - 1
+    span = max(1.0, distances[segment + 1] - distances[segment])
+    t = (target - distances[segment]) / span
+    a = points[segment]
+    b = points[segment + 1]
+    return (
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t,
+        segment,
+    )
 
 
 def extract_thalweg(heightfield: Heightfield, step_x: int = 5, search_radius: int = 70) -> list[tuple[float, float, float]]:
@@ -131,6 +161,112 @@ def section_for(route: str, ratio: float) -> str:
     if ratio < 0.96:
         return "Brake"
     return "Station"
+
+
+def scenic_section_for(ratio: float) -> str:
+    if ratio < 0.035:
+        return "Station"
+    if ratio < 0.135:
+        return "Lift"
+    if ratio < 0.52:
+        return "Outbound"
+    if ratio < 0.59:
+        return "Turnaround"
+    if ratio < 0.80:
+        return "Return"
+    if ratio < 0.90:
+        return "Launch"
+    if ratio < 0.965:
+        return "Brake"
+    return "Station"
+
+
+def build_scenic_freeform(
+    heightfield: Heightfield,
+    thalweg: list[tuple[float, float, float]],
+    target_length_m: float,
+    spacing_m: float,
+    clearance_m: float,
+    scenic_lateral_scale_m: float,
+    scenic_height_m: float,
+    outbound_descent_m: float,
+    design_speed_mps: float,
+    max_bank_deg: float,
+) -> list[TrackPoint]:
+    river_path = resample_polyline(thalweg, 70.0 * 100.0)
+    river_distances = cumulative_distances(river_path)
+    total_river_cm = river_distances[-1]
+    scenic_span_cm = min(total_river_cm * 0.74, target_length_m * 100.0 * 0.45)
+    start_cm = max(0.0, (total_river_cm - scenic_span_cm) * 0.52)
+
+    # Fractions intentionally alternate river sides. This gives the first-person
+    # camera repeated cross-river and high-overlook beats instead of a parallel
+    # thalweg offset that keeps the water out of frame.
+    anchor_specs = [
+        (0.00, -0.42, "Station"),
+        (0.07, -0.62, "Lift"),
+        (0.16, 0.18, "Outbound"),
+        (0.27, 0.78, "Outbound"),
+        (0.39, -0.24, "Outbound"),
+        (0.51, -0.86, "Outbound"),
+        (0.63, 0.30, "Turnaround"),
+        (0.76, 0.82, "Return"),
+        (0.88, 0.08, "Return"),
+        (1.00, -0.46, "Return"),
+        (0.87, -0.82, "Launch"),
+        (0.70, 0.54, "Launch"),
+        (0.53, 0.88, "Brake"),
+        (0.35, -0.58, "Brake"),
+        (0.18, -0.82, "Station"),
+        (0.06, 0.26, "Station"),
+    ]
+
+    margin_cm = 180.0 * 100.0
+    anchors: list[tuple[float, float, float]] = []
+    for fraction, side_scale, _section in anchor_specs:
+        center = point_at_distance(river_path, river_distances, start_cm + scenic_span_cm * fraction)
+        nx, ny = tangent_normal(river_path, center[3])
+        lateral_cm = side_scale * scenic_lateral_scale_m * 100.0
+        x = clamp(center[0] + nx * lateral_cm, heightfield.min_x + margin_cm, heightfield.max_x - margin_cm)
+        y = clamp(center[1] + ny * lateral_cm, heightfield.min_y + margin_cm, heightfield.max_y - margin_cm)
+        anchors.append((x, y, heightfield.sample_cm(x, y)))
+
+    samples_per_segment = max(8, int(target_length_m / max(1.0, len(anchors) * spacing_m * 1.5)))
+    scenic_curve = sample_closed_catmull(anchors, samples_per_segment=samples_per_segment)
+    scenic_curve = [(x, y, heightfield.sample_cm(x, y)) for x, y, _z in scenic_curve]
+    scenic_curve = moving_average_points(scenic_curve, radius=2, passes=2)
+    route = resample_polyline(scenic_curve + [scenic_curve[0]], spacing_m * 100.0)
+    if len(route) > 1 and math.dist(route[0], route[-1]) < spacing_m * 100.0 * 0.55:
+        route = route[:-1]
+
+    terrain_values = [heightfield.sample_cm(x, y) for x, y, _z in route]
+    station_z = max(terrain_values) + scenic_height_m * 100.0
+    distances_cm = cumulative_distances(route)
+    total_cm = max(distances_cm[-1], 1.0)
+    points: list[TrackPoint] = []
+    for index, (x, y, _z) in enumerate(route):
+        ratio = distances_cm[index] / total_cm
+        terrain_z = terrain_values[index]
+        descent = outbound_descent_m * 100.0 * smoothstep(0.09, 0.46, ratio)
+        climb = outbound_descent_m * 100.0 * smoothstep(0.58, 0.96, ratio)
+        hero_crests = (
+            raised_cosine_bump(distances_cm[index] / 100.0, 940.0, 95.0, 2600.0)
+            + raised_cosine_bump(distances_cm[index] / 100.0, 1350.0, 105.0, 3200.0)
+            + raised_cosine_bump(distances_cm[index] / 100.0, 1780.0, 105.0, 2800.0)
+            + raised_cosine_bump(distances_cm[index] / 100.0, 3380.0, 130.0, 1800.0)
+        )
+        design_z = station_z - descent + climb + hero_crests
+        z = max(terrain_z + clearance_m * 100.0, design_z)
+        points.append(TrackPoint(index, x, y, z, 0.0, scenic_section_for(ratio), terrain_z))
+
+    smooth_z(points, radius=3, passes=3, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
+    smooth_closed_xy(points, radius=2, passes=2, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
+    smooth_z(points, radius=5, passes=2, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
+    apply_curvature_banking(points, design_speed_mps=design_speed_mps, max_bank_deg=max_bank_deg)
+    smooth_roll(points, radius=3, passes=3)
+    for idx, point in enumerate(points):
+        point.idx = idx
+    return points
 
 
 def build_out_and_back(
@@ -307,6 +443,7 @@ def update_manifest(
     root: Path,
     track_path: Path,
     points: list[TrackPoint],
+    route_style: str,
     design_speed_mps: float,
     max_bank_deg: float,
 ) -> dict[str, object]:
@@ -334,7 +471,8 @@ def update_manifest(
             "max_bank_deg": max_bank_deg,
         },
         "generator": "scripts/generate-yarlung-track.py",
-        "note": "Generated scenic out-and-back track with curvature-derived roll_deg for P3 comfort validation.",
+        "route_style": route_style,
+        "note": "Generated scenic route with curvature-derived roll_deg for clearance, comfort, and first-person spatial validation.",
     }
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest
@@ -369,14 +507,17 @@ def write_overlay(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--route-style", choices=("scenic-freeform", "out-and-back"), default="scenic-freeform")
     parser.add_argument("--target-length-m", type=float, default=5000.0)
     parser.add_argument("--spacing-m", type=float, default=25.0)
-    parser.add_argument("--clearance-m", type=float, default=42.0)
+    parser.add_argument("--clearance-m", type=float, default=72.0)
     parser.add_argument("--outbound-offset-m", type=float, default=35.0)
     parser.add_argument("--return-offset-m", type=float, default=90.0)
     parser.add_argument("--return-extra-height-m", type=float, default=12.0)
-    parser.add_argument("--outbound-descent-m", type=float, default=260.0)
-    parser.add_argument("--design-speed-mps", type=float, default=22.0)
+    parser.add_argument("--outbound-descent-m", type=float, default=210.0)
+    parser.add_argument("--scenic-lateral-scale-m", type=float, default=210.0)
+    parser.add_argument("--scenic-height-m", type=float, default=80.0)
+    parser.add_argument("--design-speed-mps", type=float, default=34.0)
     parser.add_argument("--max-bank-deg", type=float, default=70.0)
     parser.add_argument("--out", default="Content/Generated/YarlungLandscape/YarlungTrack.csv")
     parser.add_argument("--overlay", default="Saved/Diagnostics/yarlung-track-overlay.png")
@@ -385,22 +526,36 @@ def main() -> None:
     root = Path.cwd()
     heightfield = load_heightfield(root)
     thalweg = extract_thalweg(heightfield)
-    points = build_out_and_back(
-        heightfield,
-        thalweg,
-        target_length_m=args.target_length_m,
-        spacing_m=args.spacing_m,
-        clearance_m=args.clearance_m,
-        outbound_offset_m=args.outbound_offset_m,
-        return_offset_m=args.return_offset_m,
-        return_extra_height_m=args.return_extra_height_m,
-        outbound_descent_m=args.outbound_descent_m,
-        design_speed_mps=args.design_speed_mps,
-        max_bank_deg=args.max_bank_deg,
-    )
+    if args.route_style == "out-and-back":
+        points = build_out_and_back(
+            heightfield,
+            thalweg,
+            target_length_m=args.target_length_m,
+            spacing_m=args.spacing_m,
+            clearance_m=args.clearance_m,
+            outbound_offset_m=args.outbound_offset_m,
+            return_offset_m=args.return_offset_m,
+            return_extra_height_m=args.return_extra_height_m,
+            outbound_descent_m=args.outbound_descent_m,
+            design_speed_mps=args.design_speed_mps,
+            max_bank_deg=args.max_bank_deg,
+        )
+    else:
+        points = build_scenic_freeform(
+            heightfield,
+            thalweg,
+            target_length_m=args.target_length_m,
+            spacing_m=args.spacing_m,
+            clearance_m=args.clearance_m,
+            scenic_lateral_scale_m=args.scenic_lateral_scale_m,
+            scenic_height_m=args.scenic_height_m,
+            outbound_descent_m=args.outbound_descent_m,
+            design_speed_mps=args.design_speed_mps,
+            max_bank_deg=args.max_bank_deg,
+        )
     track_path = Path(args.out)
     write_track_csv(track_path, points)
-    manifest = update_manifest(root, track_path, points, args.design_speed_mps, args.max_bank_deg)
+    manifest = update_manifest(root, track_path, points, args.route_style, args.design_speed_mps, args.max_bank_deg)
     overlay = Path(args.overlay)
     write_overlay(root, heightfield, thalweg, points, overlay)
     track = manifest["track"]

@@ -34,6 +34,13 @@ def object_path(obj):
     return obj.get_path_name() if obj else "<none>"
 
 
+def editor_bool(obj, property_name):
+    try:
+        return obj.get_editor_property(property_name)
+    except Exception:
+        return "<unavailable>"
+
+
 def main():
     if not unreal.EditorLoadingAndSavingUtils.load_map(MAP_PATH):
         raise RuntimeError(f"Unable to load map: {MAP_PATH}")
@@ -126,33 +133,58 @@ def main():
             raise RuntimeError(f"UE Water river has no WaterBody component: {sorted(component_names)}")
         if not any("Spline" in name for name in component_names):
             raise RuntimeError(f"UE Water river has no spline component: {sorted(component_names)}")
+        uses_static_spline_rendering = False
+        has_water_material = False
+        water_body_components = [component for component in components if component.get_class().get_name().startswith("WaterBodyRiverComponent")]
+        for component in water_body_components:
+            mesh_override = component.get_water_mesh_override() if hasattr(component, "get_water_mesh_override") else None
+            water_material = component.get_water_material() if hasattr(component, "get_water_material") else None
+            static_mesh_material = component.get_water_static_mesh_material() if hasattr(component, "get_water_static_mesh_material") else None
+            uses_static_spline_rendering = uses_static_spline_rendering or bool(mesh_override)
+            has_water_material = has_water_material or bool(water_material)
+            emit(
+                f"[YARLUNG-INSPECT] ue_water_component={component.get_name()} "
+                f"mesh_override={object_path(mesh_override)} water_material={object_path(water_material)} "
+                f"static_mesh_material={object_path(static_mesh_material)} "
+                f"hidden={editor_bool(component, 'hidden_in_game')} visible={editor_bool(component, 'visible')}"
+            )
+        if not has_water_material:
+            raise RuntimeError("UE Water river has no water material")
+        render_mode = "static_spline_mesh" if uses_static_spline_rendering else "water_zone_mesh"
+        emit(f"[YARLUNG-INSPECT] ue_water_render_mode={render_mode}")
         spline_mesh_count = 0
         visible_spline_mesh_count = 0
+        visible_info_mesh_count = 0
         sample_water_meshes = []
         for component in actor.get_components_by_class(unreal.MeshComponent):
             material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
             hidden = component.get_editor_property("hidden_in_game")
+            editor_visible = editor_bool(component, "visible")
             component_class = component.get_class().get_name()
+            if component_class == "WaterBodyInfoMeshComponent" and not hidden and editor_visible:
+                visible_info_mesh_count += 1
             if component_class == "SplineMeshComponent" or component.get_name().startswith("SplineMeshComponent"):
                 spline_mesh_count += 1
                 if not hidden:
                     visible_spline_mesh_count += 1
                 if len(sample_water_meshes) < 4:
                     sample_water_meshes.append(
-                        f"{component.get_name()} hidden={hidden} materials={material_names}"
+                        f"{component.get_name()} hidden={hidden} visible={editor_visible} materials={material_names}"
                     )
             elif len(sample_water_meshes) < 4:
                 sample_water_meshes.append(
-                    f"{component.get_name()} class={component_class} hidden={hidden} materials={material_names}"
+                    f"{component.get_name()} class={component_class} hidden={hidden} visible={editor_visible} materials={material_names}"
                 )
         if spline_mesh_count <= 0:
             raise RuntimeError("UE Water river has no spline mesh renderables")
-        if visible_spline_mesh_count <= 0:
-            raise RuntimeError(f"UE Water river spline meshes are all hidden: count={spline_mesh_count}")
         emit(
             f"[YARLUNG-INSPECT] ue_water_spline_meshes={spline_mesh_count} "
-            f"visible={visible_spline_mesh_count} samples={sample_water_meshes}"
+            f"visible={visible_spline_mesh_count} info_visible={visible_info_mesh_count} samples={sample_water_meshes}"
         )
+        if uses_static_spline_rendering and visible_spline_mesh_count <= 0:
+            raise RuntimeError(f"UE Water river spline meshes are all hidden: count={spline_mesh_count}")
+        if not uses_static_spline_rendering and visible_info_mesh_count <= 0:
+            raise RuntimeError("UE WaterZone render path has no visible water info mesh")
 
     scenery_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungSceneryActor")]
     if len(scenery_actors) != 1:
@@ -160,7 +192,7 @@ def main():
     for actor in scenery_actors:
         emit(f"[YARLUNG-INSPECT] scenery={actor.get_actor_label()} class={actor.get_class().get_name()}")
         total_instances = 0
-        forest_shrub_instances = 0
+        bad_forest_shrub_instances = 0
         real_rock_or_cliff_instances = 0
         for component in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
             material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
@@ -174,14 +206,16 @@ def main():
                     )
                 real_rock_or_cliff_instances += instance_count
             if component.get_name().startswith("ForestShrubs"):
-                forest_shrub_instances += instance_count
+                uses_real_spruce_asset = any("/Game/PN_interactiveSpruceForest/" in material_name for material_name in material_names)
+                if not uses_real_spruce_asset:
+                    bad_forest_shrub_instances += instance_count
             emit(
                 f"[YARLUNG-INSPECT] scenery_component={component.get_name()} "
                 f"class={component.get_class().get_name()} hidden={component.get_editor_property('hidden_in_game')} "
                 f"materials={material_names} instances={instance_count}"
             )
-        if forest_shrub_instances != 0:
-            raise RuntimeError(f"Known-bad shrub proxy scatter must stay disabled: {forest_shrub_instances} instances")
+        if bad_forest_shrub_instances != 0:
+            raise RuntimeError(f"Known-bad shrub proxy scatter must stay disabled: {bad_forest_shrub_instances} instances")
         if real_rock_or_cliff_instances <= 0:
             raise RuntimeError("Expected real Megascans rock/cliff scatter instances, found none")
         emit(f"[YARLUNG-INSPECT] real_rock_or_cliff_instances={real_rock_or_cliff_instances} proxy_shrubs_disabled=true")
@@ -198,4 +232,7 @@ def main():
     write_report()
 
 
-main()
+try:
+    main()
+finally:
+    write_report()

@@ -9,6 +9,8 @@ import math
 import sys
 from pathlib import Path
 
+from yarlung_track_lib import Heightfield, load_heightfield
+
 
 def read_track(path: Path) -> list[dict[str, object]]:
     with path.open(newline="", encoding="utf-8") as handle:
@@ -109,6 +111,95 @@ def camera_axes(forward: tuple[float, float, float], pitch_deg: float) -> tuple[
     return camera_forward, right, camera_up
 
 
+def camera_position(
+    track_position: tuple[float, float, float],
+    forward: tuple[float, float, float],
+    camera_back_cm: float,
+    camera_up_cm: float,
+) -> tuple[float, float, float]:
+    world_up = (0.0, 0.0, 1.0)
+    right = normalize(cross(world_up, forward), (0.0, 1.0, 0.0))
+    up = normalize(cross(forward, right), world_up)
+    return (
+        track_position[0] - forward[0] * camera_back_cm + up[0] * camera_up_cm,
+        track_position[1] - forward[1] * camera_back_cm + up[1] * camera_up_cm,
+        track_position[2] - forward[2] * camera_back_cm + up[2] * camera_up_cm,
+    )
+
+
+def terrain_occludes(
+    heightfield: Heightfield,
+    start: tuple[float, float, float],
+    end: tuple[float, float, float],
+    clearance_cm: float,
+    samples: int,
+) -> bool:
+    for index in range(1, samples):
+        t = index / samples
+        x = start[0] + (end[0] - start[0]) * t
+        y = start[1] + (end[1] - start[1]) * t
+        z = start[2] + (end[2] - start[2]) * t
+        if heightfield.sample_cm(x, y) + clearance_cm > z:
+            return True
+    return False
+
+
+def river_visibility(
+    heightfield: Heightfield,
+    river: list[dict[str, float]],
+    position: tuple[float, float, float],
+    camera_forward: tuple[float, float, float],
+    camera_right: tuple[float, float, float],
+    camera_up: tuple[float, float, float],
+    half_h: float,
+    half_v: float,
+    max_distance_cm: float,
+    occlusion_clearance_cm: float,
+    occlusion_samples: int,
+) -> tuple[dict[str, float], float, float, float, float, bool, int]:
+    best: tuple[float, dict[str, float], float, float, float, float, bool] | None = None
+    visible_count = 0
+    for row in river:
+        target = (row["x"], row["y"], row["z"] + 220.0)
+        to_river = (target[0] - position[0], target[1] - position[1], target[2] - position[2])
+        xy_distance = math.hypot(to_river[0], to_river[1])
+        if xy_distance > max_distance_cm:
+            continue
+        forward_depth = dot(to_river, camera_forward)
+        horizontal_angle = math.degrees(math.atan2(dot(to_river, camera_right), max(1.0, forward_depth)))
+        vertical_angle = math.degrees(math.atan2(dot(to_river, camera_up), max(1.0, forward_depth)))
+        in_fov = (
+            forward_depth > 0.0
+            and abs(math.radians(horizontal_angle)) <= half_h
+            and abs(math.radians(vertical_angle)) <= half_v
+        )
+        occluded = in_fov and terrain_occludes(
+            heightfield,
+            position,
+            target,
+            occlusion_clearance_cm,
+            occlusion_samples,
+        )
+        visible = in_fov and not occluded
+        visible_count += int(visible)
+        horizontal_overflow = max(0.0, abs(math.radians(horizontal_angle)) - half_h)
+        vertical_overflow = max(0.0, abs(math.radians(vertical_angle)) - half_v)
+        behind_penalty = 20.0 if forward_depth <= 0.0 else 0.0
+        score = behind_penalty + horizontal_overflow + vertical_overflow
+        if visible:
+            # Prefer river that is actually ahead, not a near-edge sliver.
+            score -= min(forward_depth / 100000.0, 1.0)
+        if best is None or score < best[0]:
+            dz_m = (position[2] - target[2]) / 100.0
+            best = (score, row, xy_distance / 100.0, dz_m, horizontal_angle, vertical_angle, visible)
+    if best is None:
+        row = nearest_river(river, position)
+        target = (row["x"], row["y"], row["z"] + 220.0)
+        to_river = (target[0] - position[0], target[1] - position[1], target[2] - position[2])
+        return row, math.hypot(to_river[0], to_river[1]) / 100.0, (position[2] - target[2]) / 100.0, 180.0, 180.0, False, 0
+    return best[1], best[2], best[3], best[4], best[5], best[6], visible_count
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--track", default="Content/Generated/YarlungLandscape/YarlungTrack.csv")
@@ -116,15 +207,21 @@ def main() -> int:
     parser.add_argument("--times", default="45,57,60,66,237")
     parser.add_argument("--start-ratio", type=float, default=0.34)
     parser.add_argument("--speed-mps", type=float, default=18.0)
-    parser.add_argument("--camera-pitch-deg", type=float, default=-7.5)
+    parser.add_argument("--camera-pitch-deg", type=float, default=-14.0)
+    parser.add_argument("--camera-back-cm", type=float, default=146.0)
+    parser.add_argument("--camera-up-cm", type=float, default=372.0)
     parser.add_argument("--horizontal-fov-deg", type=float, default=86.0)
     parser.add_argument("--vertical-fov-deg", type=float, default=52.0)
+    parser.add_argument("--max-river-target-distance-m", type=float, default=1800.0)
+    parser.add_argument("--occlusion-clearance-cm", type=float, default=180.0)
+    parser.add_argument("--occlusion-samples", type=int, default=24)
     parser.add_argument("--min-visible-samples", type=int, default=1)
     parser.add_argument("--out-csv", default="Saved/Diagnostics/yarlung-spatial-contract.csv")
     args = parser.parse_args()
 
     track = read_track(Path(args.track))
     river = read_river(Path(args.river))
+    heightfield = load_heightfield(Path.cwd())
     segments, total_length = track_segments(track)
     if not segments or not river:
         print("missing track or river samples", file=sys.stderr)
@@ -138,30 +235,37 @@ def main() -> int:
 
     for seconds in times:
         distance_cm = total_length * args.start_ratio + args.speed_mps * 100.0 * seconds
-        pos, forward, section = sample_track(segments, total_length, distance_cm)
-        river_row = nearest_river(river, pos)
-        target = (
-            river_row["x"],
-            river_row["y"],
-            river_row["z"] + 220.0,
-        )
-        to_river = (target[0] - pos[0], target[1] - pos[1], target[2] - pos[2])
+        track_pos, forward, section = sample_track(segments, total_length, distance_cm)
+        pos = camera_position(track_pos, forward, args.camera_back_cm, args.camera_up_cm)
         camera_forward, camera_right, camera_up = camera_axes(forward, args.camera_pitch_deg)
-        forward_depth = dot(to_river, camera_forward)
-        horizontal_angle = math.degrees(math.atan2(dot(to_river, camera_right), max(1.0, forward_depth)))
-        vertical_angle = math.degrees(math.atan2(dot(to_river, camera_up), max(1.0, forward_depth)))
-        xy_distance_m = math.hypot(to_river[0], to_river[1]) / 100.0
-        dz_m = (pos[2] - target[2]) / 100.0
-        visible = forward_depth > 0.0 and abs(math.radians(horizontal_angle)) <= half_h and abs(math.radians(vertical_angle)) <= half_v
+        nearest_row = nearest_river(river, pos)
+        nearest_xy_distance_m = math.hypot(nearest_row["x"] - pos[0], nearest_row["y"] - pos[1]) / 100.0
+        river_row, xy_distance_m, dz_m, horizontal_angle, vertical_angle, visible, visible_river_samples = river_visibility(
+            heightfield,
+            river,
+            pos,
+            camera_forward,
+            camera_right,
+            camera_up,
+            half_h,
+            half_v,
+            args.max_river_target_distance_m * 100.0,
+            args.occlusion_clearance_cm,
+            args.occlusion_samples,
+        )
         visible_count += int(visible)
         rows.append(
             {
                 "time_s": seconds,
                 "section": section,
+                "target_river_x": round(river_row["x"], 2),
+                "target_river_y": round(river_row["y"], 2),
+                "nearest_xy_distance_m": round(nearest_xy_distance_m, 2),
                 "xy_distance_m": round(xy_distance_m, 2),
                 "track_above_water_m": round(dz_m, 2),
                 "horizontal_angle_deg": round(horizontal_angle, 2),
                 "vertical_angle_deg": round(vertical_angle, 2),
+                "visible_river_samples": visible_river_samples,
                 "in_camera_fov": visible,
             }
         )

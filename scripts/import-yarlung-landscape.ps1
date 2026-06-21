@@ -186,7 +186,7 @@ if ($Verify) {
         Write-Host "[YARLUNG-TIME] verify existing map without reimport"
     }
     Invoke-TimedStep "verify map" {
-        & $EditorCmd $Project "-ExecutePythonScript=$InspectScript" -unattended -nop4 -NullRHI -NoSplash @EditorCommonArgs
+        & $EditorCmd $Project "-run=pythonscript" "-script=$InspectScript" -unattended -nop4 -NoSplash @EditorCommonArgs
         if ($LASTEXITCODE -ne 0) {
             throw "Yarlung landscape verification failed with exit code $LASTEXITCODE"
         }

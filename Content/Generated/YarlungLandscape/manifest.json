@@ -92,26 +92,27 @@
     "water_z_offset_cm": 180.0
   },
   "track": {
-    "path": "C:/Users/guoyu/Projects/coaster-sim/Content/Generated/YarlungLandscape/YarlungTrack.csv",
-    "length_m": 4943.84,
-    "control_point_count": 198,
-    "out_back_split_m": 2471.92,
-    "min_clearance_m": 42.0,
+    "path": "Content/Generated/YarlungLandscape/YarlungTrack.csv",
+    "length_m": 4942.72,
+    "control_point_count": 203,
+    "out_back_split_m": 2471.36,
+    "min_clearance_m": 72.0,
     "section_distances_m": {
-      "Station": 160.64,
-      "Lift": 307.66,
-      "Outbound": 1956.99,
-      "Turnaround": 450.9,
-      "Return": 1458.99,
-      "Launch": 360.91,
-      "Brake": 247.76
+      "Station": 346.38,
+      "Lift": 486.95,
+      "Outbound": 1887.0,
+      "Turnaround": 349.18,
+      "Return": 1056.96,
+      "Launch": 499.19,
+      "Brake": 317.07
     },
     "banking": {
       "roll_source": "curvature-derived",
-      "design_speed_mps": 22.0,
+      "design_speed_mps": 34.0,
       "max_bank_deg": 70.0
     },
     "generator": "scripts/generate-yarlung-track.py",
-    "note": "Generated scenic out-and-back track with curvature-derived roll_deg for P3 comfort validation."
+    "route_style": "scenic-freeform",
+    "note": "Generated scenic route with curvature-derived roll_deg for clearance, comfort, and first-person spatial validation."
   }
 }

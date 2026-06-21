@@ -6,7 +6,7 @@
 namespace
 {
 const FVector CameraOffsetCm(-146.0f, 0.0f, 372.0f);
-const FRotator CameraLookRotation(-7.5f, 0.0f, 0.0f);
+const FRotator CameraLookRotation(-14.0f, 0.0f, 0.0f);
 }
 
 namespace CoasterRideCamera
@@ -44,8 +44,10 @@ void Configure(UCameraComponent* RideCamera)
     RideCamera->PostProcessSettings.CameraShutterSpeed = 500.0f;
     RideCamera->PostProcessSettings.bOverride_CameraISO = true;
     RideCamera->PostProcessSettings.CameraISO = 100.0f;
+    RideCamera->PostProcessSettings.bOverride_DepthOfFieldFstop = true;
+    RideCamera->PostProcessSettings.DepthOfFieldFstop = 11.0f;
     RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-    RideCamera->PostProcessSettings.AutoExposureBias = -1.05f;
+    RideCamera->PostProcessSettings.AutoExposureBias = -1.45f;
     RideCamera->PostProcessSettings.bOverride_FilmSlope = true;
     RideCamera->PostProcessSettings.FilmSlope = 0.86f;
     RideCamera->PostProcessSettings.bOverride_FilmToe = true;
