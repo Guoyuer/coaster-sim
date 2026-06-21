@@ -12,7 +12,7 @@ param(
     [double]$StartSpeedMps = 18.0,
     [switch]$KeepSourceFrames,
     [switch]$SimulateWait,
-    [int[]]$BatchJumpSeconds = @(),
+    [string[]]$BatchJumpSeconds = @(),
     [string]$BatchNamePrefix = "",
     [int]$BatchSettleFrames = 4,
     [int]$BatchPostFrames = 8,
@@ -61,19 +61,55 @@ function Convert-ToFlatArgumentList {
     return $Flat
 }
 
-if ($BatchJumpSeconds.Count -gt 0) {
+function Convert-ToSecondList {
+    param(
+        [string[]]$Values,
+        [Parameter(Mandatory = $true)][string]$ParameterName
+    )
+
+    $Seconds = @()
+    foreach ($Value in $Values) {
+        foreach ($Token in ([string]$Value -split "[,+;\s]+")) {
+            if ([string]::IsNullOrWhiteSpace($Token)) {
+                continue
+            }
+            $Parsed = 0
+            if (-not [int]::TryParse($Token, [System.Globalization.NumberStyles]::Integer, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$Parsed)) {
+                throw "$ParameterName contains a non-integer time value: $Token"
+            }
+            $Seconds += $Parsed
+        }
+    }
+    return [int[]]$Seconds
+}
+
+function Test-FreshNonEmptyFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][datetime]$StartedAt
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $false
+    }
+    $Item = Get-Item -LiteralPath $Path
+    return $Item.Length -gt 0 -and $Item.LastWriteTime -ge $StartedAt.AddSeconds(-1)
+}
+
+$BatchSeconds = Convert-ToSecondList -Values $BatchJumpSeconds -ParameterName "BatchJumpSeconds"
+if ($BatchSeconds.Count -gt 0) {
     if ([string]::IsNullOrWhiteSpace($BatchNamePrefix)) {
         throw "BatchNamePrefix is required when BatchJumpSeconds is provided."
     }
 
     $ExpectedOutputs = @()
-    foreach ($Second in $BatchJumpSeconds) {
+    foreach ($Second in $BatchSeconds) {
         $Expected = Join-Path $OutputDir "$BatchNamePrefix-t$Second.png"
         Remove-Item -LiteralPath $Expected -Force -ErrorAction SilentlyContinue
         $ExpectedOutputs += $Expected
     }
 
-    $TimesCsv = ($BatchJumpSeconds | ForEach-Object { [string]$_ }) -join "+"
+    $TimesCsv = ($BatchSeconds | ForEach-Object { [string]$_ }) -join "+"
     $BatchOutputDir = $OutputDir.Replace("\", "/")
     $BatchArgs = @(
         $Project,
@@ -120,13 +156,8 @@ if ($BatchJumpSeconds.Count -gt 0) {
 
     $Missing = @()
     foreach ($Expected in $ExpectedOutputs) {
-        if (-not (Test-Path -LiteralPath $Expected)) {
-            $Missing += $Expected
-            continue
-        }
-        $Item = Get-Item -LiteralPath $Expected
-        if ($Item.LastWriteTime -lt $RunStartedAt.AddSeconds(-1)) {
-            $Missing += "$Expected (stale)"
+        if (-not (Test-FreshNonEmptyFile -Path $Expected -StartedAt $RunStartedAt)) {
+            $Missing += "$Expected (missing, stale, or empty)"
         }
     }
     if ($Missing.Count -gt 0) {
@@ -142,6 +173,8 @@ if ($BatchJumpSeconds.Count -gt 0) {
 }
 
 $Before = @{}
+$Output = Join-Path $OutputDir "$Name.png"
+Remove-Item -LiteralPath $Output -Force -ErrorAction SilentlyContinue
 Get-ChildItem -Path $RepoRoot -Recurse -File -Include *.png -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -like "*\Saved\*" } |
     ForEach-Object { $Before[$_.FullName] = $true }
@@ -213,8 +246,10 @@ if (-not $NewImages) {
 }
 
 $Chosen = $NewImages | Select-Object -Last 1
-$Output = Join-Path $OutputDir "$Name.png"
 Copy-Item -LiteralPath $Chosen.FullName -Destination $Output -Force
+if (-not (Test-FreshNonEmptyFile -Path $Output -StartedAt $RunStartedAt)) {
+    throw "UE exited but final screenshot is missing, stale, or empty: $Output. See $LogPath"
+}
 if (-not $KeepSourceFrames) {
     foreach ($Image in $NewImages) {
         if ($Image.FullName -ne $Output) {

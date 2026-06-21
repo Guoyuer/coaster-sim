@@ -21,6 +21,8 @@ There are still useful cleanup opportunities, but they should stay separate from
 - Validation: `git diff --check` PASS; C++ build PASS; `.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -RestoreGeneratedMap -NamePrefix scenery-placement-helper-smoke` PASS; manifest `Saved\Diagnostics\scenery-placement-helper-smoke-run.json`; generated `.umap` was restored.
 - Fixed the UE 5.8 `Rename` deprecation warning in `YarlungLandscapeImportCommandlet.cpp`: generated mesh replacement now explicitly calls `ResetLoaders(MeshPackage)` and uses `REN_AllowPackageLinkerMismatch` instead of deprecated `REN_ForceNoResetLoaders`.
 - Validation: `git diff --check` PASS; C++ build PASS with no `Rename` warning; `.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -RestoreGeneratedMap -NamePrefix rename-warning-fix-smoke` PASS; commandlet reported `Success - 0 error(s), 0 warning(s)`.
+- Hardened screenshot gates in `scripts/offscreen-shot.ps1` and `scripts/visual-survey.ps1`: time lists now parse comma/plus/space separated values explicitly, batch and single-shot outputs must be fresh non-empty PNGs, analysis outputs are deleted before rerun and must be fresh non-empty files, and survey JSON row count must match screenshot count.
+- Validation: PowerShell parse PASS; `git diff --check` PASS; `.\scripts\visual-survey.ps1 -Times 60,120 -NamePrefix harden-shot-gate-smoke -ResX 640 -ResY 360 -TimeoutSeconds 180` PASS with two expected screenshots and two JSON rows; `.\scripts\offscreen-shot.ps1 -Name harden-single-shot-smoke -JumpSeconds 60 -ResX 640 -ResY 360 -TimeoutSeconds 180` PASS.
 
 ## Recommended next cleanup
 
