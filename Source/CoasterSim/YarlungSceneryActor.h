@@ -5,6 +5,10 @@
 #include "YarlungSceneryActor.generated.h"
 
 class UHierarchicalInstancedStaticMeshComponent;
+struct FYarlungAssetConfig;
+struct FYarlungCanopyBeltConfig;
+struct FYarlungSceneryComponentConfig;
+struct FYarlungScatterKindConfig;
 
 USTRUCT()
 struct FYarlungSceneryTrackSample
@@ -68,6 +72,23 @@ private:
     bool LoadHeightmap(TArray<uint16>& OutHeightData) const;
     float SampleHeightCm(const TArray<uint16>& HeightData, float X, float Y) const;
     FVector SampleNormal(const TArray<uint16>& HeightData, float X, float Y) const;
-    void BuildScatter(const TArray<FYarlungSceneryTrackSample>& TrackSamples, const TArray<uint16>& HeightData);
-    void ApplyMaterials();
+    void ConfigureMeshesFromAssets(const FYarlungAssetConfig& AssetConfig);
+    UHierarchicalInstancedStaticMeshComponent* ComponentByName(const FString& Name) const;
+    void ClearAllInstances();
+    void BuildScatter(const TArray<FYarlungSceneryTrackSample>& TrackSamples, const TArray<uint16>& HeightData, const FYarlungAssetConfig& AssetConfig);
+    void AddScatterRule(
+        UHierarchicalInstancedStaticMeshComponent* Component,
+        const FYarlungSceneryComponentConfig& ComponentConfig,
+        const FYarlungScatterKindConfig& KindConfig,
+        const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<uint16>& HeightData,
+        const class FYarlungRiverField& RiverField);
+    void AddCanopyBelt(
+        UHierarchicalInstancedStaticMeshComponent* Component,
+        const FYarlungCanopyBeltConfig& BeltConfig,
+        float Seed,
+        const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<uint16>& HeightData,
+        const class FYarlungRiverField& RiverField);
+    void ApplyMaterials(const FYarlungAssetConfig& AssetConfig);
 };

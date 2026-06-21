@@ -11,6 +11,7 @@
 #include "YarlungTerrainRelief.h"
 #include "YarlungTrackCsv.h"
 #include "YarlungViewCorridor.h"
+#include "YarlungWaterBuilder.h"
 #include "Components/StaticMeshComponent.h"
 #include "Editor.h"
 #include "Engine/StaticMesh.h"
@@ -20,12 +21,6 @@
 #include "MeshDescriptionBuilder.h"
 #include "Misc/FileHelper.h"
 #include "StaticMeshAttributes.h"
-#include "WaterBodyComponent.h"
-#include "WaterBodyRiverActor.h"
-#include "WaterBodyRiverComponent.h"
-#include "WaterSplineComponent.h"
-#include "WaterSubsystem.h"
-#include "WaterZoneActor.h"
 
 #endif
 
@@ -672,156 +667,6 @@ bool LoadYarlungHeightmap(TArray<uint16>& OutHeightData)
     return true;
 }
 
-void SpawnYarlungWaterActors(UWorld* World)
-{
-    FYarlungRiverField RiverField;
-    FString RiverLoadError;
-    if (!RiverField.LoadFromProjectContent(&RiverLoadError))
-    {
-        UE_LOG(LogTemp, Error, TEXT("Unable to read generated Yarlung river field for UE Water: %s"), *RiverLoadError);
-        return;
-    }
-    const TArray<FYarlungRiverRow>& RiverRows = RiverField.GetRows();
-
-    AWaterZone* WaterZone = World->SpawnActor<AWaterZone>(AWaterZone::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
-    if (WaterZone)
-    {
-        WaterZone->SetActorLabel(TEXT("YarlungWaterZone"));
-        const YarlungTerrain::FConfig& Config = YarlungTerrain::Config();
-        const FVector2D ZoneExtent(
-            (Config.MaxXCm - Config.MinXCm) * 0.55f,
-            (Config.MaxYCm - Config.MinYCm) * 0.55f);
-        WaterZone->SetActorLocation(FVector(
-            (Config.MinXCm + Config.MaxXCm) * 0.5f,
-            (Config.MinYCm + Config.MaxYCm) * 0.5f,
-            Config.RiverZCm));
-        WaterZone->SetZoneExtent(ZoneExtent);
-        WaterZone->SetRenderTargetResolution(FIntPoint(1024, 1024));
-    }
-
-    AWaterBodyRiver* River = World->SpawnActor<AWaterBodyRiver>(AWaterBodyRiver::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
-    if (!River)
-    {
-        UE_LOG(LogTemp, Error, TEXT("Unable to spawn Yarlung UE Water river actor"));
-        return;
-    }
-    River->SetActorLabel(TEXT("YarlungUERiver"));
-
-    UWaterSplineComponent* Spline = River->GetWaterSpline();
-    UWaterBodyRiverComponent* RiverComponent = Cast<UWaterBodyRiverComponent>(River->GetWaterBodyComponent());
-    if (!Spline || !RiverComponent)
-    {
-        UE_LOG(LogTemp, Error, TEXT("Yarlung UE Water river missing spline/component: spline=%s component=%s"),
-            Spline ? TEXT("ok") : TEXT("missing"),
-            RiverComponent ? TEXT("ok") : TEXT("missing"));
-        return;
-    }
-
-    Spline->ClearSplinePoints(false);
-    for (const FYarlungRiverRow& Row : RiverRows)
-    {
-        Spline->AddSplinePoint(Row.PositionCm + FVector(0.0f, 0.0f, FYarlungRiverField::DefaultWaterSurfaceLiftCm), ESplineCoordinateSpace::World, false);
-    }
-    Spline->SetClosedLoop(false, false);
-    Spline->UpdateSpline();
-    Spline->K2_SynchronizeAndBroadcastDataChange();
-
-    constexpr float DefaultRiverDepthCm = 2200.0f;
-    constexpr float BaseVelocityCmPerSec = 480.0f;
-    float MinWaterWidthCm = TNumericLimits<float>::Max();
-    float MaxWaterWidthCm = -TNumericLimits<float>::Max();
-    for (int32 Index = 0; Index < RiverRows.Num(); ++Index)
-    {
-        const FYarlungRiverRow& Row = RiverRows[Index];
-        const float InputKey = static_cast<float>(Index);
-        const float RiverWidthCm = FMath::Clamp(Row.HalfWidthCm * 0.55f, 9000.0f, 16000.0f);
-        RiverComponent->SetRiverWidthAtSplineInputKey(InputKey, RiverWidthCm);
-        RiverComponent->SetRiverDepthAtSplineInputKey(InputKey, DefaultRiverDepthCm);
-        RiverComponent->SetWaterVelocityAtSplineInputKey(InputKey, BaseVelocityCmPerSec + FMath::Frac(Row.Flow * 11.0f) * 260.0f);
-        RiverComponent->SetAudioIntensityAtSplineInputKey(InputKey, 0.65f);
-        MinWaterWidthCm = FMath::Min(MinWaterWidthCm, RiverWidthCm);
-        MaxWaterWidthCm = FMath::Max(MaxWaterWidthCm, RiverWidthCm);
-    }
-
-    if (WaterZone)
-    {
-        RiverComponent->SetWaterZoneOverride(TSoftObjectPtr<AWaterZone>(WaterZone));
-    }
-    RiverComponent->bAffectsLandscape = false;
-    RiverComponent->ShapeDilation = 8192.0f;
-    if (UStaticMesh* DefaultRiverMesh = UWaterSubsystem::StaticClass()->GetDefaultObject<UWaterSubsystem>()->DefaultRiverMesh)
-    {
-        RiverComponent->SetWaterMeshOverride(DefaultRiverMesh);
-    }
-#if WITH_EDITOR
-    RiverComponent->SetWaterBodyStaticMeshEnabled(true);
-#endif
-
-    UMaterialInterface* RiverMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/MI_YarlungWaterRiver.MI_YarlungWaterRiver"));
-    if (!RiverMaterial)
-    {
-        RiverMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Water/Materials/WaterSurface/Water_Material_River.Water_Material_River"));
-    }
-    UMaterialInterface* RiverSurfaceMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface"));
-    if (!RiverSurfaceMaterial)
-    {
-        RiverSurfaceMaterial = RiverMaterial;
-    }
-
-    if (RiverMaterial)
-    {
-        RiverComponent->SetWaterMaterial(RiverMaterial);
-        RiverComponent->SetWaterStaticMeshMaterial(RiverSurfaceMaterial);
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Yarlung UE Water river material not found; using AWaterBodyRiver defaults"));
-    }
-
-    FOnWaterBodyChangedParams ChangedParams;
-    ChangedParams.bShapeOrPositionChanged = true;
-    RiverComponent->UpdateAll(ChangedParams);
-#if WITH_EDITOR
-    RiverComponent->UpdateWaterBodyRenderData();
-#endif
-    RiverComponent->UpdateWaterZones(true);
-    RiverComponent->UpdateVisibility();
-
-    TArray<UPrimitiveComponent*> WaterRenderables = RiverComponent->GetStandardRenderableComponents();
-    int32 ForcedVisibleRenderables = 0;
-    for (UPrimitiveComponent* Renderable : WaterRenderables)
-    {
-        if (!Renderable)
-        {
-            continue;
-        }
-
-        Renderable->SetVisibility(true, true);
-        Renderable->SetHiddenInGame(false);
-        Renderable->MarkRenderStateDirty();
-        ++ForcedVisibleRenderables;
-    }
-
-    if (WaterZone)
-    {
-        WaterZone->Update();
-    }
-
-    UE_LOG(LogTemp, Display, TEXT("Yarlung UE Water render path: mesh_override=%s material=%s static_material=%s generates_water_mesh_tile=%s renderables=%d forced_visible=%d"),
-        RiverComponent->GetWaterMeshOverride() ? *RiverComponent->GetWaterMeshOverride()->GetName() : TEXT("none"),
-        RiverComponent->GetWaterMaterial() ? *RiverComponent->GetWaterMaterial()->GetName() : TEXT("none"),
-        RiverComponent->GetWaterStaticMeshMaterial() ? *RiverComponent->GetWaterStaticMeshMaterial()->GetName() : TEXT("none"),
-        RiverComponent->ShouldGenerateWaterMeshTile() ? TEXT("true") : TEXT("false"),
-        WaterRenderables.Num(),
-        ForcedVisibleRenderables);
-
-    UE_LOG(LogTemp, Display, TEXT("Spawned Yarlung UE Water river: samples=%d water_width_cm=%.0f..%.0f lift_cm=%.0f"),
-        RiverRows.Num(),
-        MinWaterWidthCm,
-        MaxWaterWidthCm,
-        FYarlungRiverField::DefaultWaterSurfaceLiftCm);
-}
-
 void SpawnYarlungWorldActors(UWorld* World, UStaticMesh* CorridorTerrainAsset)
 {
     const auto Spawn = [World](UClass* Class, const TCHAR* Label) -> AActor*
@@ -843,7 +688,7 @@ void SpawnYarlungWorldActors(UWorld* World, UStaticMesh* CorridorTerrainAsset)
     }
 
     Spawn(ACoasterRideActor::StaticClass(), TEXT("YarlungCoasterRide"));
-    SpawnYarlungWaterActors(World);
+    YarlungWaterBuilder::SpawnYarlungWater(World);
     Spawn(AYarlungSceneryActor::StaticClass(), TEXT("YarlungForestRockScenery"));
 }
 }

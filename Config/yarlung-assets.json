@@ -1,0 +1,171 @@
+{
+  "scenery": {
+    "material_usage_roots": [
+      "/Game/Fab/Materials",
+      "/Game/Megaplant_Library/Tree_Norway_Spruce/Materials",
+      "/Game/Megaplant_Library/Tree_Aleppo_Pine/Materials"
+    ],
+    "components": [
+      {
+        "name": "RockOutcrops",
+        "mesh": "/Game/Fab/Megascans/3D/Beach_Boulder_uisjbbis/Medium/uisjbbis_tier_2/StaticMeshes/uisjbbis_tier_2.uisjbbis_tier_2",
+        "kind": "boulder",
+        "count": 90,
+        "seed": 0.0
+      },
+      {
+        "name": "UnderstoryClumps",
+        "mesh": "",
+        "kind": "shrub",
+        "count": 0,
+        "seed": 3.0,
+        "tint": [0.035, 0.160, 0.055]
+      },
+      {
+        "name": "CliffRockFacesA",
+        "mesh": "/Game/Fab/Megascans/3D/Nordic_Forest_Cliff_Large_xibsff1/Raw/xibsff1_tier_0/StaticMeshes/xibsff1_tier_0.xibsff1_tier_0",
+        "kind": "cliff",
+        "count": 72,
+        "seed": 17.0
+      },
+      {
+        "name": "CliffRockFacesB",
+        "mesh": "/Game/Fab/Megascans/3D/Quarry_Cliff_uchwaffda/High/uchwaffda_tier_1/StaticMeshes/uchwaffda_tier_1.uchwaffda_tier_1",
+        "kind": "cliff",
+        "count": 72,
+        "seed": 31.0
+      },
+      {
+        "name": "ForestShrubsA",
+        "mesh": "/Game/Generated/Models/Shrub03/shrub_03_1k.shrub_03_1k",
+        "kind": "shrub",
+        "count": 0,
+        "seed": 43.0,
+        "tint": [0.026, 0.130, 0.048]
+      },
+      {
+        "name": "ForestShrubsB",
+        "mesh": "/Game/Generated/Models/Shrub04/shrub_04_1k.shrub_04_1k",
+        "kind": "shrub",
+        "count": 0,
+        "seed": 59.0,
+        "tint": [0.045, 0.180, 0.068]
+      },
+      {
+        "name": "CanopyTreesA",
+        "mesh": "/Game/Megaplant_Library/Tree_Norway_Spruce/Instances/Branch_Norway_Spruce_01.Branch_Norway_Spruce_01",
+        "kind": "canopy_tree",
+        "count": 280,
+        "seed": 71.0,
+        "canopy_belt_seed": 131.0
+      },
+      {
+        "name": "CanopyTreesB",
+        "mesh": "/Game/Megaplant_Library/Tree_Norway_Spruce/Instances/Branch_Norway_Spruce_05.Branch_Norway_Spruce_05",
+        "kind": "canopy_tree",
+        "count": 280,
+        "seed": 83.0,
+        "canopy_belt_seed": 149.0
+      },
+      {
+        "name": "CanopyTreesC",
+        "mesh": "/Game/Megaplant_Library/Tree_Norway_Spruce/Instances/Branch_Norway_Spruce_Top_01.Branch_Norway_Spruce_Top_01",
+        "kind": "canopy_tree",
+        "count": 280,
+        "seed": 97.0,
+        "canopy_belt_seed": 167.0
+      }
+    ],
+    "kinds": {
+      "boulder": {
+        "side_bias": 0.58,
+        "distance_power": 0.82,
+        "min_lateral_cm": 2600.0,
+        "max_lateral_cm": 118000.0,
+        "river_clearance_cm": 72000.0,
+        "min_height_cm": 262000.0,
+        "max_height_cm": 430000.0,
+        "min_slope": 0.05,
+        "max_slope": 1.0,
+        "scale_min": 1.2,
+        "scale_max": 4.0,
+        "height_offset_cm": 24.0,
+        "align_to_surface": true
+      },
+      "cliff": {
+        "side_bias": 0.70,
+        "distance_power": 0.78,
+        "min_lateral_cm": 5200.0,
+        "max_lateral_cm": 42000.0,
+        "river_clearance_cm": 96000.0,
+        "min_height_cm": 262000.0,
+        "max_height_cm": 520000.0,
+        "min_slope": 0.075,
+        "max_slope": 1.0,
+        "scale_min": 9.0,
+        "scale_max": 20.0,
+        "height_offset_cm": 18.0,
+        "align_to_surface": true
+      },
+      "canopy_tree": {
+        "side_bias": 0.62,
+        "distance_power": 1.38,
+        "min_lateral_cm": 26000.0,
+        "max_lateral_cm": 126000.0,
+        "river_clearance_cm": 52000.0,
+        "min_height_cm": 262000.0,
+        "max_height_cm": 470000.0,
+        "min_slope": 0.0,
+        "max_slope": 0.62,
+        "scale_min": 10.0,
+        "scale_max": 24.0,
+        "height_offset_cm": 85.0,
+        "align_to_surface": false
+      },
+      "shrub": {
+        "side_bias": 0.58,
+        "distance_power": 1.18,
+        "min_lateral_cm": 3600.0,
+        "max_lateral_cm": 108000.0,
+        "river_clearance_cm": 42000.0,
+        "min_height_cm": 262000.0,
+        "max_height_cm": 455000.0,
+        "min_slope": 0.0,
+        "max_slope": 1.0,
+        "scale_min": 6.5,
+        "scale_max": 22.0,
+        "height_offset_cm": 6.0,
+        "align_to_surface": true
+      }
+    },
+    "canopy_belt": {
+      "sample_stride": 2,
+      "lateral_bands_cm": [26000.0, 42000.0, 62000.0, 88000.0, 118000.0],
+      "near_band_count": 3,
+      "near_occupancy": 0.78,
+      "far_occupancy": 0.54,
+      "river_clearance_cm": 56000.0,
+      "min_height_cm": 262000.0,
+      "max_height_cm": 476000.0,
+      "max_slope": 0.78,
+      "scale_min": 14.0,
+      "scale_max": 34.0,
+      "height_offset_cm": 120.0
+    }
+  },
+  "water": {
+    "river_material": "/Game/Generated/Materials/MI_YarlungWaterRiver.MI_YarlungWaterRiver",
+    "fallback_river_material": "/Water/Materials/WaterSurface/Water_Material_River.Water_Material_River",
+    "surface_material": "/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface",
+    "zone_render_target_resolution": 1024,
+    "zone_extent_scale": 0.55,
+    "default_depth_cm": 2200.0,
+    "base_velocity_cm_per_sec": 480.0,
+    "flow_velocity_jitter_cm_per_sec": 260.0,
+    "width_scale": 0.55,
+    "min_width_cm": 9000.0,
+    "max_width_cm": 16000.0,
+    "shape_dilation": 8192.0,
+    "audio_intensity": 0.65
+  }
+}

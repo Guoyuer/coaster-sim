@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import unreal
 
 
@@ -16,6 +19,11 @@ AERIAL_GRASS_ROCK_TEXTURES = {
     "T_AerialGrassRock_Rough": ("aerial_grass_rock_rough_2k.jpg", False, unreal.TextureCompressionSettings.TC_DEFAULT),
     "T_AerialGrassRock_AO": ("aerial_grass_rock_ao_2k.jpg", False, unreal.TextureCompressionSettings.TC_DEFAULT),
 }
+
+
+def yarlung_asset_config():
+    path = Path(unreal.Paths.project_config_dir()) / "yarlung-assets.json"
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def ensure_folder(path):
@@ -472,11 +480,7 @@ def enable_imported_material_usages():
     components (and Nanite cliffs) in a headless -game run, the engine has no editor
     auto-fix and swaps in the default grey material. Enable the flags on every Fab base
     material and Megaplant material so scanned PBR renders on scattered + Nanite instances."""
-    material_dirs = [
-        "/Game/Fab/Materials",
-        "/Game/Megaplant_Library/Tree_Norway_Spruce/Materials",
-        "/Game/Megaplant_Library/Tree_Aleppo_Pine/Materials",
-    ]
+    material_dirs = yarlung_asset_config()["scenery"].get("material_usage_roots", [])
     usage_names = ["MATUSAGE_INSTANCED_STATIC_MESHES", "MATUSAGE_NANITE"]
     for material_dir in material_dirs:
         if not unreal.EditorAssetLibrary.does_directory_exist(material_dir):
