@@ -61,11 +61,12 @@ float Ridged2D(float X, float Y, int32 Octaves, float Lacunarity, float Gain)
 }
 }
 
-float ComputeReliefCm(
+float ComputeReliefForRiverDistanceCm(
     const FVector2D& Position,
     float HeightCm,
     const FVector& BaseNormal,
     float TrackDistanceCm,
+    float RiverDistance,
     float ViewCorridorMask,
     const FReliefConfig& Config)
 {
@@ -76,8 +77,6 @@ float ComputeReliefCm(
         return 0.0f;
     }
 
-    const float RiverCenterY = YarlungTerrain::RiverCenterY(Position.X);
-    const float RiverDistance = FMath::Abs(Position.Y - RiverCenterY);
     const float RiverGate = YarlungTerrain::Smooth01((RiverDistance - Config.RiverProtectInnerCm) / Config.RiverProtectFadeCm);
     if (RiverGate <= 0.001f)
     {
@@ -171,6 +170,24 @@ float ComputeReliefCm(
     }
 
     return Displacement;
+}
+
+float ComputeReliefCm(
+    const FVector2D& Position,
+    float HeightCm,
+    const FVector& BaseNormal,
+    float TrackDistanceCm,
+    float ViewCorridorMask,
+    const FReliefConfig& Config)
+{
+    return ComputeReliefForRiverDistanceCm(
+        Position,
+        HeightCm,
+        BaseNormal,
+        TrackDistanceCm,
+        FMath::Abs(Position.Y - YarlungTerrain::RiverCenterY(Position.X)),
+        ViewCorridorMask,
+        Config);
 }
 
 FVector ApplyVerticalDisplacement(const FVector& BasePosition, float DisplacementCm)

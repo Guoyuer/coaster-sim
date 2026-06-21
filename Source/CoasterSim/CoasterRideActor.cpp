@@ -1,6 +1,6 @@
 #include "CoasterRideActor.h"
 
-#include "YarlungRiverCsv.h"
+#include "YarlungRiverField.h"
 
 #include "CoasterBanking.h"
 #include "CoasterTrackComponent.h"
@@ -33,33 +33,31 @@ namespace
 constexpr float CmPerMeter = 100.0f;
 constexpr float GravityCms2 = 980.665f;
 
-FTransform MakeSegmentTransform(const FVector& Start, const FVector& End, const FVector& ScaleCm)
+// Round-tube transform for the BasicShapes Cylinder (100cm tall along Z, 100cm
+// diameter). Orients the cylinder's long Z axis along the segment so rails, ties
+// and support columns read as real tubular steel instead of square greybox bars.
+FTransform MakeTubeTransform(const FVector& Start, const FVector& End, float DiameterCm)
 {
     const FVector Mid = (Start + End) * 0.5f;
     const FVector Delta = End - Start;
     const float Length = FMath::Max(Delta.Length(), 1.0f);
-    const FRotator Rotation = FRotationMatrix::MakeFromX(Delta.GetSafeNormal()).Rotator();
-    return FTransform(Rotation, Mid, FVector(Length / 100.0f, ScaleCm.Y / 100.0f, ScaleCm.Z / 100.0f));
+    const FRotator Rotation = FRotationMatrix::MakeFromZ(Delta.GetSafeNormal()).Rotator();
+    const float Diameter = FMath::Max(DiameterCm, 1.0f);
+    return FTransform(Rotation, Mid, FVector(Diameter / 100.0f, Diameter / 100.0f, Length / 100.0f));
 }
 
 bool LoadGeneratedRiverAverageZCm(float& OutZCm)
 {
-    const FString Path = FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungRiver.csv");
-    TArray<FYarlungRiverRow> Rows;
+    FYarlungRiverField RiverField;
     FString Error;
-    if (!YarlungRiverCsv::Load(Path, Rows, &Error))
+    if (!RiverField.LoadFromProjectContent(&Error))
     {
-        UE_LOG(LogTemp, Error, TEXT("Unable to read Yarlung river CSV for fog anchor: %s"), *Error);
-        return false;
-    }
-
-    if (Rows.Num() == 0)
-    {
-        UE_LOG(LogTemp, Error, TEXT("Yarlung river CSV has no usable fog-anchor samples: %s"), *Path);
+        UE_LOG(LogTemp, Error, TEXT("Unable to read generated Yarlung river field for fog anchor: %s"), *Error);
         return false;
     }
 
     double SumZ = 0.0;
+    const TArray<FYarlungRiverRow>& Rows = RiverField.GetRows();
     for (const FYarlungRiverRow& Row : Rows)
     {
         SumZ += Row.PositionCm.Z;
@@ -127,14 +125,22 @@ ACoasterRideActor::ACoasterRideActor()
 
     TrainBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TrainBody"));
     TrainBody->SetupAttachment(TrainRoot);
-    TrainBody->SetRelativeScale3D(FVector(1.22f, 0.60f, 0.14f));
-    TrainBody->SetRelativeLocation(FVector(155.0f, 0.0f, -126.0f));
+    TrainBody->SetRelativeScale3D(FVector(1.05f, 0.52f, 0.08f));
+    TrainBody->SetRelativeLocation(FVector(175.0f, 0.0f, -188.0f));
+    // This is only a BasicShapes cube placeholder, not a real car/cockpit asset.
+    // Hide it by default so first-person visual iteration is not judged against a
+    // greybox block; D-stage work should replace it with an authored train mesh.
+    TrainBody->SetVisibility(false, true);
 
     RideCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("RideCamera"));
     RideCamera->SetupAttachment(TrainRoot);
-    RideCamera->SetRelativeLocation(FVector(-104.0f, 0.0f, 286.0f));
-    RideCamera->SetRelativeRotation(FRotator(-4.0f, 0.0f, 0.0f));
-    RideCamera->SetFieldOfView(78.0f);
+    RideCamera->SetRelativeLocation(FVector(-146.0f, 0.0f, 372.0f));
+    // Both hero refs (02/03) look distinctly DOWN into the gorge at the river and
+    // valley floor (~-15 to -25 deg), not across at the near hillside. The old
+    // -4 deg framed flat pale mid-slope terrain that reads as greybox; pitching
+    // down swaps it for the textured near canyon wall + valley depth.
+    RideCamera->SetRelativeRotation(FRotator(-7.5f, 0.0f, 0.0f));
+    RideCamera->SetFieldOfView(86.0f);
     RideCamera->bUsePawnControlRotation = false;
     RideCamera->PostProcessSettings.bOverride_MotionBlurAmount = true;
     RideCamera->PostProcessSettings.MotionBlurAmount = 0.025f;
@@ -221,11 +227,15 @@ ACoasterRideActor::ACoasterRideActor()
     ValleyFog = CreateDefaultSubobject<UExponentialHeightFogComponent>(TEXT("ValleyFog"));
     ValleyFog->SetupAttachment(SceneRoot);
     ValleyFog->SetRelativeLocation(FVector::ZeroVector);
-    ValleyFog->SetFogDensity(0.000040f);
-    ValleyFog->SetFogHeightFalloff(0.16f);
-    ValleyFog->SetFogMaxOpacity(0.18f);
-    ValleyFog->SetStartDistance(6200.0f);
-    ValleyFog->SetFogInscatteringColor(FLinearColor(0.58f, 0.70f, 0.82f));
+    // Aerial perspective: real gorge refs (L2/L3) show distant ranges receding into
+    // pale blue haze, layer behind layer. The old near-zero fog gave no depth
+    // separation. Raise density/opacity for tonal recession but keep a long start
+    // distance so near textured terrain stays crisp (avoid pushing washed back up).
+    ValleyFog->SetFogDensity(0.000090f);
+    ValleyFog->SetFogHeightFalloff(0.10f);
+    ValleyFog->SetFogMaxOpacity(0.55f);
+    ValleyFog->SetStartDistance(9000.0f);
+    ValleyFog->SetFogInscatteringColor(FLinearColor(0.60f, 0.72f, 0.86f));
     ValleyFog->SetVolumetricFog(true);
     ValleyFog->SetVolumetricFogScatteringDistribution(0.38f);
     ValleyFog->SetVolumetricFogExtinctionScale(0.032f);
@@ -244,10 +254,16 @@ ACoasterRideActor::ACoasterRideActor()
     if (CubeMesh.Succeeded())
     {
         TrainBody->SetStaticMesh(CubeMesh.Object);
-        LeftRail->SetStaticMesh(CubeMesh.Object);
-        RightRail->SetStaticMesh(CubeMesh.Object);
-        Ties->SetStaticMesh(CubeMesh.Object);
-        Supports->SetStaticMesh(CubeMesh.Object);
+    }
+
+    // Rails, ties and support columns are round tubular steel, not square bars.
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+    if (CylinderMesh.Succeeded())
+    {
+        LeftRail->SetStaticMesh(CylinderMesh.Object);
+        RightRail->SetStaticMesh(CylinderMesh.Object);
+        Ties->SetStaticMesh(CylinderMesh.Object);
+        Supports->SetStaticMesh(CylinderMesh.Object);
     }
 
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
@@ -282,6 +298,7 @@ void ACoasterRideActor::BeginPlay()
     RebuildSpline();
     ApplyVisualMaterials();
     RebuildVisuals();
+    TrainBody->SetVisibility(false, true);
 
     const TCHAR* CommandLine = FCommandLine::Get();
     if (FParse::Param(CommandLine, TEXT("YarlungHideRide")))
@@ -585,8 +602,8 @@ void ACoasterRideActor::RebuildVisuals()
 
         const FVector RailDropA = UpA * 18.0f;
         const FVector RailDropB = UpB * 18.0f;
-        LeftRail->AddInstance(MakeSegmentTransform(LocationA - RightA * RailHalfGauge - RailDropA, LocationB - RightB * RailHalfGauge - RailDropB, FVector(SegmentStep, 9.0f, 9.0f)));
-        RightRail->AddInstance(MakeSegmentTransform(LocationA + RightA * RailHalfGauge - RailDropA, LocationB + RightB * RailHalfGauge - RailDropB, FVector(SegmentStep, 9.0f, 9.0f)));
+        LeftRail->AddInstance(MakeTubeTransform(LocationA - RightA * RailHalfGauge - RailDropA, LocationB - RightB * RailHalfGauge - RailDropB, 12.0f));
+        RightRail->AddInstance(MakeTubeTransform(LocationA + RightA * RailHalfGauge - RailDropA, LocationB + RightB * RailHalfGauge - RailDropB, 12.0f));
     }
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += TieStep)
@@ -599,9 +616,9 @@ void ACoasterRideActor::RebuildVisuals()
         SampleFrame(Distance, Location, Rotation, Forward, Right, Up);
 
         const FVector TieCenter = Location - Up * 42.0f;
-        const FVector TieStart = TieCenter - Right * (RailHalfGauge + 28.0f);
-        const FVector TieEnd = TieCenter + Right * (RailHalfGauge + 28.0f);
-        Ties->AddInstance(MakeSegmentTransform(TieStart, TieEnd, FVector(RailGaugeCm + 56.0f, 14.0f, 9.0f)));
+        const FVector TieStart = TieCenter - Right * (RailHalfGauge - 8.0f);
+        const FVector TieEnd = TieCenter + Right * (RailHalfGauge - 8.0f);
+        Ties->AddInstance(MakeTubeTransform(TieStart, TieEnd, 6.0f));
     }
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += SupportStep)
@@ -628,17 +645,19 @@ void ACoasterRideActor::RebuildVisuals()
             const FVector LeftFoot = FVector(YokeLeft.X, YokeLeft.Y, TerrainFootZ);
             const FVector RightFoot = FVector(YokeRight.X, YokeRight.Y, TerrainFootZ);
 
-            // The track is a high canyon viaduct (avg ~157 m, up to ~331 m above the
-            // valley floor). Drop a few thick monumental piers, not thousands of
-            // hair-thin threads: girth scales with the *visible* height so a 150 m
-            // pier still reads as structure instead of a vertical streak.
-            // (MakeSegmentTransform derives length from the endpoints, so ScaleCm.X is unused.)
+            // Keep the near-camera support steel in coaster/trestle scale. The
+            // earlier 1.4%-of-height rule produced 1.5-4.7m diameter cylinders; at
+            // first-person range their caps filled the frame and read as a greybox
+            // car nose. Tall canyon supports need repetition/bracing, not huge tubes.
             const float PierHeight = FMath::Max(YokeCenter.Z - TerrainRefZ, 1.0f);
-            const float LegThickness = FMath::Clamp(PierHeight * 0.014f, 150.0f, 470.0f);
+            const float LegThickness = FMath::Clamp(PierHeight * 0.004f, 42.0f, 120.0f);
 
-            Supports->AddInstance(MakeSegmentTransform(YokeLeft, YokeRight, FVector(0.0f, LegThickness * 1.25f, LegThickness)));
-            Supports->AddInstance(MakeSegmentTransform(LeftFoot, YokeLeft, FVector(0.0f, LegThickness, LegThickness)));
-            Supports->AddInstance(MakeSegmentTransform(RightFoot, YokeRight, FVector(0.0f, LegThickness, LegThickness)));
+            // Do not add a top cross-yoke directly under the rails. In first-person
+            // downhill frames its cylinder cap sits at the bottom of the camera and
+            // reads as a fake silver car body. The visible trestle legs/braces carry
+            // the support read without polluting the cockpit foreground.
+            Supports->AddInstance(MakeTubeTransform(LeftFoot, YokeLeft, LegThickness));
+            Supports->AddInstance(MakeTubeTransform(RightFoot, YokeRight, LegThickness));
 
             // Horizontal cross-ties up the legs read as an engineered trestle ladder
             // and break up the otherwise blank tall pier face. Place them along the
@@ -651,7 +670,7 @@ void ACoasterRideActor::RebuildVisuals()
                 const float BraceT = static_cast<float>(BraceIndex) / static_cast<float>(BraceCount + 1);
                 const FVector BraceLeft = FMath::Lerp(LeftSurface, YokeLeft, BraceT);
                 const FVector BraceRight = FMath::Lerp(RightSurface, YokeRight, BraceT);
-                Supports->AddInstance(MakeSegmentTransform(BraceLeft, BraceRight, FVector(0.0f, LegThickness * 0.5f, LegThickness * 0.5f)));
+                Supports->AddInstance(MakeTubeTransform(BraceLeft, BraceRight, LegThickness * 0.35f));
             }
         }
     }
@@ -795,8 +814,10 @@ void ACoasterRideActor::AdvanceRide(float DeltaSeconds)
 
 void ACoasterRideActor::UpdateFirstPersonCamera()
 {
-    RideCamera->SetRelativeLocation(FVector(-104.0f, 0.0f, 286.0f));
-    RideCamera->SetRelativeRotation(FRotator(-4.0f, 0.0f, 0.0f));
+    RideCamera->SetRelativeLocation(FVector(-146.0f, 0.0f, 372.0f));
+    // Keep in sync with the constructor: this runs every frame and governs the
+    // running-shot framing. Look down into the gorge to match hero refs 02/03.
+    RideCamera->SetRelativeRotation(FRotator(-7.5f, 0.0f, 0.0f));
 }
 
 void ACoasterRideActor::SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const

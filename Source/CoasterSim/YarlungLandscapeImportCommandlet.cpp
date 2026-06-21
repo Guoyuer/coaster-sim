@@ -3,8 +3,7 @@
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "CoasterRideActor.h"
-#include "YarlungCanyonWallActor.h"
-#include "YarlungRiverActor.h"
+#include "YarlungRiverField.h"
 #include "YarlungSceneryActor.h"
 #include "YarlungMeshTerrainActor.h"
 #include "YarlungCorridorProfile.h"
@@ -21,6 +20,12 @@
 #include "MeshDescriptionBuilder.h"
 #include "Misc/FileHelper.h"
 #include "StaticMeshAttributes.h"
+#include "WaterBodyComponent.h"
+#include "WaterBodyRiverActor.h"
+#include "WaterBodyRiverComponent.h"
+#include "WaterSplineComponent.h"
+#include "WaterSubsystem.h"
+#include "WaterZoneActor.h"
 
 #endif
 
@@ -110,30 +115,30 @@ FVector YarlungSmoothNormalAtWorldXY(const TArray<uint16>& HeightData, float X, 
     return FVector(Left - Right, Down - Up, SampleSpacingCm * 4.0f).GetSafeNormal();
 }
 
-float YarlungCanyonWetRockMask(float X, float Y, float Height, const FVector& BaseNormal)
+float YarlungCanyonWetRockMask(float X, float Y, float Height, const FVector& BaseNormal, const FYarlungRiverField& RiverField)
 {
     const float SlopeMask = YarlungTerrain::Smooth01(((1.0f - BaseNormal.Z) - 0.13f) / 0.38f);
     const float HeightMask = 1.0f - 0.55f * YarlungTerrain::Smooth01((Height - 515000.0f) / 120000.0f);
-    const float RiverDistance = FMath::Abs(Y - YarlungTerrain::RiverCenterY(X));
+    const float RiverDistance = RiverField.DistanceCm(FVector2D(X, Y));
     const float DistanceMask = YarlungTerrain::Smooth01((RiverDistance - 28000.0f) / 95000.0f)
         * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 320000.0f) / 120000.0f));
     const float Strata = 0.5f + 0.5f * FMath::Sin(X * 0.0019f - Y * 0.0023f + Height * 0.0041f);
     return FMath::Clamp(DistanceMask * SlopeMask * HeightMask * (0.72f + Strata * 0.42f), 0.0f, 1.0f);
 }
 
-float YarlungRavineMask(float X, float Y)
+float YarlungRavineMask(float X, float Y, const FYarlungRiverField& RiverField)
 {
-    const float RiverDistance = FMath::Abs(Y - YarlungTerrain::RiverCenterY(X));
+    const float RiverDistance = RiverField.DistanceCm(FVector2D(X, Y));
     const float Along = X / 210000.0f + Y / 567000.0f;
     const float Across = RiverDistance / 86000.0f;
     const float Signal = 0.5f + 0.5f * FMath::Sin(Along * 11.2f + Across * 2.65f - 0.9f);
     return FMath::Pow(FMath::Clamp(Signal, 0.0f, 1.0f), 5.0f);
 }
 
-FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVector& Normal, float RockMask)
+FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVector& Normal, float RockMask, const FYarlungRiverField& RiverField)
 {
     const float Height01 = YarlungTerrain::NormalizeEncodedHeightCm(Height);
-    const float RiverDistance = FMath::Abs(Y - YarlungTerrain::RiverCenterY(X));
+    const float RiverDistance = RiverField.DistanceCm(FVector2D(X, Y));
     const float Slope = 1.0f - Normal.GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector).Z;
     const float MidSlope = YarlungTerrain::Smooth01((Slope - 0.08f) / 0.24f);
     const float SteepSlope = YarlungTerrain::Smooth01((Slope - 0.22f) / 0.30f);
@@ -147,7 +152,7 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
         ForestDistance * ForestElevation * FMath::Lerp(0.82f, 1.16f, MidSlope) * FMath::Lerp(0.72f, 1.0f, CanopyMask),
         0.0f,
         1.0f);
-    const float Ravine = MidSlope * YarlungRavineMask(X, Y);
+    const float Ravine = MidSlope * YarlungRavineMask(X, Y, RiverField);
     const float RavineStreak = FMath::Pow(
         FMath::Clamp(0.5f + 0.5f * FMath::Sin(X * 0.0025f - Y * 0.0014f + Height * 0.0038f), 0.0f, 1.0f),
         4.0f);
@@ -246,11 +251,12 @@ bool FindNearestTrackProfileFrame(
 // priority, but the foundation must be a non-self-intersecting world surface.
 // A track-swept strip folded over itself on loops/turns and clipped the camera.
 constexpr int32 BaseTerrainStride = 1;
-
 struct FBaseTerrainMeshStats
 {
     int32 DisplacedVertexCount = 0;
     float MaxAbsDisplacementCm = 0.0f;
+    int32 RiverCarvedVertexCount = 0;
+    float MaxRiverCarveCm = 0.0f;
 };
 
 int32 BaseTerrainSampleCount()
@@ -278,10 +284,44 @@ int32 BaseTerrainVertexIndex(int32 XIndex, int32 YIndex, int32 SampleCount)
     return YIndex * SampleCount + XIndex;
 }
 
+float CarveRiverChannelCm(
+    float HeightCm,
+    const FVector2D& Position,
+    const FYarlungRiverField& RiverField,
+    FBaseTerrainMeshStats& Stats)
+{
+    const FYarlungRiverQuery River = RiverField.QueryNearest(Position);
+    if (!River.bIsValid)
+    {
+        return HeightCm;
+    }
+
+    const float InnerBankCm = River.WaterHalfWidthCm + 1800.0f;
+    const float OuterBankCm = River.WaterHalfWidthCm + 26000.0f;
+    if (River.DistanceCm >= OuterBankCm)
+    {
+        return HeightCm;
+    }
+
+    const float BankT = YarlungTerrain::Smooth01((River.DistanceCm - InnerBankCm) / (OuterBankCm - InnerBankCm));
+    const float CarveAlpha = 1.0f - BankT;
+    const float BankRiseCm = FMath::Max(0.0f, River.DistanceCm - River.WaterHalfWidthCm) * 0.46f;
+    const float TargetHeightCm = River.WaterSurfaceZCm - 240.0f + BankRiseCm;
+    const float CarvedHeightCm = FMath::Min(HeightCm, FMath::Lerp(HeightCm, TargetHeightCm, CarveAlpha));
+    const float CarveCm = HeightCm - CarvedHeightCm;
+    if (CarveCm > 1.0f)
+    {
+        ++Stats.RiverCarvedVertexCount;
+        Stats.MaxRiverCarveCm = FMath::Max(Stats.MaxRiverCarveCm, CarveCm);
+    }
+    return CarvedHeightCm;
+}
+
 // Phase 1: continuous DEM-led surface positions and UVs.
 void ComputeBaseTerrainPositions(
     const TArray<uint16>& HeightData,
     const TArray<YarlungViewCorridor::FTrackPoint>& TrackPoints,
+    const FYarlungRiverField& RiverField,
     TArray<FVector>& Positions,
     TArray<float>& Us,
     TArray<float>& Vs,
@@ -312,15 +352,18 @@ void ComputeBaseTerrainPositions(
             const float ProfileBlend = FMath::Clamp(ViewCorridorMask, 0.0f, 1.0f)
                 * YarlungTerrain::Smooth01((TrackDistance - 30000.0f) / 52000.0f);
             const float AuthoredProfileHeight = BaseHeight + (ProfileHeight - BaseHeight) * 0.48f;
-            const float DisplacementCm = YarlungTerrainRelief::ComputeReliefCm(
+            const float RiverDistance = RiverField.DistanceCm(Position2D);
+            const float DisplacementCm = YarlungTerrainRelief::ComputeReliefForRiverDistanceCm(
                 Position2D,
                 AuthoredProfileHeight,
                 BaseNormal,
                 TrackDistance,
+                RiverDistance,
                 ViewCorridorMask);
 
             const int32 VertexIndex = BaseTerrainVertexIndex(XIndex, YIndex, SampleCount);
-            const float Height = FMath::Lerp(BaseHeight, AuthoredProfileHeight, ProfileBlend) + DisplacementCm;
+            const float HeightBeforeRiverCarve = FMath::Lerp(BaseHeight, AuthoredProfileHeight, ProfileBlend) + DisplacementCm;
+            const float Height = CarveRiverChannelCm(HeightBeforeRiverCarve, Position2D, RiverField, Stats);
             Positions[VertexIndex] = FVector(Position2D.X, Position2D.Y, Height + 25.0f);
             Us[VertexIndex] = static_cast<float>(XIndex) / static_cast<float>(SampleCount - 1);
             Vs[VertexIndex] = static_cast<float>(YIndex) / static_cast<float>(SampleCount - 1);
@@ -337,6 +380,7 @@ void ComputeBaseTerrainPositions(
 void ComputeBaseTerrainNormalsAndColors(
     const TArray<uint16>& HeightData,
     const TArray<YarlungViewCorridor::FTrackPoint>& TrackPoints,
+    const FYarlungRiverField& RiverField,
     const TArray<FVector>& Positions,
     TArray<FVector>& Normals,
     TArray<FLinearColor>& Colors)
@@ -365,8 +409,8 @@ void ComputeBaseTerrainNormalsAndColors(
             Normals[VertexIndex] = Normal.IsNearlyZero() ? FVector::UpVector : Normal;
             const FVector& Position = Positions[VertexIndex];
             const FVector BaseNormal = YarlungSmoothNormalAtWorldXY(HeightData, Position.X, Position.Y);
-            const float RockMask = YarlungCanyonWetRockMask(Position.X, Position.Y, Position.Z, BaseNormal);
-            Colors[VertexIndex] = YarlungColorAtPosition(Position.X, Position.Y, Position.Z, Normals[VertexIndex], RockMask);
+            const float RockMask = YarlungCanyonWetRockMask(Position.X, Position.Y, Position.Z, BaseNormal, RiverField);
+            Colors[VertexIndex] = YarlungColorAtPosition(Position.X, Position.Y, Position.Z, Normals[VertexIndex], RockMask, RiverField);
         }
     }
 }
@@ -436,9 +480,17 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
     Us.SetNumUninitialized(VertexCount);
     Vs.SetNumUninitialized(VertexCount);
 
+    FYarlungRiverField RiverField;
+    FString RiverLoadError;
+    if (!RiverField.LoadFromProjectContent(&RiverLoadError))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Unable to read generated Yarlung river field for terrain mesh: %s"), *RiverLoadError);
+        return nullptr;
+    }
+
     FBaseTerrainMeshStats Stats;
-    ComputeBaseTerrainPositions(HeightData, TrackPoints, Positions, Us, Vs, Stats);
-    ComputeBaseTerrainNormalsAndColors(HeightData, TrackPoints, Positions, Normals, Colors);
+    ComputeBaseTerrainPositions(HeightData, TrackPoints, RiverField, Positions, Us, Vs, Stats);
+    ComputeBaseTerrainNormalsAndColors(HeightData, TrackPoints, RiverField, Positions, Normals, Colors);
 
     FLinearColor MinColor(
         TNumericLimits<float>::Max(),
@@ -620,6 +672,156 @@ bool LoadYarlungHeightmap(TArray<uint16>& OutHeightData)
     return true;
 }
 
+void SpawnYarlungWaterActors(UWorld* World)
+{
+    FYarlungRiverField RiverField;
+    FString RiverLoadError;
+    if (!RiverField.LoadFromProjectContent(&RiverLoadError))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Unable to read generated Yarlung river field for UE Water: %s"), *RiverLoadError);
+        return;
+    }
+    const TArray<FYarlungRiverRow>& RiverRows = RiverField.GetRows();
+
+    AWaterZone* WaterZone = World->SpawnActor<AWaterZone>(AWaterZone::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
+    if (WaterZone)
+    {
+        WaterZone->SetActorLabel(TEXT("YarlungWaterZone"));
+        const YarlungTerrain::FConfig& Config = YarlungTerrain::Config();
+        const FVector2D ZoneExtent(
+            (Config.MaxXCm - Config.MinXCm) * 0.55f,
+            (Config.MaxYCm - Config.MinYCm) * 0.55f);
+        WaterZone->SetActorLocation(FVector(
+            (Config.MinXCm + Config.MaxXCm) * 0.5f,
+            (Config.MinYCm + Config.MaxYCm) * 0.5f,
+            Config.RiverZCm));
+        WaterZone->SetZoneExtent(ZoneExtent);
+        WaterZone->SetRenderTargetResolution(FIntPoint(1024, 1024));
+    }
+
+    AWaterBodyRiver* River = World->SpawnActor<AWaterBodyRiver>(AWaterBodyRiver::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
+    if (!River)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Unable to spawn Yarlung UE Water river actor"));
+        return;
+    }
+    River->SetActorLabel(TEXT("YarlungUERiver"));
+
+    UWaterSplineComponent* Spline = River->GetWaterSpline();
+    UWaterBodyRiverComponent* RiverComponent = Cast<UWaterBodyRiverComponent>(River->GetWaterBodyComponent());
+    if (!Spline || !RiverComponent)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Yarlung UE Water river missing spline/component: spline=%s component=%s"),
+            Spline ? TEXT("ok") : TEXT("missing"),
+            RiverComponent ? TEXT("ok") : TEXT("missing"));
+        return;
+    }
+
+    Spline->ClearSplinePoints(false);
+    for (const FYarlungRiverRow& Row : RiverRows)
+    {
+        Spline->AddSplinePoint(Row.PositionCm + FVector(0.0f, 0.0f, FYarlungRiverField::DefaultWaterSurfaceLiftCm), ESplineCoordinateSpace::World, false);
+    }
+    Spline->SetClosedLoop(false, false);
+    Spline->UpdateSpline();
+    Spline->K2_SynchronizeAndBroadcastDataChange();
+
+    constexpr float DefaultRiverDepthCm = 2200.0f;
+    constexpr float BaseVelocityCmPerSec = 480.0f;
+    float MinWaterWidthCm = TNumericLimits<float>::Max();
+    float MaxWaterWidthCm = -TNumericLimits<float>::Max();
+    for (int32 Index = 0; Index < RiverRows.Num(); ++Index)
+    {
+        const FYarlungRiverRow& Row = RiverRows[Index];
+        const float InputKey = static_cast<float>(Index);
+        const float RiverWidthCm = FMath::Clamp(Row.HalfWidthCm * 0.55f, 9000.0f, 16000.0f);
+        RiverComponent->SetRiverWidthAtSplineInputKey(InputKey, RiverWidthCm);
+        RiverComponent->SetRiverDepthAtSplineInputKey(InputKey, DefaultRiverDepthCm);
+        RiverComponent->SetWaterVelocityAtSplineInputKey(InputKey, BaseVelocityCmPerSec + FMath::Frac(Row.Flow * 11.0f) * 260.0f);
+        RiverComponent->SetAudioIntensityAtSplineInputKey(InputKey, 0.65f);
+        MinWaterWidthCm = FMath::Min(MinWaterWidthCm, RiverWidthCm);
+        MaxWaterWidthCm = FMath::Max(MaxWaterWidthCm, RiverWidthCm);
+    }
+
+    if (WaterZone)
+    {
+        RiverComponent->SetWaterZoneOverride(TSoftObjectPtr<AWaterZone>(WaterZone));
+    }
+    RiverComponent->bAffectsLandscape = false;
+    RiverComponent->ShapeDilation = 8192.0f;
+    if (UStaticMesh* DefaultRiverMesh = UWaterSubsystem::StaticClass()->GetDefaultObject<UWaterSubsystem>()->DefaultRiverMesh)
+    {
+        RiverComponent->SetWaterMeshOverride(DefaultRiverMesh);
+    }
+#if WITH_EDITOR
+    RiverComponent->SetWaterBodyStaticMeshEnabled(true);
+#endif
+
+    UMaterialInterface* RiverMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/MI_YarlungWaterRiver.MI_YarlungWaterRiver"));
+    if (!RiverMaterial)
+    {
+        RiverMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Water/Materials/WaterSurface/Water_Material_River.Water_Material_River"));
+    }
+    UMaterialInterface* RiverSurfaceMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface"));
+    if (!RiverSurfaceMaterial)
+    {
+        RiverSurfaceMaterial = RiverMaterial;
+    }
+
+    if (RiverMaterial)
+    {
+        RiverComponent->SetWaterMaterial(RiverMaterial);
+        RiverComponent->SetWaterStaticMeshMaterial(RiverSurfaceMaterial);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Yarlung UE Water river material not found; using AWaterBodyRiver defaults"));
+    }
+
+    FOnWaterBodyChangedParams ChangedParams;
+    ChangedParams.bShapeOrPositionChanged = true;
+    RiverComponent->UpdateAll(ChangedParams);
+#if WITH_EDITOR
+    RiverComponent->UpdateWaterBodyRenderData();
+#endif
+    RiverComponent->UpdateWaterZones(true);
+    RiverComponent->UpdateVisibility();
+
+    TArray<UPrimitiveComponent*> WaterRenderables = RiverComponent->GetStandardRenderableComponents();
+    int32 ForcedVisibleRenderables = 0;
+    for (UPrimitiveComponent* Renderable : WaterRenderables)
+    {
+        if (!Renderable)
+        {
+            continue;
+        }
+
+        Renderable->SetVisibility(true, true);
+        Renderable->SetHiddenInGame(false);
+        Renderable->MarkRenderStateDirty();
+        ++ForcedVisibleRenderables;
+    }
+
+    if (WaterZone)
+    {
+        WaterZone->Update();
+    }
+
+    UE_LOG(LogTemp, Display, TEXT("Yarlung UE Water render path: mesh_override=%s material=%s static_material=%s generates_water_mesh_tile=%s renderables=%d forced_visible=%d"),
+        RiverComponent->GetWaterMeshOverride() ? *RiverComponent->GetWaterMeshOverride()->GetName() : TEXT("none"),
+        RiverComponent->GetWaterMaterial() ? *RiverComponent->GetWaterMaterial()->GetName() : TEXT("none"),
+        RiverComponent->GetWaterStaticMeshMaterial() ? *RiverComponent->GetWaterStaticMeshMaterial()->GetName() : TEXT("none"),
+        RiverComponent->ShouldGenerateWaterMeshTile() ? TEXT("true") : TEXT("false"),
+        WaterRenderables.Num(),
+        ForcedVisibleRenderables);
+
+    UE_LOG(LogTemp, Display, TEXT("Spawned Yarlung UE Water river: samples=%d water_width_cm=%.0f..%.0f lift_cm=%.0f"),
+        RiverRows.Num(),
+        MinWaterWidthCm,
+        MaxWaterWidthCm,
+        FYarlungRiverField::DefaultWaterSurfaceLiftCm);
+}
+
 void SpawnYarlungWorldActors(UWorld* World, UStaticMesh* CorridorTerrainAsset)
 {
     const auto Spawn = [World](UClass* Class, const TCHAR* Label) -> AActor*
@@ -641,9 +843,8 @@ void SpawnYarlungWorldActors(UWorld* World, UStaticMesh* CorridorTerrainAsset)
     }
 
     Spawn(ACoasterRideActor::StaticClass(), TEXT("YarlungCoasterRide"));
-    Spawn(AYarlungRiverActor::StaticClass(), TEXT("YarlungRiverScenery"));
+    SpawnYarlungWaterActors(World);
     Spawn(AYarlungSceneryActor::StaticClass(), TEXT("YarlungForestRockScenery"));
-    Spawn(AYarlungCanyonWallActor::StaticClass(), TEXT("YarlungAuthoredCanyonWalls"));
 }
 }
 #endif

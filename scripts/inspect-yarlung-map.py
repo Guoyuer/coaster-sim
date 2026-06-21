@@ -105,18 +105,54 @@ def main():
                 f"relative_z_cm={location.z:.1f}"
             )
 
-    river_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungRiverActor")]
-    if len(river_actors) != 1:
-        raise RuntimeError(f"Expected exactly one YarlungRiverActor, found {len(river_actors)}")
-    for actor in river_actors:
-        emit(f"[YARLUNG-INSPECT] river={actor.get_actor_label()} class={actor.get_class().get_name()}")
+    legacy_river_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungRiverActor")]
+    if legacy_river_actors:
+        raise RuntimeError(f"Legacy procedural YarlungRiverActor still present: {len(legacy_river_actors)}")
+
+    water_zone_actors = [actor for actor in actors if actor.get_class().get_name().startswith("WaterZone")]
+    if len(water_zone_actors) != 1:
+        raise RuntimeError(f"Expected exactly one UE WaterZone, found {len(water_zone_actors)}")
+    for actor in water_zone_actors:
+        emit(f"[YARLUNG-INSPECT] water_zone={actor.get_actor_label()} class={actor.get_class().get_name()}")
+
+    ue_river_actors = [actor for actor in actors if actor.get_class().get_name().startswith("WaterBodyRiver")]
+    if len(ue_river_actors) != 1:
+        raise RuntimeError(f"Expected exactly one UE WaterBodyRiver, found {len(ue_river_actors)}")
+    for actor in ue_river_actors:
+        emit(f"[YARLUNG-INSPECT] ue_water_river={actor.get_actor_label()} class={actor.get_class().get_name()}")
+        components = actor.get_components_by_class(unreal.ActorComponent)
+        component_names = {component.get_name() for component in components}
+        if not any("WaterBody" in name for name in component_names):
+            raise RuntimeError(f"UE Water river has no WaterBody component: {sorted(component_names)}")
+        if not any("Spline" in name for name in component_names):
+            raise RuntimeError(f"UE Water river has no spline component: {sorted(component_names)}")
+        spline_mesh_count = 0
+        visible_spline_mesh_count = 0
+        sample_water_meshes = []
         for component in actor.get_components_by_class(unreal.MeshComponent):
             material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
-            emit(
-                f"[YARLUNG-INSPECT] river_component={component.get_name()} "
-                f"class={component.get_class().get_name()} hidden={component.get_editor_property('hidden_in_game')} "
-                f"materials={material_names}"
-            )
+            hidden = component.get_editor_property("hidden_in_game")
+            component_class = component.get_class().get_name()
+            if component_class == "SplineMeshComponent" or component.get_name().startswith("SplineMeshComponent"):
+                spline_mesh_count += 1
+                if not hidden:
+                    visible_spline_mesh_count += 1
+                if len(sample_water_meshes) < 4:
+                    sample_water_meshes.append(
+                        f"{component.get_name()} hidden={hidden} materials={material_names}"
+                    )
+            elif len(sample_water_meshes) < 4:
+                sample_water_meshes.append(
+                    f"{component.get_name()} class={component_class} hidden={hidden} materials={material_names}"
+                )
+        if spline_mesh_count <= 0:
+            raise RuntimeError("UE Water river has no spline mesh renderables")
+        if visible_spline_mesh_count <= 0:
+            raise RuntimeError(f"UE Water river spline meshes are all hidden: count={spline_mesh_count}")
+        emit(
+            f"[YARLUNG-INSPECT] ue_water_spline_meshes={spline_mesh_count} "
+            f"visible={visible_spline_mesh_count} samples={sample_water_meshes}"
+        )
 
     scenery_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungSceneryActor")]
     if len(scenery_actors) != 1:
@@ -124,17 +160,19 @@ def main():
     for actor in scenery_actors:
         emit(f"[YARLUNG-INSPECT] scenery={actor.get_actor_label()} class={actor.get_class().get_name()}")
         total_instances = 0
-        rock_instances = 0
-        cliff_face_instances = 0
         forest_shrub_instances = 0
+        real_rock_or_cliff_instances = 0
         for component in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
             material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
             instance_count = component.get_instance_count()
             total_instances += instance_count
-            if component.get_name() == "RockOutcrops":
-                rock_instances = instance_count
-            if component.get_name().startswith("CliffRockFaces"):
-                cliff_face_instances += instance_count
+            is_rock_or_cliff = component.get_name() == "RockOutcrops" or component.get_name().startswith("CliffRockFaces")
+            if is_rock_or_cliff and instance_count:
+                if not any("/Game/Fab/Megascans/" in material_name for material_name in material_names):
+                    raise RuntimeError(
+                        f"Rock/cliff scatter must use real Megascans materials, got {component.get_name()} materials={material_names}"
+                    )
+                real_rock_or_cliff_instances += instance_count
             if component.get_name().startswith("ForestShrubs"):
                 forest_shrub_instances += instance_count
             emit(
@@ -142,37 +180,16 @@ def main():
                 f"class={component.get_class().get_name()} hidden={component.get_editor_property('hidden_in_game')} "
                 f"materials={material_names} instances={instance_count}"
             )
-        if rock_instances != 0:
-            raise RuntimeError(f"Known-bad boulder proxy scatter must stay disabled: {rock_instances} instances")
-        if cliff_face_instances != 0:
-            raise RuntimeError(f"Known-bad cliff-face proxy scatter must stay disabled: {cliff_face_instances} instances")
         if forest_shrub_instances != 0:
             raise RuntimeError(f"Known-bad shrub proxy scatter must stay disabled: {forest_shrub_instances} instances")
-        emit("[YARLUNG-INSPECT] proxy_scenery_disabled=true real_forest_and_cliff_assets_required=true")
+        if real_rock_or_cliff_instances <= 0:
+            raise RuntimeError("Expected real Megascans rock/cliff scatter instances, found none")
+        emit(f"[YARLUNG-INSPECT] real_rock_or_cliff_instances={real_rock_or_cliff_instances} proxy_shrubs_disabled=true")
 
     canyon_wall_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungCanyonWallActor")]
-    if len(canyon_wall_actors) != 1:
-        raise RuntimeError(f"Expected exactly one YarlungCanyonWallActor, found {len(canyon_wall_actors)}")
-    for actor in canyon_wall_actors:
-        emit(f"[YARLUNG-INSPECT] canyon_wall={actor.get_actor_label()} class={actor.get_class().get_name()}")
-        component_names = set()
-        for component in actor.get_components_by_class(unreal.MeshComponent):
-            component_names.add(component.get_name())
-            material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
-            hidden = component.get_editor_property("hidden_in_game")
-            emit(
-                f"[YARLUNG-INSPECT] canyon_wall_component={component.get_name()} "
-                f"class={component.get_class().get_name()} hidden={hidden} "
-                f"materials={material_names}"
-            )
-            if hidden:
-                raise RuntimeError(f"Yarlung canyon wall component is hidden: {component.get_name()}")
-            if not any("M_YarlungCanyonWall" in material_name for material_name in material_names):
-                raise RuntimeError(f"Yarlung canyon wall component missing canyon material: {component.get_name()}")
-        expected_components = {"ForestApronMesh", "WetCliffMesh"}
-        missing_components = expected_components - component_names
-        if missing_components:
-            raise RuntimeError(f"Yarlung canyon wall missing components: {sorted(missing_components)}")
+    if canyon_wall_actors:
+        raise RuntimeError(f"Procedural YarlungCanyonWallActor should not be in the default map: {len(canyon_wall_actors)}")
+    emit("[YARLUNG-INSPECT] procedural_canyon_wall_disabled=true")
 
     cliff_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungCliffActor")]
     if cliff_actors:

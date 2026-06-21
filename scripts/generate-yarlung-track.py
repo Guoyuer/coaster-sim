@@ -155,7 +155,7 @@ def build_out_and_back(
 
     points: list[TrackPoint] = []
     station_z = None
-    station_extra_cm = 30000.0
+    station_extra_cm = 4000.0
     outbound_descent_cm = outbound_descent_m * 100.0
     outbound_distances_cm = cumulative_distances(outbound_center)
     for index, center in enumerate(outbound_center):
@@ -170,12 +170,13 @@ def build_out_and_back(
             station_z = terrain_z + clearance_m * 100.0 + station_extra_cm
         descent_drop = outbound_descent_cm * smoothstep(0.08, 0.36, ratio)
         camelbacks = (
-            raised_cosine_bump(distance_m, 900.0, 76.0, 1700.0)
-            + raised_cosine_bump(distance_m, 1210.0, 66.0, 2000.0)
-            + raised_cosine_bump(distance_m, 1535.0, 68.0, 1900.0)
+            raised_cosine_bump(distance_m, 900.0, 48.0, 3200.0)
+            + raised_cosine_bump(distance_m, 1210.0, 46.0, 3800.0)
+            + raised_cosine_bump(distance_m, 1535.0, 48.0, 3400.0)
         )
         design_z = station_z - descent_drop + camelbacks
-        z = max(terrain_z + clearance_m * 100.0, design_z)
+        scenic_floor_z = terrain_z + clearance_m * 100.0 + camelbacks
+        z = max(scenic_floor_z, design_z)
         section = section_for("outbound", ratio)
         roll = 0.0
         points.append(TrackPoint(len(points), x, y, z, roll, section, terrain_z))
@@ -370,9 +371,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--target-length-m", type=float, default=5000.0)
     parser.add_argument("--spacing-m", type=float, default=25.0)
-    parser.add_argument("--clearance-m", type=float, default=24.0)
-    parser.add_argument("--outbound-offset-m", type=float, default=72.0)
-    parser.add_argument("--return-offset-m", type=float, default=148.0)
+    parser.add_argument("--clearance-m", type=float, default=42.0)
+    parser.add_argument("--outbound-offset-m", type=float, default=35.0)
+    parser.add_argument("--return-offset-m", type=float, default=90.0)
     parser.add_argument("--return-extra-height-m", type=float, default=12.0)
     parser.add_argument("--outbound-descent-m", type=float, default=260.0)
     parser.add_argument("--design-speed-mps", type=float, default=22.0)

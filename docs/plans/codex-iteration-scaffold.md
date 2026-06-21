@@ -61,7 +61,7 @@ Always open the contact sheet as an image before judging the result.
 | `Actor` | C++ actor placement, scenery actors, water actor, lighting, camera, postprocess | No |
 | `Material` | Generated material graph or parameter changes | No |
 | `Terrain` | Corridor terrain geometry, vertex color, displacement, Nanite mesh generation | Yes |
-| `Full` | DEM/source asset generation, materials, model imports, and map need refresh | Yes |
+| `Full` | DEM/source asset generation, generated track, materials, model imports, and map need refresh | Yes |
 | `ScreenshotOnly` | Inspect the current built map without importing | No |
 
 Rules:
@@ -160,9 +160,11 @@ Do not commit generated outputs when:
 
 `SM_YarlungCorridorTerrain` is the slow artifact. Rebuilding it is only required
 when terrain source data, terrain geometry, vertex colors, or terrain material
-bindings change. Actor-only work can reuse the existing mesh via
-`-SkipTerrainMeshBuild`; this keeps iteration focused on first-person visuals
-instead of repeatedly baking unchanged geometry.
+bindings change. `YarlungTrack.csv` is now a first-class generated artifact in
+the Full pipeline: source terrain/river changes must regenerate and verify the
+track before map import. Actor-only work can reuse the existing mesh and track
+via `-SkipTerrainMeshBuild` / `-SkipTrackGeneration`; this keeps iteration
+focused on first-person visuals instead of repeatedly baking unchanged geometry.
 
 ## Current High-Ceiling Bias
 

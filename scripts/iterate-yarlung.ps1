@@ -49,12 +49,12 @@ function Invoke-Step {
     param(
         [Parameter(Mandatory = $true)][string]$Name,
         [Parameter(Mandatory = $true)][scriptblock]$Script,
-        [object[]]$ArgumentList = @()
+        [object[]]$StepArgs = @()
     )
 
     $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     Write-Host "[YARLUNG-ITER] start $Name"
-    & $Script @ArgumentList | ForEach-Object { Write-Host $_ }
+    & $Script @StepArgs | ForEach-Object { Write-Host $_ }
     $Stopwatch.Stop()
     Write-Host ("[YARLUNG-ITER] end {0}: {1:n1}s" -f $Name, $Stopwatch.Elapsed.TotalSeconds)
     return [pscustomobject]@{
@@ -65,6 +65,35 @@ function Invoke-Step {
 
 $Steps = @()
 
+$ModeImportFlags = @{
+    Actor = @(
+        "SkipAssetGeneration",
+        "SkipTrackGeneration",
+        "SkipMaterials",
+        "SkipModels",
+        "SkipTerrainMeshBuild"
+    )
+    Material = @(
+        "SkipAssetGeneration",
+        "SkipTrackGeneration",
+        "ForceMaterials",
+        "SkipModels",
+        "SkipTerrainMeshBuild"
+    )
+    Terrain = @(
+        "SkipAssetGeneration",
+        "SkipTrackGeneration",
+        "SkipMaterials",
+        "SkipModels"
+    )
+    Full = @(
+        "ForceAssetGeneration",
+        "ForceTrackGeneration",
+        "ForceMaterials",
+        "ForceModels"
+    )
+}
+
 if ($Mode -ne "ScreenshotOnly") {
     $ImportParams = @{
         Verify = $true
@@ -73,32 +102,11 @@ if ($Mode -ne "ScreenshotOnly") {
         $ImportParams["Build"] = $true
     }
 
-    switch ($Mode) {
-        "Actor" {
-            $ImportParams["SkipAssetGeneration"] = $true
-            $ImportParams["SkipMaterials"] = $true
-            $ImportParams["SkipModels"] = $true
-            $ImportParams["SkipTerrainMeshBuild"] = $true
-        }
-        "Material" {
-            $ImportParams["SkipAssetGeneration"] = $true
-            $ImportParams["ForceMaterials"] = $true
-            $ImportParams["SkipModels"] = $true
-            $ImportParams["SkipTerrainMeshBuild"] = $true
-        }
-        "Terrain" {
-            $ImportParams["SkipAssetGeneration"] = $true
-            $ImportParams["SkipMaterials"] = $true
-            $ImportParams["SkipModels"] = $true
-        }
-        "Full" {
-            $ImportParams["ForceAssetGeneration"] = $true
-            $ImportParams["ForceMaterials"] = $true
-            $ImportParams["ForceModels"] = $true
-        }
+    foreach ($Flag in $ModeImportFlags[$Mode]) {
+        $ImportParams[$Flag] = $true
     }
 
-    $Steps += Invoke-Step -Name "import-$Mode" -ArgumentList @($PSScriptRoot, $ImportParams) -Script {
+    $Steps += Invoke-Step -Name "import-$Mode" -StepArgs @($PSScriptRoot, $ImportParams) -Script {
         param([string]$ScriptRoot, [hashtable]$Params)
         & (Join-Path $ScriptRoot "import-yarlung-landscape.ps1") @Params
     }
@@ -120,7 +128,7 @@ if (-not $SkipCapture) {
         TimeoutSeconds = $TimeoutSeconds
         ExtraArgs = $ExtraArgs
     }
-    $Steps += Invoke-Step -Name "visual-survey" -ArgumentList @($PSScriptRoot, $SurveyParams) -Script {
+    $Steps += Invoke-Step -Name "visual-survey" -StepArgs @($PSScriptRoot, $SurveyParams) -Script {
         param([string]$ScriptRoot, [hashtable]$Params)
         & (Join-Path $ScriptRoot "visual-survey.ps1") @Params
     }

@@ -4,10 +4,10 @@ import unreal
 PACKAGE_PATH = "/Game/Generated/Materials"
 AERIAL_GRASS_ROCK_PACKAGE_PATH = f"{PACKAGE_PATH}/PolyHaven/AerialGrassRock"
 TINT_MATERIAL_NAME = "M_CoasterTint"
-RIVER_WATER_MATERIAL_NAME = "M_YarlungRiverWater"
-RIVER_FOAM_MATERIAL_NAME = "M_YarlungRiverFoam"
 MESH_TERRAIN_MATERIAL_NAME = "M_YarlungMeshTerrain"
-CANYON_WALL_MATERIAL_NAME = "M_YarlungCanyonWall"
+WATER_RIVER_MATERIAL_INSTANCE_NAME = "MI_YarlungWaterRiver"
+WATER_SURFACE_MATERIAL_NAME = "M_YarlungWaterSurface"
+UE_WATER_RIVER_PARENT_PATH = "/Water/Materials/WaterSurface/Water_Material_River.Water_Material_River"
 SUCCESS_MARKER = "material-generation-ok.txt"
 AERIAL_GRASS_ROCK_SOURCE_DIR = "SourceAssets/PolyHaven/aerial_grass_rock"
 AERIAL_GRASS_ROCK_TEXTURES = {
@@ -42,6 +42,27 @@ def create_material_asset(name, package_path, replace_existing=False):
     if material is None:
         raise RuntimeError(f"Unable to create material: {asset_path}")
     return material
+
+
+def create_material_instance_asset(name, package_path, parent_path):
+    asset_path = f"{package_path}/{name}"
+    parent = unreal.EditorAssetLibrary.load_asset(parent_path)
+    if parent is None:
+        raise RuntimeError(f"Unable to load material instance parent: {parent_path}")
+
+    instance = unreal.EditorAssetLibrary.load_asset(asset_path)
+    if instance is None:
+        instance = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+            name,
+            package_path,
+            unreal.MaterialInstanceConstant,
+            unreal.MaterialInstanceConstantFactoryNew(),
+        )
+    if instance is None:
+        raise RuntimeError(f"Unable to create material instance: {asset_path}")
+
+    instance.set_editor_property("parent", parent)
+    return instance
 
 
 def connect_material_property(material, expression, material_property, label):
@@ -264,139 +285,108 @@ def set_optional_material_usage(material, usage_name):
         unreal.MaterialEditingLibrary.set_material_usage(material, usage)
 
 
-def create_translucent_parameter_material(name, base_color, opacity, roughness, specular):
-    material = create_material_asset(name, PACKAGE_PATH)
+def set_instance_scalar(instance, name, value):
+    unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(
+        instance,
+        name,
+        value,
+    )
+
+
+def set_instance_vector(instance, name, value):
+    unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(
+        instance,
+        name,
+        value,
+    )
+
+
+def create_yarlung_water_material_instance():
+    instance = create_material_instance_asset(
+        WATER_RIVER_MATERIAL_INSTANCE_NAME,
+        PACKAGE_PATH,
+        UE_WATER_RIVER_PARENT_PATH,
+    )
+
+    # Keep the UE Water shader/render path, but bias it toward glacial Yarlung
+    # water: cold emerald body color, high roughness, and readable whitewater.
+    vector_values = {
+        "Water Albedo": unreal.LinearColor(0.055, 0.42, 0.36, 1.0),
+        "Scattering": unreal.LinearColor(0.76, 1.08, 0.92, 1.0),
+        "Absorption": unreal.LinearColor(0.82, 0.18, 0.08, 1.0),
+        "Foam Scattering": unreal.LinearColor(0.92, 1.00, 0.90, 1.0),
+        "Foam Emissive": unreal.LinearColor(0.22, 0.30, 0.22, 1.0),
+    }
+    scalar_values = {
+        "Opacity": 0.86,
+        "Water Opacity": 0.86,
+        "Water Roughness": 0.86,
+        "Water Specular": 0.18,
+        "Refraction": 0.035,
+        "Refraction Far": 0.015,
+        "Water Fresnel Roughness": 0.94,
+        "Water Fresnel Specular": 0.14,
+        "Default Near Normal Strength": 1.85,
+        "Default Distant Normal Strength": 1.05,
+        "Default Distant Normal StrengthB": 0.86,
+        "River Normal Flatness": 0.12,
+        "River Flowmap Speed": 2.35,
+        "River Flowmap Detection Velocity": 0.08,
+        "River Foam Scale": 3.80,
+        "Foam Opacity": 1.0,
+        "Foam Roughness": 0.96,
+        "FoamContrast": 5.40,
+        "Foam Boost": 4.80,
+        "Foam MacroScale": 0.32,
+        "Front Foam Scale": 2.10,
+        "SimFoam Contrast": 4.20,
+        "MaxFlowVelocity": 1180.0,
+    }
+    for name, value in vector_values.items():
+        set_instance_vector(instance, name, value)
+    for name, value in scalar_values.items():
+        set_instance_scalar(instance, name, value)
+
+    unreal.EditorAssetLibrary.save_loaded_asset(instance)
+    print(f"[WATER-MATERIAL] saved /Game/Generated/Materials/{WATER_RIVER_MATERIAL_INSTANCE_NAME}")
+    return instance
+
+
+def create_yarlung_water_surface_material():
+    material = create_material_asset(WATER_SURFACE_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
-    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
-    material.set_editor_property("two_sided", False)
+    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
+    material.set_editor_property("two_sided", True)
 
     connect_material_property(
         material,
-        create_vector_parameter(material, "BaseColor", base_color, -620, -240),
+        create_vector_parameter(material, "BaseColor", unreal.LinearColor(0.055, 0.42, 0.36, 1.0), -500, -220),
         unreal.MaterialProperty.MP_BASE_COLOR,
-        f"{name} BaseColor",
+        "yarlung water surface BaseColor",
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Opacity", opacity, -620, -40),
-        unreal.MaterialProperty.MP_OPACITY,
-        f"{name} Opacity",
-    )
-    connect_material_property(
-        material,
-        create_scalar_parameter(material, "Roughness", roughness, -620, 160),
+        create_scalar_parameter(material, "Roughness", 0.92, -500, -40),
         unreal.MaterialProperty.MP_ROUGHNESS,
-        f"{name} Roughness",
+        "yarlung water surface Roughness",
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Specular", specular, -620, 340),
+        create_scalar_parameter(material, "Specular", 0.12, -500, 120),
         unreal.MaterialProperty.MP_SPECULAR,
-        f"{name} Specular",
-    )
-    set_optional_material_usage(material, "MATUSAGE_PROCEDURAL_MESHES")
-    finalize_material(material)
-
-
-def create_translucent_vertex_color_material(name, opacity, roughness, specular):
-    material = create_material_asset(name, PACKAGE_PATH)
-    unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
-    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
-    material.set_editor_property("two_sided", False)
-
-    vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
-        material,
-        unreal.MaterialExpressionVertexColor,
-        -620,
-        -160,
-    )
-    if not unreal.MaterialEditingLibrary.connect_material_property(
-        vertex_color,
-        "",
-        unreal.MaterialProperty.MP_BASE_COLOR,
-    ):
-        raise RuntimeError(f"Unable to connect {name} vertex BaseColor")
-    opacity_scale = create_scalar_parameter(material, "Opacity", opacity, -620, 20)
-    scaled_opacity = unreal.MaterialEditingLibrary.create_material_expression(
-        material,
-        unreal.MaterialExpressionMultiply,
-        -360,
-        -20,
-    )
-    if not unreal.MaterialEditingLibrary.connect_material_expressions(vertex_color, "A", scaled_opacity, "A"):
-        raise RuntimeError(f"Unable to connect {name} vertex alpha")
-    if not unreal.MaterialEditingLibrary.connect_material_expressions(opacity_scale, "", scaled_opacity, "B"):
-        raise RuntimeError(f"Unable to connect {name} opacity scale")
-    if not unreal.MaterialEditingLibrary.connect_material_property(
-        scaled_opacity,
-        "",
-        unreal.MaterialProperty.MP_OPACITY,
-    ):
-        raise RuntimeError(f"Unable to connect {name} vertex Opacity")
-    connect_material_property(
-        material,
-        create_scalar_parameter(material, "Roughness", roughness, -620, 160),
-        unreal.MaterialProperty.MP_ROUGHNESS,
-        f"{name} Roughness",
+        "yarlung water surface Specular",
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Specular", specular, -620, 340),
-        unreal.MaterialProperty.MP_SPECULAR,
-        f"{name} Specular",
-    )
-    set_optional_material_usage(material, "MATUSAGE_PROCEDURAL_MESHES")
-    finalize_material(material)
-
-
-def create_opaque_vertex_color_material(name, roughness, specular):
-    material = create_material_asset(name, PACKAGE_PATH)
-    unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
-    material.set_editor_property("two_sided", False)
-
-    vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
-        material,
-        unreal.MaterialExpressionVertexColor,
-        -620,
-        -160,
-    )
-    if not unreal.MaterialEditingLibrary.connect_material_property(
-        vertex_color,
-        "",
-        unreal.MaterialProperty.MP_BASE_COLOR,
-    ):
-        raise RuntimeError(f"Unable to connect {name} vertex BaseColor")
-    connect_material_property(
-        material,
-        create_scalar_parameter(material, "Roughness", roughness, -620, 160),
-        unreal.MaterialProperty.MP_ROUGHNESS,
-        f"{name} Roughness",
-    )
-    connect_material_property(
-        material,
-        create_scalar_parameter(material, "Specular", specular, -620, 340),
-        unreal.MaterialProperty.MP_SPECULAR,
-        f"{name} Specular",
+        create_vector_parameter(material, "EmissiveTint", unreal.LinearColor(0.018, 0.055, 0.047, 1.0), -500, 280),
+        unreal.MaterialProperty.MP_EMISSIVE_COLOR,
+        "yarlung water surface EmissiveTint",
     )
     set_optional_material_usage(material, "MATUSAGE_STATIC_MESH")
-    set_optional_material_usage(material, "MATUSAGE_NANITE")
-    set_optional_material_usage(material, "MATUSAGE_PROCEDURAL_MESHES")
+    set_optional_material_usage(material, "MATUSAGE_SPLINE_MESHES")
     finalize_material(material)
-
-
-def create_river_materials():
-    create_translucent_vertex_color_material(
-        RIVER_WATER_MATERIAL_NAME,
-        0.14,
-        0.18,
-        0.75,
-    )
-    create_translucent_vertex_color_material(
-        RIVER_FOAM_MATERIAL_NAME,
-        0.24,
-        0.62,
-        0.20,
-    )
+    print(f"[WATER-SURFACE] saved /Game/Generated/Materials/{WATER_SURFACE_MATERIAL_NAME}")
+    return material
 
 
 def create_mesh_terrain_material(rock_textures):
@@ -410,7 +400,9 @@ def create_mesh_terrain_material(rock_textures):
         -940,
         -180,
     )
-    detail_coordinates = create_texture_coordinate(material, -940, 240, 18.0, 18.0)
+    # Finer tiling than the old 18x so the scanned grain reads as surface texture
+    # in the near/mid corridor instead of a ~400m-per-tile smear.
+    detail_coordinates = create_texture_coordinate(material, -940, 240, 48.0, 48.0)
     rock_diffuse = create_texture_sample(
         material,
         rock_textures["T_AerialGrassRock_Diffuse"],
@@ -418,31 +410,34 @@ def create_mesh_terrain_material(rock_textures):
         -220,
         detail_coordinates,
     )
-    rock_mix = create_lerp(
+    # Detail-albedo x macro-landform-color. The old graph hid the scanned albedo
+    # at a 2.5% lerp, leaving a flat vertex-color surface that read as greybox
+    # (flat_block ~0.6-0.8 regardless of camera). Multiplying the rock/grass grain
+    # by the humid vertex-color bands keeps the broad landform palette while
+    # restoring the high-frequency surface variation that kills the greybox read.
+    # The product (rock ~0.4 x vertex ~0.12 ~= 0.05) is lifted by AlbedoGain back
+    # into wet-gorge rock albedo range (~0.08-0.13) without photographing pale.
+    macro_tint = unreal.MaterialEditingLibrary.create_material_expression(
         material,
-        vertex_color,
-        "",
-        rock_diffuse,
-        "",
-        create_constant(material, 0.025, -640, -20),
-        "",
-        -360,
-        -160,
-        "mesh terrain rock diffuse mix",
+        unreal.MaterialExpressionMultiply,
+        -400,
+        -200,
     )
-    # Keep broad vertex-color landform bands readable; the scanned albedo is only
-    # a surface breakup layer because it photographs too pale on whole mountains.
-    brightness = create_scalar_parameter(material, "TerrainBrightness", 0.48, -440, 40)
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(rock_diffuse, "", macro_tint, "A"):
+        raise RuntimeError("Unable to connect mesh terrain macro tint A")
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(vertex_color, "", macro_tint, "B"):
+        raise RuntimeError("Unable to connect mesh terrain macro tint B")
+    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 2.6, -400, 40)
     base_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
         unreal.MaterialExpressionMultiply,
         -200,
         -160,
     )
-    if not unreal.MaterialEditingLibrary.connect_material_expressions(rock_mix, "", base_color, "A"):
-        raise RuntimeError("Unable to connect mesh terrain brightness A")
-    if not unreal.MaterialEditingLibrary.connect_material_expressions(brightness, "", base_color, "B"):
-        raise RuntimeError("Unable to connect mesh terrain brightness B")
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(macro_tint, "", base_color, "A"):
+        raise RuntimeError("Unable to connect mesh terrain base color A")
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(albedo_gain, "", base_color, "B"):
+        raise RuntimeError("Unable to connect mesh terrain base color B")
     if not unreal.MaterialEditingLibrary.connect_material_property(
         base_color,
         "",
@@ -471,12 +466,41 @@ def create_mesh_terrain_material(rock_textures):
     finalize_material(material)
 
 
+def enable_imported_material_usages():
+    """Imported asset base materials can miss Nanite / instanced-static-mesh
+    usage flags. When our scatter places those assets on HierarchicalInstancedStaticMesh
+    components (and Nanite cliffs) in a headless -game run, the engine has no editor
+    auto-fix and swaps in the default grey material. Enable the flags on every Fab base
+    material and Megaplant material so scanned PBR renders on scattered + Nanite instances."""
+    material_dirs = [
+        "/Game/Fab/Materials",
+        "/Game/Megaplant_Library/Tree_Norway_Spruce/Materials",
+        "/Game/Megaplant_Library/Tree_Aleppo_Pine/Materials",
+    ]
+    usage_names = ["MATUSAGE_INSTANCED_STATIC_MESHES", "MATUSAGE_NANITE"]
+    for material_dir in material_dirs:
+        if not unreal.EditorAssetLibrary.does_directory_exist(material_dir):
+            print(f"[IMPORTED-USAGE] no {material_dir} directory; skipping")
+            continue
+        for path in unreal.EditorAssetLibrary.list_assets(material_dir, recursive=True, include_folder=False):
+            asset = unreal.EditorAssetLibrary.load_asset(path)
+            if not isinstance(asset, unreal.Material):
+                continue
+            for name in usage_names:
+                usage = getattr(unreal.MaterialUsage, name, None)
+                if usage is not None:
+                    unreal.MaterialEditingLibrary.set_material_usage(asset, usage)
+            unreal.EditorAssetLibrary.save_loaded_asset(asset)
+            print(f"[IMPORTED-USAGE] enabled instancing/nanite usage: {path}")
+
+
 def main():
     ensure_folder(PACKAGE_PATH)
     ensure_folder(AERIAL_GRASS_ROCK_PACKAGE_PATH)
+    enable_imported_material_usages()
     create_tint_material()
-    create_river_materials()
-    create_opaque_vertex_color_material(CANYON_WALL_MATERIAL_NAME, 0.94, 0.03)
+    create_yarlung_water_material_instance()
+    create_yarlung_water_surface_material()
     aerial_grass_rock_textures = import_textures(
         AERIAL_GRASS_ROCK_PACKAGE_PATH,
         AERIAL_GRASS_ROCK_SOURCE_DIR,

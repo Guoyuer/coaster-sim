@@ -29,6 +29,7 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Project = Join-Path $RepoRoot "CoasterSim.uproject"
 $EditorCmd = "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 $BuildBat = "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat"
+$EditorCommonArgs = @("-DDC-ForceMemoryCache")
 $OutputDir = Join-Path $RepoRoot "Saved\OffscreenShots"
 $LogPath = Join-Path $RepoRoot "Saved\Logs\offscreen-shot.log"
 
@@ -43,6 +44,22 @@ if ($Build) {
 }
 
 $RunStartedAt = Get-Date
+
+function Convert-ToFlatArgumentList {
+    param([object[]]$Items)
+
+    $Flat = @()
+    foreach ($Item in $Items) {
+        if ($Item -is [System.Array]) {
+            foreach ($Nested in $Item) {
+                $Flat += [string]$Nested
+            }
+        } else {
+            $Flat += [string]$Item
+        }
+    }
+    return $Flat
+}
 
 if ($BatchJumpSeconds.Count -gt 0) {
     if ([string]::IsNullOrWhiteSpace($BatchNamePrefix)) {
@@ -87,7 +104,9 @@ if ($BatchJumpSeconds.Count -gt 0) {
         "-YarlungBatchShotPostFrames=$BatchPostFrames",
         "-ExecCmds=DisableAllScreenMessages"
     )
+    $BatchArgs += $EditorCommonArgs
     $BatchArgs += $ExtraArgs
+    $BatchArgs = Convert-ToFlatArgumentList -Items $BatchArgs
 
     $Process = Start-Process -FilePath $EditorCmd -ArgumentList $BatchArgs -WorkingDirectory $RepoRoot -PassThru -NoNewWindow
     if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
@@ -147,6 +166,7 @@ $CommonArgs = @(
     "-log=$LogPath"
 )
 
+$CommonArgs += $EditorCommonArgs
 $CommonArgs += $ExtraArgs
 
 if (-not $SimulateWait) {
@@ -173,6 +193,7 @@ if ($Mode -eq "MovieFrames") {
     )
 }
 
+$Args = Convert-ToFlatArgumentList -Items $Args
 $Process = Start-Process -FilePath $EditorCmd -ArgumentList $Args -WorkingDirectory $RepoRoot -PassThru -NoNewWindow
 if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
     Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue

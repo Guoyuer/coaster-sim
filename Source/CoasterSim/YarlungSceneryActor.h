@@ -48,6 +48,15 @@ private:
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ForestShrubsB;
 
+    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
+    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CanopyTreesA;
+
+    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
+    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CanopyTreesB;
+
+    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
+    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CanopyTreesC;
+
     UPROPERTY(EditAnywhere, Category = "Yarlung Scenery")
     FString TrackCsvRelativePath = TEXT("Generated/YarlungLandscape/YarlungTrack.csv");
 

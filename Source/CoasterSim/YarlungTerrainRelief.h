@@ -59,5 +59,13 @@ float ComputeReliefCm(
     float TrackDistanceCm,
     float ViewCorridorMask = 1.0f,
     const FReliefConfig& Config = FReliefConfig());
+float ComputeReliefForRiverDistanceCm(
+    const FVector2D& Position,
+    float HeightCm,
+    const FVector& BaseNormal,
+    float TrackDistanceCm,
+    float RiverDistanceCm,
+    float ViewCorridorMask = 1.0f,
+    const FReliefConfig& Config = FReliefConfig());
 FVector ApplyVerticalDisplacement(const FVector& BasePosition, float DisplacementCm);
 }

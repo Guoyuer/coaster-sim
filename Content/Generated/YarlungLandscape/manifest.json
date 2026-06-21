@@ -4,9 +4,6 @@
   "river_csv": "YarlungRiver.csv",
   "preview": "YarlungTsangpo_preview.ppm",
   "masks_preview": "YarlungTsangpo_masks.ppm",
-  "macro_albedo": "SourceAssets\\Generated\\YarlungLandscape\\YarlungTsangpo_macro_albedo.tga",
-  "macro_masks": "SourceAssets\\Generated\\YarlungLandscape\\YarlungTsangpo_macro_masks.tga",
-  "macro_roughness": "SourceAssets\\Generated\\YarlungLandscape\\YarlungTsangpo_macro_roughness.tga",
   "resolution": [
     1009,
     1009
@@ -46,9 +43,9 @@
         "outer_cm": 112000.0,
         "max_slope_rise_per_run": 0.45,
         "base_lift_cm": 2400.0,
-        "affected_samples": 45764,
-        "max_lowered_cm": 30811.652,
-        "mean_lowered_cm": 7824.012,
+        "affected_samples": 48257,
+        "max_lowered_cm": 27057.425,
+        "mean_lowered_cm": 6266.932,
         "purpose": "Replace the grazing-angle heightfield cliff wall with a heightfield-friendly natural slope instead of a fascia mesh."
       }
     },
@@ -95,19 +92,19 @@
     "water_z_offset_cm": 180.0
   },
   "track": {
-    "path": "Content/Generated/YarlungLandscape/YarlungTrack.csv",
-    "length_m": 5020.11,
+    "path": "C:/Users/guoyu/Projects/coaster-sim/Content/Generated/YarlungLandscape/YarlungTrack.csv",
+    "length_m": 4943.84,
     "control_point_count": 198,
-    "out_back_split_m": 2510.06,
-    "min_clearance_m": 341.93,
+    "out_back_split_m": 2471.92,
+    "min_clearance_m": 42.0,
     "section_distances_m": {
-      "Station": 179.78,
-      "Lift": 310.15,
-      "Outbound": 1985.41,
-      "Turnaround": 461.54,
-      "Return": 1473.67,
-      "Launch": 361.42,
-      "Brake": 248.14
+      "Station": 160.64,
+      "Lift": 307.66,
+      "Outbound": 1956.99,
+      "Turnaround": 450.9,
+      "Return": 1458.99,
+      "Launch": 360.91,
+      "Brake": 247.76
     },
     "banking": {
       "roll_source": "curvature-derived",
