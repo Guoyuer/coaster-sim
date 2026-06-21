@@ -19,6 +19,8 @@ There are still useful cleanup opportunities, but they should stay separate from
 - Validation: script parse PASS; `git diff --check` PASS; `.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -RestoreGeneratedMap -NamePrefix generated-map-restore-smoke` PASS; manifest recorded `dirty_before=false`, `dirty_after=true`, `restored=true`; worktree did not keep `.umap` dirty.
 - Consolidated `YarlungSceneryActor` placement gates behind `TryResolvePlacement()`, so scatter rules and canopy belts share terrain bounds, river clearance, authored height, height-range, and slope checks while keeping their visual policy differences local.
 - Validation: `git diff --check` PASS; C++ build PASS; `.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -RestoreGeneratedMap -NamePrefix scenery-placement-helper-smoke` PASS; manifest `Saved\Diagnostics\scenery-placement-helper-smoke-run.json`; generated `.umap` was restored.
+- Fixed the UE 5.8 `Rename` deprecation warning in `YarlungLandscapeImportCommandlet.cpp`: generated mesh replacement now explicitly calls `ResetLoaders(MeshPackage)` and uses `REN_AllowPackageLinkerMismatch` instead of deprecated `REN_ForceNoResetLoaders`.
+- Validation: `git diff --check` PASS; C++ build PASS with no `Rename` warning; `.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -RestoreGeneratedMap -NamePrefix rename-warning-fix-smoke` PASS; commandlet reported `Success - 0 error(s), 0 warning(s)`.
 
 ## Recommended next cleanup
 
@@ -38,13 +40,13 @@ There are still useful cleanup opportunities, but they should stay separate from
 - Benefit: cleaner worktree; fewer accidental generated commits; clearer agent handoff.
 - Recommendation: Done.
 
-### 3. Fix the UE 5.8 `Rename` deprecation warning
+### 3. Fix the UE 5.8 `Rename` deprecation warning — implemented
 
 - Files: `Source/CoasterSim/YarlungLandscapeImportCommandlet.cpp`
-- Problem: every build reports `Rename will no longer call ResetLoaders...` at the generated asset replacement path.
-- Solution: update the rename flags/API to the UE 5.8-preferred form and validate a map rebuild.
-- Benefit: build logs become quieter; future UE upgrades carry less risk.
-- Recommendation: Worth exploring.
+- Problem: every build reported `Rename will no longer call ResetLoaders...` at the generated asset replacement path.
+- Solution: implemented by explicitly resetting the mesh package loader before moving the old mesh object to transient, then using `REN_AllowPackageLinkerMismatch`.
+- Benefit: build logs are quieter; future UE upgrades carry less risk.
+- Recommendation: Done.
 
 ### 4. Split terrain mesh coloring from map import orchestration
 

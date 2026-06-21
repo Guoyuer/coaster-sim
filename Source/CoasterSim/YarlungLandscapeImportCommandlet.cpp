@@ -21,6 +21,7 @@
 #include "MeshDescriptionBuilder.h"
 #include "Misc/FileHelper.h"
 #include "StaticMeshAttributes.h"
+#include "UObject/Linker.h"
 
 #endif
 
@@ -433,7 +434,8 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
 
     if (UObject* Existing = StaticFindObject(UStaticMesh::StaticClass(), MeshPackage, YarlungCorridorTerrainMeshAssetName))
     {
-        Existing->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_ForceNoResetLoaders);
+        ResetLoaders(MeshPackage);
+        Existing->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_AllowPackageLinkerMismatch);
     }
 
     UStaticMesh* StaticMesh = NewObject<UStaticMesh>(
