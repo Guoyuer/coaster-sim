@@ -19,7 +19,7 @@ This pass tightened the default path so missing config, broken material generati
 
 ## Non-Blocking Suggestions
 
-1. Replace deprecated Unreal Python APIs in `inspect-yarlung-map.py` and material generation so the project can later treat selected warnings as errors.
+1. Replace deprecated Unreal Python APIs in material generation so the project can later treat selected warnings as errors.
 2. Make map import verification parse and require the commandlet `Success - 0 error(s)` line, not just the process exit code.
 3. Extend config validation from required top-level objects to required scalar fields with explicit field names.
 
@@ -32,3 +32,10 @@ Continue AAA visual iteration, but keep `scripts/test-yarlung.ps1` as the setup/
 - Status: Done
 - Progress link: `docs/plans/photoreal-progress.md`
 - Follow-up evidence: C++ build PASS; `scripts/import-yarlung-landscape.ps1` material+verify PASS; `scripts/test-yarlung.ps1 -Build` PASS with 10 Yarlung automation tests; generated UE Water/material assets regenerated.
+
+## Follow-Up Hardening
+
+- `CoasterTrackComponent` now fails generated CSV load on unknown section names or invalid generated section/roll sample ranges, instead of silently falling back to `Coast`, zero bank, or zero terrain height.
+- `YarlungLandscapeImportCommandlet` now fails map import when required world actors or UE Water fail to spawn.
+- `YarlungWaterBuilder` now requires WaterZone, river material, and surface material; missing water materials no longer fall through to `AWaterBodyRiver` defaults.
+- `inspect-yarlung-map.py` now uses `UnrealEditorSubsystem` / `EditorActorSubsystem`; map verify reaches `Success - 0 error(s), 0 warning(s)`.

@@ -47,7 +47,7 @@ public:
     static FName SectionName(ECoasterSection Section);
 
 private:
-    static ECoasterSection ParseSectionName(const FString& Value);
+    static bool TryParseSectionName(const FString& Value, ECoasterSection& OutSection);
     void RebuildFromControlPoints(const TArray<FVector>& ControlPoints);
     void BuildSectionRanges(const TArray<FVector>& Points, const TArray<ECoasterSection>& Sections);
 

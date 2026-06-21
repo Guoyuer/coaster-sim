@@ -669,7 +669,7 @@ bool LoadYarlungHeightmap(TArray<uint16>& OutHeightData)
     return true;
 }
 
-void SpawnYarlungWorldActors(UWorld* World, UStaticMesh* CorridorTerrainAsset)
+bool SpawnYarlungWorldActors(UWorld* World, UStaticMesh* CorridorTerrainAsset)
 {
     const auto Spawn = [World](UClass* Class, const TCHAR* Label) -> AActor*
     {
@@ -681,17 +681,38 @@ void SpawnYarlungWorldActors(UWorld* World, UStaticMesh* CorridorTerrainAsset)
         return Actor;
     };
 
-    if (AActor* Terrain = Spawn(AYarlungMeshTerrainActor::StaticClass(), TEXT("YarlungCorridorTerrainScenery")))
+    AActor* Terrain = Spawn(AYarlungMeshTerrainActor::StaticClass(), TEXT("YarlungCorridorTerrainScenery"));
+    if (!Terrain)
     {
-        if (UStaticMeshComponent* MeshComponent = Terrain->FindComponentByClass<UStaticMeshComponent>())
-        {
-            MeshComponent->SetStaticMesh(CorridorTerrainAsset);
-        }
+        UE_LOG(LogTemp, Error, TEXT("Unable to spawn Yarlung corridor terrain actor"));
+        return false;
+    }
+    if (UStaticMeshComponent* MeshComponent = Terrain->FindComponentByClass<UStaticMeshComponent>())
+    {
+        MeshComponent->SetStaticMesh(CorridorTerrainAsset);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("Yarlung corridor terrain actor has no static mesh component"));
+        return false;
     }
 
-    Spawn(ACoasterRideActor::StaticClass(), TEXT("YarlungCoasterRide"));
-    YarlungWaterBuilder::SpawnYarlungWater(World);
-    Spawn(AYarlungSceneryActor::StaticClass(), TEXT("YarlungForestRockScenery"));
+    if (!Spawn(ACoasterRideActor::StaticClass(), TEXT("YarlungCoasterRide")))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Unable to spawn Yarlung coaster ride actor"));
+        return false;
+    }
+    if (!YarlungWaterBuilder::SpawnYarlungWater(World))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Unable to spawn required Yarlung UE Water actors"));
+        return false;
+    }
+    if (!Spawn(AYarlungSceneryActor::StaticClass(), TEXT("YarlungForestRockScenery")))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Unable to spawn Yarlung forest/rock scenery actor"));
+        return false;
+    }
+    return true;
 }
 }
 #endif
@@ -736,7 +757,10 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
         return 1;
     }
 
-    SpawnYarlungWorldActors(World, CorridorTerrainAsset);
+    if (!SpawnYarlungWorldActors(World, CorridorTerrainAsset))
+    {
+        return 1;
+    }
 
     if (!UEditorLoadingAndSavingUtils::SaveMap(World, MapPackagePath))
     {

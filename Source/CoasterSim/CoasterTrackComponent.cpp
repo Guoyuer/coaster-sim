@@ -35,9 +35,15 @@ bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
 
     for (const FYarlungTrackRow& Row : Rows)
     {
+        ECoasterSection Section = ECoasterSection::Coast;
+        if (!TryParseSectionName(Row.Section, Section))
+        {
+            UE_LOG(LogTemp, Error, TEXT("Generated coaster track CSV has unknown section '%s': %s"), *Row.Section, *CsvPath);
+            return ResetToEmpty();
+        }
         Points.Add(Row.PositionCm);
         RollDegrees.Add(Row.RollDegrees);
-        Sections.Add(ParseSectionName(Row.Section));
+        Sections.Add(Section);
         TerrainZCm.Add(Row.TerrainZCm);
     }
 
@@ -51,6 +57,11 @@ bool UCoasterTrackComponent::LoadGeneratedTrack(const FString& CsvPath)
     GeneratedRollDegrees = MoveTemp(RollDegrees);
     GeneratedTerrainZCm = MoveTemp(TerrainZCm);
     BuildSectionRanges(Points, Sections);
+    if (SectionRanges.IsEmpty() || GeneratedRollSampleDistancesCm.Num() != Points.Num() + 1)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Generated coaster track CSV did not produce valid section/roll sample ranges: %s"), *CsvPath);
+        return ResetToEmpty();
+    }
 
     UE_LOG(LogTemp, Display, TEXT("Loaded generated coaster track: %s (%d points, %.1fm)"),
         *FPaths::GetCleanFilename(CsvPath),
@@ -226,38 +237,50 @@ FName UCoasterTrackComponent::SectionName(ECoasterSection Section)
     }
 }
 
-ECoasterSection UCoasterTrackComponent::ParseSectionName(const FString& Value)
+bool UCoasterTrackComponent::TryParseSectionName(const FString& Value, ECoasterSection& OutSection)
 {
     const FString Normalized = Value.TrimStartAndEnd().ToLower();
     if (Normalized == TEXT("station"))
     {
-        return ECoasterSection::Station;
+        OutSection = ECoasterSection::Station;
+        return true;
     }
     if (Normalized == TEXT("lift"))
     {
-        return ECoasterSection::Lift;
+        OutSection = ECoasterSection::Lift;
+        return true;
     }
     if (Normalized == TEXT("outbound"))
     {
-        return ECoasterSection::Outbound;
+        OutSection = ECoasterSection::Outbound;
+        return true;
     }
     if (Normalized == TEXT("turnaround"))
     {
-        return ECoasterSection::Turnaround;
+        OutSection = ECoasterSection::Turnaround;
+        return true;
     }
     if (Normalized == TEXT("return"))
     {
-        return ECoasterSection::Return;
+        OutSection = ECoasterSection::Return;
+        return true;
     }
     if (Normalized == TEXT("launch"))
     {
-        return ECoasterSection::Launch;
+        OutSection = ECoasterSection::Launch;
+        return true;
     }
     if (Normalized == TEXT("brake"))
     {
-        return ECoasterSection::Brake;
+        OutSection = ECoasterSection::Brake;
+        return true;
     }
-    return ECoasterSection::Coast;
+    if (Normalized == TEXT("coast"))
+    {
+        OutSection = ECoasterSection::Coast;
+        return true;
+    }
+    return false;
 }
 
 void UCoasterTrackComponent::BuildSectionRanges(const TArray<FVector>& Points, const TArray<ECoasterSection>& Sections)

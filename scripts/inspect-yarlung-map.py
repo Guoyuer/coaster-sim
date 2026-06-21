@@ -56,8 +56,10 @@ def main():
         corridor_nanite_status = corridor_terrain_static_mesh.is_nanite_enabled()
     emit(f"[YARLUNG-INSPECT] corridor_terrain_static_mesh_nanite={corridor_nanite_status}")
 
-    world = unreal.EditorLevelLibrary.get_editor_world()
-    actors = unreal.EditorLevelLibrary.get_all_level_actors()
+    editor_subsystem = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
+    actor_subsystem = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    world = editor_subsystem.get_editor_world()
+    actors = actor_subsystem.get_all_level_actors()
     landscapes = [actor for actor in actors if actor.get_class().get_name().startswith("Landscape")]
     emit(f"[YARLUNG-INSPECT] world={object_path(world)} actor_count={len(actors)} landscape_count={len(landscapes)}")
     if landscapes:

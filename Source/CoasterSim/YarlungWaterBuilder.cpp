@@ -32,20 +32,22 @@ bool SpawnYarlungWater(UWorld* World)
     const FYarlungWaterConfig& WaterConfig = YarlungAssets::Config().Water;
 
     AWaterZone* WaterZone = World->SpawnActor<AWaterZone>(AWaterZone::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
-    if (WaterZone)
+    if (!WaterZone)
     {
-        WaterZone->SetActorLabel(TEXT("YarlungWaterZone"));
-        const YarlungTerrain::FConfig& TerrainConfig = YarlungTerrain::Config();
-        const FVector2D ZoneExtent(
-            (TerrainConfig.MaxXCm - TerrainConfig.MinXCm) * WaterConfig.ZoneExtentScale,
-            (TerrainConfig.MaxYCm - TerrainConfig.MinYCm) * WaterConfig.ZoneExtentScale);
-        WaterZone->SetActorLocation(FVector(
-            (TerrainConfig.MinXCm + TerrainConfig.MaxXCm) * 0.5f,
-            (TerrainConfig.MinYCm + TerrainConfig.MaxYCm) * 0.5f,
-            TerrainConfig.RiverZCm));
-        WaterZone->SetZoneExtent(ZoneExtent);
-        WaterZone->SetRenderTargetResolution(FIntPoint(WaterConfig.ZoneRenderTargetResolution, WaterConfig.ZoneRenderTargetResolution));
+        UE_LOG(LogTemp, Error, TEXT("Unable to spawn Yarlung UE Water zone actor"));
+        return false;
     }
+    WaterZone->SetActorLabel(TEXT("YarlungWaterZone"));
+    const YarlungTerrain::FConfig& TerrainConfig = YarlungTerrain::Config();
+    const FVector2D ZoneExtent(
+        (TerrainConfig.MaxXCm - TerrainConfig.MinXCm) * WaterConfig.ZoneExtentScale,
+        (TerrainConfig.MaxYCm - TerrainConfig.MinYCm) * WaterConfig.ZoneExtentScale);
+    WaterZone->SetActorLocation(FVector(
+        (TerrainConfig.MinXCm + TerrainConfig.MaxXCm) * 0.5f,
+        (TerrainConfig.MinYCm + TerrainConfig.MaxYCm) * 0.5f,
+        TerrainConfig.RiverZCm));
+    WaterZone->SetZoneExtent(ZoneExtent);
+    WaterZone->SetRenderTargetResolution(FIntPoint(WaterConfig.ZoneRenderTargetResolution, WaterConfig.ZoneRenderTargetResolution));
 
     AWaterBodyRiver* River = World->SpawnActor<AWaterBodyRiver>(AWaterBodyRiver::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
     if (!River)
@@ -94,10 +96,7 @@ bool SpawnYarlungWater(UWorld* World)
         MaxWaterWidthCm = FMath::Max(MaxWaterWidthCm, RiverWidthCm);
     }
 
-    if (WaterZone)
-    {
-        RiverComponent->SetWaterZoneOverride(TSoftObjectPtr<AWaterZone>(WaterZone));
-    }
+    RiverComponent->SetWaterZoneOverride(TSoftObjectPtr<AWaterZone>(WaterZone));
     RiverComponent->bAffectsLandscape = false;
     RiverComponent->ShapeDilation = WaterConfig.ShapeDilation;
 #if WITH_EDITOR
@@ -112,18 +111,20 @@ bool SpawnYarlungWater(UWorld* World)
     UMaterialInterface* RiverSurfaceMaterial = LoadObject<UMaterialInterface>(nullptr, *WaterConfig.SurfaceMaterialPath);
     if (!RiverSurfaceMaterial)
     {
-        RiverSurfaceMaterial = RiverMaterial;
+        UE_LOG(LogTemp, Error, TEXT("Yarlung UE Water surface material not found: %s"), *WaterConfig.SurfaceMaterialPath);
+        return false;
     }
 
-    if (RiverMaterial)
+    if (!RiverMaterial)
     {
-        RiverComponent->SetWaterMaterial(RiverMaterial);
-        RiverComponent->SetWaterStaticMeshMaterial(RiverSurfaceMaterial);
+        UE_LOG(LogTemp, Error, TEXT("Yarlung UE Water river material not found: %s fallback=%s"),
+            *WaterConfig.RiverMaterialPath,
+            *WaterConfig.FallbackRiverMaterialPath);
+        return false;
     }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Yarlung UE Water river material not found; using AWaterBodyRiver defaults"));
-    }
+
+    RiverComponent->SetWaterMaterial(RiverMaterial);
+    RiverComponent->SetWaterStaticMeshMaterial(RiverSurfaceMaterial);
 
     FOnWaterBodyChangedParams ChangedParams;
     ChangedParams.bShapeOrPositionChanged = true;
@@ -149,10 +150,7 @@ bool SpawnYarlungWater(UWorld* World)
         ++ForcedVisibleRenderables;
     }
 
-    if (WaterZone)
-    {
-        WaterZone->Update();
-    }
+    WaterZone->Update();
 
     UE_LOG(LogTemp, Display, TEXT("Yarlung UE Water render path: mesh_override=%s material=%s static_material=%s generates_water_mesh_tile=%s renderables=%d forced_visible=%d"),
         RiverComponent->GetWaterMeshOverride() ? *RiverComponent->GetWaterMeshOverride()->GetName() : TEXT("none"),
