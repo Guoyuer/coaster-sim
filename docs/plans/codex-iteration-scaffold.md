@@ -54,6 +54,18 @@ run manifest plus handoff note:
 
 Always open the contact sheet as an image before judging the result.
 
+For code-only smoke runs that should verify Actor/Material import without
+committing a regenerated binary map, add `-SkipCapture -RestoreGeneratedMap`:
+
+```powershell
+.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -RestoreGeneratedMap -NamePrefix "smoke-name"
+```
+
+`-RestoreGeneratedMap` only restores
+`Content/Generated/YarlungLandscape/YarlungLandscape_Level.umap` when that file
+was clean before the run. If the map was already dirty, the script leaves it
+alone and records the skip reason in the manifest/handoff.
+
 ## Modes
 
 | Mode | Use When | Terrain Mesh Rebuild |
@@ -155,6 +167,11 @@ Do not commit generated outputs when:
 - the output belongs to a failed visual experiment that was not accepted
 - the status script still shows unrelated source/doc dirty files mixed into the
   same commit
+
+For unrelated smoke validation, prefer `-RestoreGeneratedMap`. The run manifest
+records `generated_map.restore_requested`, `dirty_before`, `dirty_after`, and
+`restored` so the handoff explains why the tracked `.umap` did or did not stay
+dirty.
 
 ## Fast Loop Rationale
 

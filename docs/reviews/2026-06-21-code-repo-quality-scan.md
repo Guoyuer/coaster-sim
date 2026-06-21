@@ -15,6 +15,8 @@ There are still useful cleanup opportunities, but they should stay separate from
 - Removed local ignored `scripts/__pycache__` noise so file scans do not surface stale bytecode.
 - Refactored `ACoasterRideActor` command-line ride positioning: `StartRideFromCommandLine()` and batch screenshot positioning now share `ComputeAdvancedTrackRatio()`. This removes duplicated start-distance / speed / wraparound math without changing behavior.
 - Validation: `git diff --check` PASS; C++ build PASS; `.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -NamePrefix ride-start-helper-smoke` PASS. Generated `.umap` dirt from the smoke run was reverted.
+- Added `.\scripts\iterate-yarlung.ps1 -RestoreGeneratedMap` for code-only smoke validation. It records generated-map dirty state in the manifest/handoff and restores `Content/Generated/YarlungLandscape/YarlungLandscape_Level.umap` only when it was clean before the run.
+- Validation: script parse PASS; `git diff --check` PASS; `.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -RestoreGeneratedMap -NamePrefix generated-map-restore-smoke` PASS; manifest recorded `dirty_before=false`, `dirty_after=true`, `restored=true`; worktree did not keep `.umap` dirty.
 
 ## Recommended next cleanup
 
@@ -26,13 +28,13 @@ There are still useful cleanup opportunities, but they should stay separate from
 - Benefit: locality for placement bugs; one test surface for river clearance and slope gates; easier to add PCG/foliage or whole-tree StaticMesh later.
 - Recommendation: Strong.
 
-### 2. Make the generated-map dirty contract explicit
+### 2. Make the generated-map dirty contract explicit — implemented
 
 - Files: `scripts/iterate-yarlung.ps1`, `scripts/import-yarlung-landscape.ps1`, `Content/Generated/YarlungLandscape/YarlungLandscape_Level.umap`
 - Problem: Actor-mode smoke/import rewrites the tracked `.umap` even for code-only or config-only validation. This is expected but keeps creating dirty generated state that must be manually reverted when the source change is unrelated.
-- Solution: add an explicit validation mode or post-step that distinguishes "verify generated map in place" from "intentional generated-map update". The script should report generated dirt separately and optionally restore it for smoke-only runs.
+- Solution: implemented as explicit `-RestoreGeneratedMap` on `iterate-yarlung.ps1`. The script reports generated dirt separately and optionally restores the map for smoke-only runs.
 - Benefit: cleaner worktree; fewer accidental generated commits; clearer agent handoff.
-- Recommendation: Strong.
+- Recommendation: Done.
 
 ### 3. Fix the UE 5.8 `Rename` deprecation warning
 

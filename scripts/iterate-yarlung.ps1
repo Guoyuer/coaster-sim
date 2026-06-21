@@ -11,6 +11,7 @@ param(
     [switch]$Build,
     [switch]$SkipCapture,
     [switch]$NoHandoff,
+    [switch]$RestoreGeneratedMap,
     [string[]]$ExtraArgs = @()
 )
 
@@ -63,7 +64,29 @@ function Invoke-Step {
     }
 }
 
+function Test-GitPathDirty {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$RelativePath
+    )
+
+    $Status = & git -C $RepoRoot status --porcelain -- $RelativePath
+    return -not [string]::IsNullOrWhiteSpace(($Status | Out-String))
+}
+
 $Steps = @()
+$GeneratedMapRelativePath = "Content/Generated/YarlungLandscape/YarlungLandscape_Level.umap"
+$GeneratedMapState = [pscustomobject]@{
+    path = $GeneratedMapRelativePath
+    restore_requested = [bool]$RestoreGeneratedMap
+    dirty_before = $false
+    dirty_after = $false
+    restored = $false
+    restore_skipped_reason = ""
+}
+if ($RestoreGeneratedMap) {
+    $GeneratedMapState.dirty_before = Test-GitPathDirty -RepoRoot $RepoRoot -RelativePath $GeneratedMapRelativePath
+}
 
 $ModeImportFlags = @{
     Actor = @(
@@ -136,6 +159,20 @@ if (-not $SkipCapture) {
     Write-Host "[YARLUNG-ITER] skip visual-survey: requested"
 }
 
+if ($RestoreGeneratedMap) {
+    $GeneratedMapState.dirty_after = Test-GitPathDirty -RepoRoot $RepoRoot -RelativePath $GeneratedMapRelativePath
+    if ($GeneratedMapState.dirty_before) {
+        $GeneratedMapState.restore_skipped_reason = "generated map was already dirty before iteration"
+        Write-Host "[YARLUNG-ITER] generated map restore skipped: $($GeneratedMapState.restore_skipped_reason)"
+    } elseif ($GeneratedMapState.dirty_after) {
+        & git -C $RepoRoot restore -- $GeneratedMapRelativePath
+        $GeneratedMapState.restored = $true
+        Write-Host "[YARLUNG-ITER] restored generated map: $GeneratedMapRelativePath"
+    } else {
+        Write-Host "[YARLUNG-ITER] generated map stayed clean: $GeneratedMapRelativePath"
+    }
+}
+
 $Worst = $null
 if (Test-Path -LiteralPath $SurveyJson) {
     $Metrics = Get-Content -LiteralPath $SurveyJson -Raw | ConvertFrom-Json
@@ -169,6 +206,7 @@ $Manifest = [pscustomobject]@{
     resolution = [pscustomobject]@{ x = $ResX; y = $ResY }
     build = [bool]$Build
     skip_capture = [bool]$SkipCapture
+    generated_map = $GeneratedMapState
     extra_args = $ExtraArgs
     steps = $Steps
     outputs = [pscustomobject]@{
@@ -204,6 +242,7 @@ if (-not $NoHandoff) {
         "- Resolution: ${ResX}x${ResY}",
         "- Risk gate: $RiskGate",
         $WorstLine,
+        "- Generated map restore requested: $($GeneratedMapState.restore_requested); restored: $($GeneratedMapState.restored); dirty before: $($GeneratedMapState.dirty_before); dirty after: $($GeneratedMapState.dirty_after)",
         "",
         "## Outputs",
         "",
