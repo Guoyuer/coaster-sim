@@ -339,6 +339,48 @@ void AYarlungSceneryActor::BuildScatter(
         CanopyTreesC->GetInstanceCount());
 }
 
+bool AYarlungSceneryActor::TryResolvePlacement(
+    const TArray<uint16>& HeightData,
+    const FYarlungRiverField& RiverField,
+    const FVector& Center,
+    const FVector& Location2D,
+    float SignedOffsetCm,
+    float RiverClearanceCm,
+    float MinHeightCm,
+    float MaxHeightCm,
+    float MinSlope,
+    float MaxSlope,
+    float& OutHeightCm,
+    FVector& OutNormal) const
+{
+    const YarlungTerrain::FConfig& Bounds = YarlungTerrain::Config();
+    if (Location2D.X < Bounds.MinXCm || Location2D.X > Bounds.MaxXCm || Location2D.Y < Bounds.MinYCm || Location2D.Y > Bounds.MaxYCm)
+    {
+        return false;
+    }
+
+    if (RiverField.DistanceCm(FVector2D(Location2D.X, Location2D.Y)) < RiverClearanceCm)
+    {
+        return false;
+    }
+
+    const float BaseHeight = SampleHeightCm(HeightData, Location2D.X, Location2D.Y);
+    const float TrackBaseHeight = SampleHeightCm(HeightData, Center.X, Center.Y);
+    OutHeightCm = YarlungCorridorProfile::AuthoredHeightCm(
+        FVector2D(Center.X, Center.Y),
+        SignedOffsetCm,
+        TrackBaseHeight,
+        BaseHeight);
+    if (OutHeightCm < MinHeightCm || OutHeightCm > MaxHeightCm)
+    {
+        return false;
+    }
+
+    OutNormal = SampleNormal(HeightData, Location2D.X, Location2D.Y);
+    const float Slope = 1.0f - OutNormal.Z;
+    return Slope >= MinSlope && Slope <= MaxSlope;
+}
+
 void AYarlungSceneryActor::AddScatterRule(
     UHierarchicalInstancedStaticMeshComponent* Component,
     const FYarlungSceneryComponentConfig& ComponentConfig,
@@ -379,32 +421,21 @@ void AYarlungSceneryActor::AddScatterRule(
         const FVector Location2D = Center + Forward * AlongJitterCm + Right * Side * LateralCm;
         const float SignedOffsetCm = Side * LateralCm;
 
-        const YarlungTerrain::FConfig& Bounds = YarlungTerrain::Config();
-        if (Location2D.X < Bounds.MinXCm || Location2D.X > Bounds.MaxXCm || Location2D.Y < Bounds.MinYCm || Location2D.Y > Bounds.MaxYCm)
-        {
-            continue;
-        }
-
-        if (RiverField.DistanceCm(FVector2D(Location2D.X, Location2D.Y)) < KindConfig.RiverClearanceCm)
-        {
-            continue;
-        }
-
-        const float BaseHeight = SampleHeightCm(HeightData, Location2D.X, Location2D.Y);
-        const float TrackBaseHeight = SampleHeightCm(HeightData, Center.X, Center.Y);
-        const float Height = YarlungCorridorProfile::AuthoredHeightCm(
-            FVector2D(Center.X, Center.Y),
+        float Height = 0.0f;
+        FVector Normal = FVector::UpVector;
+        if (!TryResolvePlacement(
+            HeightData,
+            RiverField,
+            Center,
+            Location2D,
             SignedOffsetCm,
-            TrackBaseHeight,
-            BaseHeight);
-        if (Height < KindConfig.MinHeightCm || Height > KindConfig.MaxHeightCm)
-        {
-            continue;
-        }
-
-        const FVector Normal = SampleNormal(HeightData, Location2D.X, Location2D.Y);
-        const float Slope = 1.0f - Normal.Z;
-        if (Slope < KindConfig.MinSlope || Slope > KindConfig.MaxSlope)
+            KindConfig.RiverClearanceCm,
+            KindConfig.MinHeightCm,
+            KindConfig.MaxHeightCm,
+            KindConfig.MinSlope,
+            KindConfig.MaxSlope,
+            Height,
+            Normal))
         {
             continue;
         }
@@ -466,32 +497,21 @@ void AYarlungSceneryActor::AddCanopyBelt(
                 const float SignedOffsetCm = Side * LateralCm;
                 const FVector Location2D = Center + Forward * AlongJitterCm + Right * SignedOffsetCm;
 
-                const YarlungTerrain::FConfig& Bounds = YarlungTerrain::Config();
-                if (Location2D.X < Bounds.MinXCm || Location2D.X > Bounds.MaxXCm || Location2D.Y < Bounds.MinYCm || Location2D.Y > Bounds.MaxYCm)
-                {
-                    continue;
-                }
-
-                if (RiverField.DistanceCm(FVector2D(Location2D.X, Location2D.Y)) < Belt.RiverClearanceCm)
-                {
-                    continue;
-                }
-
-                const float BaseHeight = SampleHeightCm(HeightData, Location2D.X, Location2D.Y);
-                const float TrackBaseHeight = SampleHeightCm(HeightData, Center.X, Center.Y);
-                const float Height = YarlungCorridorProfile::AuthoredHeightCm(
-                    FVector2D(Center.X, Center.Y),
+                float Height = 0.0f;
+                FVector Normal = FVector::UpVector;
+                if (!TryResolvePlacement(
+                    HeightData,
+                    RiverField,
+                    Center,
+                    Location2D,
                     SignedOffsetCm,
-                    TrackBaseHeight,
-                    BaseHeight);
-                if (Height < Belt.MinHeightCm || Height > Belt.MaxHeightCm)
-                {
-                    continue;
-                }
-
-                const FVector Normal = SampleNormal(HeightData, Location2D.X, Location2D.Y);
-                const float Slope = 1.0f - Normal.Z;
-                if (Slope > Belt.MaxSlope)
+                    Belt.RiverClearanceCm,
+                    Belt.MinHeightCm,
+                    Belt.MaxHeightCm,
+                    0.0f,
+                    Belt.MaxSlope,
+                    Height,
+                    Normal))
                 {
                     continue;
                 }

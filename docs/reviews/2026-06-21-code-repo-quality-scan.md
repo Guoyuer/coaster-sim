@@ -17,16 +17,18 @@ There are still useful cleanup opportunities, but they should stay separate from
 - Validation: `git diff --check` PASS; C++ build PASS; `.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -NamePrefix ride-start-helper-smoke` PASS. Generated `.umap` dirt from the smoke run was reverted.
 - Added `.\scripts\iterate-yarlung.ps1 -RestoreGeneratedMap` for code-only smoke validation. It records generated-map dirty state in the manifest/handoff and restores `Content/Generated/YarlungLandscape/YarlungLandscape_Level.umap` only when it was clean before the run.
 - Validation: script parse PASS; `git diff --check` PASS; `.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -RestoreGeneratedMap -NamePrefix generated-map-restore-smoke` PASS; manifest recorded `dirty_before=false`, `dirty_after=true`, `restored=true`; worktree did not keep `.umap` dirty.
+- Consolidated `YarlungSceneryActor` placement gates behind `TryResolvePlacement()`, so scatter rules and canopy belts share terrain bounds, river clearance, authored height, height-range, and slope checks while keeping their visual policy differences local.
+- Validation: `git diff --check` PASS; C++ build PASS; `.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -RestoreGeneratedMap -NamePrefix scenery-placement-helper-smoke` PASS; manifest `Saved\Diagnostics\scenery-placement-helper-smoke-run.json`; generated `.umap` was restored.
 
 ## Recommended next cleanup
 
-### 1. Deepen scenery placement
+### 1. Deepen scenery placement — first pass implemented
 
 - Files: `Source/CoasterSim/YarlungSceneryActor.cpp`, `Source/CoasterSim/YarlungAssetConfig.*`
-- Problem: `AddScatterRule()` and `AddCanopyBelt()` both know too much about height sampling, bounds, river clearance, authored profile height, slope gates, yaw, scale, and placement transforms. The interface is config-driven, but the implementation is still two parallel placement pipelines.
-- Solution: extract a scenery placement module that owns the shared terrain/river/profile sampling and returns accepted transforms. Keep rock/cliff/canopy style differences as small policy inputs.
+- Problem: `AddScatterRule()` and `AddCanopyBelt()` used to duplicate height sampling, bounds, river clearance, authored profile height, and slope gates. First pass has moved those gates into `TryResolvePlacement()`. Yaw, scale, density, and transform policies are still intentionally separate.
+- Next solution: if scenery logic grows again, extract a scenery placement module that owns the shared terrain/river/profile sampling and returns accepted transforms. Keep rock/cliff/canopy style differences as small policy inputs.
 - Benefit: locality for placement bugs; one test surface for river clearance and slope gates; easier to add PCG/foliage or whole-tree StaticMesh later.
-- Recommendation: Strong.
+- Recommendation: Partially done; defer the full module split until the next foliage/PCG change creates pressure for it.
 
 ### 2. Make the generated-map dirty contract explicit — implemented
 

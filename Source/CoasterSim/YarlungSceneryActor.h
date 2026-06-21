@@ -76,6 +76,19 @@ private:
     UHierarchicalInstancedStaticMeshComponent* ComponentByName(const FString& Name) const;
     void ClearAllInstances();
     void BuildScatter(const TArray<FYarlungSceneryTrackSample>& TrackSamples, const TArray<uint16>& HeightData, const FYarlungAssetConfig& AssetConfig);
+    bool TryResolvePlacement(
+        const TArray<uint16>& HeightData,
+        const class FYarlungRiverField& RiverField,
+        const FVector& Center,
+        const FVector& Location2D,
+        float SignedOffsetCm,
+        float RiverClearanceCm,
+        float MinHeightCm,
+        float MaxHeightCm,
+        float MinSlope,
+        float MaxSlope,
+        float& OutHeightCm,
+        FVector& OutNormal) const;
     void AddScatterRule(
         UHierarchicalInstancedStaticMeshComponent* Component,
         const FYarlungSceneryComponentConfig& ComponentConfig,
