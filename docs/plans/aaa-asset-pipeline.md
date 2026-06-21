@@ -8,6 +8,8 @@
 - **引擎基线已就绪**（`Config/DefaultEngine.ini`）：Lumen GI + Lumen 反射、Virtual Shadow Maps、Nanite、Mesh Distance Fields、Virtual Textures、DX12/SM6。渲染技术不是瓶颈。
 - **程序化基线**（已停止继续投入）：旧 canyon-wall 程序化幕布和旧 procedural river actor 已从默认链路删除；它们会制造假山片/黑洞/河槽遮挡/浅色平片水面，结构上到不了 AAA。当前默认关卡保留 DEM corridor terrain + Megascans scatter + UE Water；项目不再依赖 `ProceduralMeshComponent`。
 - **现有 CC0 资产**：PolyHaven 1k `rock_face_01/02`、`boulder_01`、`shrub_03/04`（codex 评为"低模幕布"，不达 AAA），`aerial_grass_rock` 2k 地表贴图。
+- **2026-06-21 资产缺口复核**：当前已导入的 Megaplant 完整树（Norway Spruce/Aleppo Pine/Japanese Cypress 等）多为 `SkeletalMesh`，而默认森林走廊用 HISM/ISM，只能吃 `StaticMesh`。所以现有管线实际用的是 Norway Spruce branch/top/twig 静态网格，属于 branch-clump 临时近似，不是整树森林。另一次 cliff belt 实验说明：把现有大型 cliff mesh 强行沿走廊排布会形成黑色 slab、穿坡、压顶，不能作为山体主解。
+- **当前最需要的资产/路径**：①整树 conifer/fir/spruce `StaticMesh`，带 LOD/Nanite/foliage-ready，能进 HISM/ISM；或允许我把森林改到能消费现有 `SkeletalMesh` 树的 PCG/foliage actor 路径。②坡面友好的模块化 cliff/rock wall 套件：多尺寸、多断面、可旋转拼接、不是单块巨板，适合沿峡谷两侧 kitbash。③多层地表 surface（forest floor / scree / mossy rock / alpine grass）用于坡面混合，避免继续调单张 heightfield 材质。
 
 ## 你要做的一步：用 Quixel Bridge 导入 Megascans（登录 Fab）
 
@@ -17,7 +19,7 @@
 |---|---|---|---|
 | **岩壁 Cliff（主角，Nanite）** | "cliff", "rock wall", "canyon wall", "granite cliff", "alpine cliff" | 4–6 个大型 | 作为唯一近中景岩壁层，沿峡谷两壁 kitbash/散布 |
 | **巨石 Boulder（Nanite）** | "granite boulder", "mossy rock", "forest rock", "mountain rock" | 6–10 个多尺寸 | 山腰/前景碎石打散，轨道附近近景细节 |
-| **针叶/阔叶树（Foliage，带 LOD）** | Megascans 3D Plants 的 spruce/pine/fir；或 Fab 上 "conifer forest pack"/"Himalayan forest" | 3–5 种乔木 + 2–3 种灌木 | 森林树冠 massing（替换当前 branch-clump 近似）|
+| **针叶/阔叶树（Foliage，带 LOD）** | Megascans 3D Plants 的 spruce/pine/fir；或 Fab 上 "conifer forest pack"/"Himalayan forest" | 3–5 种乔木 + 2–3 种灌木 | 森林树冠 massing（必须有整树 `StaticMesh`，或明确走 PCG/foliage actor；替换当前 branch-clump 近似）|
 | **下层植被** | "fern", "grass", "understory", "bush" | 3–4 种 | 地面层次、近景绿量 |
 | **地表 Surface** | "forest floor", "alpine grass", "mossy ground", "rocky ground", "scree" | 4–5 张 | 多层混合地形材质（替换单张平铺贴图）|
 | **（可选）远山雪峰** | Fab "mountain backdrop" / "snow peak"，或保留地形 mesh + 大气 | 1 套 | 远景雪山层次（refs 地平线雪峰）|

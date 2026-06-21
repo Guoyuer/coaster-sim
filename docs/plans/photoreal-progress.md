@@ -13,6 +13,7 @@
 
 ## 最新记录
 
+- **2026-06-21 山体视觉实验/资产缺口确认（FAIL；不保留代码）**：按“轨道后面可以更大起伏，先把山体视觉搞好”的裁决，先验证山体而不是继续抬高轨道。高处俯视轨道实验能让河进入构图，但当前试跑触发物理 gate 失败（`max_grade=251.5%`、`est_vert_g=-3.89/6.51`、`violations=54`），延后到山体可信后再重排。山体方向试了两类：①地形色/材质微调（`mountain-rock-balance-v2`、`mountain-texture-lift-v3`）把黄绿坡面变成灰泥大墙，RiskGate 仍 FAIL（risk≈1.79/1.81，flat>0.90），拒绝；②沿相机走廊加 cliff belt（`mountain-cliff-belt-v1/v2`）v1 出现黑色岩板和穿插，v2 变少但仍像硬塞的大 slab，RiskGate FAIL（v2 risk=1.665，flat=0.830），拒绝。处理：所有源码/配置/generated WIP 已回滚，不把失败方案留在默认管线。根因判断：不能再靠单 heightfield 材质和大块岩板硬调，山体 AAA 的缺口是资产层：HISM/ISM 可用的整树针叶 StaticMesh 或明确的 PCG/foliage 路径、坡面友好的模块化 cliff/rock wall、以及多层地表材质。当前导入的 Megaplant 完整树多为 `SkeletalMesh`，现有 HISM 只能实例化 branch/top 静态网格，所以森林仍是 branch-clump 临时近似。
 - **2026-06-21 `CoasterRideCamera` 镜头链路拆分（OK，复杂度下降；视觉不变）**：继续按“清理/精简”裁决，把第一人称相机 rig transform、FOV、曝光、ACES/film、运动模糊、暗角、色彩和 DOF 默认值从 `ACoasterRideActor` 构造器拆到 `CoasterRideCamera` 模块；actor 构造器只创建 `RideCamera` 并调用 `CoasterRideCamera::Configure()`，每帧相机定位改为 `ApplyRigTransform()`，去掉构造器和 `UpdateFirstPersonCamera()` 的位置/俯仰双写。`CoasterRideActor.cpp` 从 374 行降到 322 行。验证：首次 build 抓到 UE `FVector/FRotator` 不能 `constexpr`，已改为普通 `const`；随后 `git diff --check` PASS；C++ Build PASS；`.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -NamePrefix split-ride-camera-v1 -Times 60` PASS，manifest=`Saved\Diagnostics\split-ride-camera-v1-run.json`，RiskGate=WARN，risk=1.441，contact sheet=`Saved\Diagnostics\split-ride-camera-v1.png`。肉眼：相机/轨道/云雾位置正常，视觉与上一轮等价；仍是黄绿山谷，水与参考构图问题未解决。
 - **2026-06-21 `CoasterRideCapture` 截图链路拆分（OK，复杂度下降；视觉不变）**：继续按“清理/精简”裁决，把批量截图与命令行 capture 状态从 `ACoasterRideActor` 拆到 `CoasterRideCapture::FState`：`YarlungBatchShotTimes/Dir/Prefix/Res/Settle/Post` 解析、stage/index/frame-wait、截图请求、完成后退出都在独立模块里；actor 只保留一个 `BatchCapture` 成员和“按秒数定位 ride”的回调。`CoasterRideActor.cpp` 从 496 行降到 374 行，header 去掉一组截图状态字段。验证：`git diff --check` PASS；C++ Build PASS（仅剩 UE `Rename` deprecated warning）；`.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -NamePrefix split-ride-capture-v1 -Times 60` PASS，manifest=`Saved\Diagnostics\split-ride-capture-v1-run.json`，RiskGate=WARN，risk=1.441，contact sheet=`Saved\Diagnostics\split-ride-capture-v1.png`。肉眼：相机/轨道/支撑/云雾正常，视觉仍未改善；此轮只是架构精简。
 - **2026-06-21 `CoasterRideActor` 职责拆分（OK，复杂度下降；视觉不变）**：按“拆”裁决，把 `ACoasterRideActor` 从仿真+相机+截图+轨道绘制+大气配置的巨类拆成三段：actor 保留轨道采样/运动仿真/第一人称相机/批量截图/telemetry；新增 `CoasterTrackVisuals` 负责 cylinder rails/ties/supports 的 mesh/material/instance rebuild/可见性；新增 `YarlungAtmosphere` 负责 SkyLight/SunLight/SkyAtmosphere/VolumetricCloud/Fog 配置、体积云 MID、river fog anchor、光照诊断命令行参数。`CoasterRideActor.cpp` 从 800+ 行降到 496 行，默认可见输出仍由同一数据链生成。验证：`git diff --check` PASS；C++ Build PASS（仅剩 UE `Rename` deprecated warning）；`.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -NamePrefix split-ride-visual-atmosphere-v1 -Times 60` PASS，manifest=`Saved\Diagnostics\split-ride-visual-atmosphere-v1-run.json`，RiskGate=WARN，risk=1.448，contact sheet=`Saved\Diagnostics\split-ride-visual-atmosphere-v1.png`。肉眼：轨道/支撑/云雾仍正常渲染；画面仍是黄绿远离参考图，下一步视觉重点不变：先修相机/轨道/英雄段与河道构图。
@@ -45,9 +46,9 @@
 | 0 参照/英雄段 | ✅ | 英雄段与 L1-L3 local refs 已确定；本地 refs 不入库。 |
 | A 真实地形/路线基础 | ✅ | DEM/长轨道/走廊基础可运行；不再用旧短环。 |
 | B 光照/曝光/大气基础 | 🟨 | 物理日光/曝光有基础，但画面仍受山体资产和成像层拖累。 |
-| C 山体/峡谷几何 | 🟦 | 旧程序化 canyon-wall 已删除；当前靠 DEM corridor terrain + Megascans scatter，仍缺真实连续 Nanite 岩壁和远山层次。 |
+| C 山体/峡谷几何 | 🟦 | 旧程序化 canyon-wall 已删除；当前靠 DEM corridor terrain + Megascans scatter，仍缺真实连续 Nanite 岩壁和远山层次；最新 cliff belt/材质微调实验被拒绝，不能靠大 slab 或单 heightfield 调色解决。 |
 | D 江水/轨道/车 | 🟨 | 轨道已管轨化且支撑比例修正；隐藏 `TrainBody` placeholder 已删除；当前无真实车体，待 authored cockpit/train 与 UE Water 材质升级。 |
-| E 密林/成像收尾 | 🟨 | HISM 树冠走廊已让 Standard 风险进 OK，但仍是 branch-clump 近似；需要整树 foliage/PCG、TSR/运动模糊、镜头感。 |
+| E 密林/成像收尾 | 🟨 | HISM 树冠走廊已让 Standard 风险进 OK，但仍是 branch-clump 近似；当前完整 Megaplant 树多为 `SkeletalMesh`，不能直接进 HISM，需要整树 StaticMesh foliage 或 PCG 路径，再做 TSR/运动模糊/镜头感。 |
 | F 全程铺开/性能 | ⬜ | 需整条 on-rails 视锥验收，当前未到。 |
 
 状态图例：⬜ TODO ／ 🟦 进行中 ／ 🟨 部分完成 ／ ✅ Done ／ ⛔ NEEDS-HUMAN ／ ❌ Blocked
@@ -60,9 +61,11 @@
    .\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Standard -Build -NamePrefix <short-name>
    ```
    如果改变 terrain mesh/vertex color/displacement，改用 `-Mode Terrain`。
-3. **主线（AAA）= 资产导入，见 `docs/plans/aaa-asset-pipeline.md`**：
-   - **【人工，阻塞中】** 用 Quixel Bridge 登录 Fab，按 aaa-asset-pipeline.md 的清单导入 Megascans（cliff/boulder/树/植被/地表，Nanite 开）。
-   - 资产落地后 agent 全自动接线：Nanite 岩壁散布 → instanced 森林树冠（已用 branch-clump 临时打通，需真整树 foliage） → 多层地形材质 → UE Water 江水升级 → authored cockpit/train → 成像收尾。
+3. **主线（AAA）= 资产导入/资产路径修正，见 `docs/plans/aaa-asset-pipeline.md`**：
+   - **【当前优先】** 先补 HISM/ISM 可用的整树针叶/冷杉/云杉 StaticMesh，或明确改成可使用现有树资产的 PCG/foliage actor 路径；否则山体只能停留在 branch-clump 近似。
+   - **【当前优先】** 选择坡面友好的模块化 cliff/rock wall（多尺寸、可旋转、非单块巨板），沿峡谷两侧 kitbash；不要恢复旧 `YarlungCanyonWallActor`，也不要用大 slab 硬盖坡。
+   - 山体读成真实密林+灰绿湿岩后，再回到轨道高度/大起伏/俯视河道构图；当前高处轨道物理 gate 未过，先不投入。
+   - 资产落地后 agent 全自动接线：Nanite 岩壁散布 → instanced/PCG 森林树冠（替换 branch-clump） → 多层地形材质 → UE Water 江水升级 → authored cockpit/train → 成像收尾。
    - 不要恢复旧 `YarlungCanyonWallActor` / `YarlungRiverActor` 程序化分支；不要回到 square full-map fallback。
 4. **验收要求**：每次必须打开 `Saved\Diagnostics\<name>.png` contact sheet，并把命令、manifest、risk gate、肉眼 verdict、下一步写回本文件。
 
