@@ -66,9 +66,26 @@ function Invoke-UnrealPythonScript {
         $Args += "-NullRHI"
     }
     $Args += $EditorCommonArgs
-    & $EditorCmd @Args
-    if ($LASTEXITCODE -ne 0) {
-        throw "Unreal Python script failed with exit code $LASTEXITCODE`: $ScriptPath"
+    Invoke-UnrealChecked -Args $Args -FailureLabel "Unreal Python script" -TargetLabel $ScriptPath -RequireSuccessSummary
+}
+
+function Invoke-UnrealChecked {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Args,
+        [Parameter(Mandatory = $true)][string]$FailureLabel,
+        [Parameter(Mandatory = $true)][string]$TargetLabel,
+        [switch]$RequireSuccessSummary
+    )
+
+    $Output = @(& $EditorCmd @Args 2>&1)
+    $Output | ForEach-Object { Write-Host $_ }
+    $ExitCode = $LASTEXITCODE
+    $Text = $Output -join [Environment]::NewLine
+    if ($ExitCode -ne 0) {
+        throw "$FailureLabel failed with exit code $ExitCode`: $TargetLabel"
+    }
+    if ($RequireSuccessSummary -and $Text -notmatch "Success - 0 error\(s\)") {
+        throw "$FailureLabel did not report 'Success - 0 error(s)': $TargetLabel"
     }
 }
 
@@ -186,10 +203,7 @@ if (-not $SkipMapImport) {
         if ($SkipTerrainMeshBuild) {
             $MapImportArgs += "-SkipTerrainMeshBuild"
         }
-        & $EditorCmd @MapImportArgs
-        if ($LASTEXITCODE -ne 0) {
-            throw "Yarlung landscape import failed with exit code $LASTEXITCODE"
-        }
+        Invoke-UnrealChecked -Args $MapImportArgs -FailureLabel "Yarlung landscape import" -TargetLabel "YarlungLandscapeImport" -RequireSuccessSummary
     }
 } else {
     Write-Host "[YARLUNG-TIME] skip import landscape map: requested"

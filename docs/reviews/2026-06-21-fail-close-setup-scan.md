@@ -19,9 +19,7 @@ This pass tightened the default path so missing config, broken material generati
 
 ## Non-Blocking Suggestions
 
-1. Replace deprecated Unreal Python APIs in material generation so the project can later treat selected warnings as errors.
-2. Make map import verification parse and require the commandlet `Success - 0 error(s)` line, not just the process exit code.
-3. Extend config validation from required top-level objects to required scalar fields with explicit field names.
+1. Extend config validation from required top-level objects to required scalar fields with explicit field names.
 
 ## Required Next Action
 
@@ -39,3 +37,6 @@ Continue AAA visual iteration, but keep `scripts/test-yarlung.ps1` as the setup/
 - `YarlungLandscapeImportCommandlet` now fails map import when required world actors or UE Water fail to spawn.
 - `YarlungWaterBuilder` now requires WaterZone, river material, and surface material; missing water materials no longer fall through to `AWaterBodyRiver` defaults.
 - `inspect-yarlung-map.py` now uses `UnrealEditorSubsystem` / `EditorActorSubsystem`; map verify reaches `Success - 0 error(s), 0 warning(s)`.
+- `import-yarlung-landscape.ps1` now requires Unreal commandlets/Python scripts to report `Success - 0 error(s)` in addition to process exit code 0.
+- `create-coaster-materials.py` now uses `set_base_material_usage(...)` instead of deprecated material usage APIs, reuses existing material assets instead of deleting/recreating them, and reaches material generation `Success - 0 error(s), 0 warning(s)`.
+- `inspect-yarlung-assets.py` now checks `does_asset_exist(...)` before loading optional assets, so missing local-only assets are reported as diagnostics instead of UE Error log noise.

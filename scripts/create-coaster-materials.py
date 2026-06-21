@@ -26,16 +26,13 @@ def ensure_folder(path):
         unreal.EditorAssetLibrary.make_directory(path)
 
 
-def create_material_asset(name, package_path, replace_existing=False):
+def create_material_asset(name, package_path):
     asset_path = f"{package_path}/{name}"
-    if replace_existing and unreal.EditorAssetLibrary.does_asset_exist(asset_path):
-        if not unreal.EditorAssetLibrary.delete_asset(asset_path):
-            raise RuntimeError(f"Unable to delete stale material: {asset_path}")
-
     if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
         material = unreal.EditorAssetLibrary.load_asset(asset_path)
-        if material:
+        if isinstance(material, unreal.Material):
             return material
+        raise RuntimeError(f"Existing asset is not a Material: {asset_path}")
 
     material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
         name,
@@ -132,7 +129,7 @@ def finalize_material(material):
 
 
 def create_tint_material():
-    material = create_material_asset(TINT_MATERIAL_NAME, PACKAGE_PATH, replace_existing=True)
+    material = create_material_asset(TINT_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
 
     connect_material_property(
@@ -163,9 +160,10 @@ def create_tint_material():
         "tint Metallic",
     )
 
-    unreal.MaterialEditingLibrary.set_material_usage(
+    unreal.MaterialEditingLibrary.set_base_material_usage(
         material,
         unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES,
+        True,
     )
     finalize_material(material)
 
@@ -173,7 +171,7 @@ def create_tint_material():
 def set_optional_material_usage(material, usage_name):
     usage = getattr(unreal.MaterialUsage, usage_name, None)
     if usage is not None:
-        unreal.MaterialEditingLibrary.set_material_usage(material, usage)
+        unreal.MaterialEditingLibrary.set_base_material_usage(material, usage, True)
 
 
 def set_instance_scalar(instance, name, value):
@@ -251,7 +249,7 @@ def create_yarlung_water_material_instance():
 
 
 def create_yarlung_water_surface_material():
-    material = create_material_asset(WATER_SURFACE_MATERIAL_NAME, PACKAGE_PATH, replace_existing=True)
+    material = create_material_asset(WATER_SURFACE_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
     material.set_editor_property("two_sided", True)
@@ -288,7 +286,7 @@ def create_yarlung_water_surface_material():
 
 
 def create_mesh_terrain_material():
-    material = create_material_asset(MESH_TERRAIN_MATERIAL_NAME, PACKAGE_PATH, replace_existing=True)
+    material = create_material_asset(MESH_TERRAIN_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     material.set_editor_property("two_sided", False)
 
@@ -359,7 +357,7 @@ def enable_imported_material_usages():
             for name in usage_names:
                 usage = getattr(unreal.MaterialUsage, name, None)
                 if usage is not None:
-                    unreal.MaterialEditingLibrary.set_material_usage(asset, usage)
+                    unreal.MaterialEditingLibrary.set_base_material_usage(asset, usage, True)
             unreal.EditorAssetLibrary.save_loaded_asset(asset)
             print(f"[IMPORTED-USAGE] enabled instancing/nanite usage: {path}")
 

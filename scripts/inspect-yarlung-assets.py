@@ -16,6 +16,9 @@ def describe_asset(path):
     if not path:
         print("[ASSET] empty path")
         return
+    if not unreal.EditorAssetLibrary.does_asset_exist(path):
+        print(f"[ASSET] MISSING {path}")
+        return
     asset = unreal.EditorAssetLibrary.load_asset(path)
     if asset is None:
         print(f"[ASSET] MISSING {path}")
@@ -48,6 +51,9 @@ def inspect_water_materials(config):
         ("surface", "surface_material"),
     ):
         material_path = water.get(key, "")
+        if not unreal.EditorAssetLibrary.does_asset_exist(material_path):
+            print(f"[WATER-PARAMS] {label}=MISSING {material_path}")
+            continue
         material = unreal.EditorAssetLibrary.load_asset(material_path)
         if material is None:
             print(f"[WATER-PARAMS] {label}=MISSING {material_path}")
