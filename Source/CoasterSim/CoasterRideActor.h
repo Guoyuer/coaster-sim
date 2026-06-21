@@ -136,7 +136,6 @@ protected:
 private:
     void RebuildSpline();
     void RebuildVisuals();
-    void ApplyVisualMaterials();
     void AdvanceRide(float DeltaSeconds);
     bool ConfigureBatchScreenshotsFromCommandLine();
     void TickBatchScreenshots();

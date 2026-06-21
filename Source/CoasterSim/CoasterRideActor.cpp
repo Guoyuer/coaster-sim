@@ -1,111 +1,30 @@
 #include "CoasterRideActor.h"
 
-#include "YarlungRiverField.h"
-
 #include "CoasterBanking.h"
+#include "CoasterTrackVisuals.h"
 #include "CoasterTrackComponent.h"
+#include "YarlungAtmosphere.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
-#include "Components/MeshComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Engine/Scene.h"
 #include "Engine/Engine.h"
-#include "Engine/StaticMesh.h"
 #include "HAL/PlatformMisc.h"
 #include "HAL/FileManager.h"
-#include "Materials/MaterialInstanceDynamic.h"
-#include "Materials/MaterialInterface.h"
 #include "Misc/CommandLine.h"
-#include "HAL/IConsoleManager.h"
-#include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Misc/Parse.h"
 #include "UnrealClient.h"
-#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
 constexpr float CmPerMeter = 100.0f;
 constexpr float GravityCms2 = 980.665f;
-
-// Round-tube transform for the BasicShapes Cylinder (100cm tall along Z, 100cm
-// diameter). Orients the cylinder's long Z axis along the segment so rails, ties
-// and support columns read as real tubular steel instead of square greybox bars.
-FTransform MakeTubeTransform(const FVector& Start, const FVector& End, float DiameterCm)
-{
-    const FVector Mid = (Start + End) * 0.5f;
-    const FVector Delta = End - Start;
-    const float Length = FMath::Max(Delta.Length(), 1.0f);
-    const FRotator Rotation = FRotationMatrix::MakeFromZ(Delta.GetSafeNormal()).Rotator();
-    const float Diameter = FMath::Max(DiameterCm, 1.0f);
-    return FTransform(Rotation, Mid, FVector(Diameter / 100.0f, Diameter / 100.0f, Length / 100.0f));
-}
-
-bool LoadGeneratedRiverAverageZCm(float& OutZCm)
-{
-    FYarlungRiverField RiverField;
-    FString Error;
-    if (!RiverField.LoadFromProjectContent(&Error))
-    {
-        UE_LOG(LogTemp, Error, TEXT("Unable to read generated Yarlung river field for fog anchor: %s"), *Error);
-        return false;
-    }
-
-    double SumZ = 0.0;
-    const TArray<FYarlungRiverRow>& Rows = RiverField.GetRows();
-    for (const FYarlungRiverRow& Row : Rows)
-    {
-        SumZ += Row.PositionCm.Z;
-    }
-    OutZCm = static_cast<float>(SumZ / static_cast<double>(Rows.Num()));
-    return true;
-}
-
-void SetConsoleVariableIfAvailable(const TCHAR* Name, int32 Value)
-{
-    if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(Name))
-    {
-        CVar->Set(Value, ECVF_SetByCode);
-    }
-}
-
-void ConfigureYarlungCloudMaterial(UVolumetricCloudComponent* Clouds, UObject* Owner)
-{
-    if (!Clouds)
-    {
-        return;
-    }
-
-    UMaterialInterface* BaseMaterial = Clouds->GetMaterial();
-    if (!BaseMaterial)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Yarlung volumetric clouds have no material; sky will render cloudless."));
-        return;
-    }
-
-    UMaterialInstanceDynamic* CloudMID = UMaterialInstanceDynamic::Create(BaseMaterial, Owner);
-    if (!CloudMID)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Unable to create dynamic Yarlung cloud material instance."));
-        return;
-    }
-
-    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"), 0.24f);
-    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalDensity"), 0.065f);
-    CloudMID->SetScalarParameterValue(TEXT("Layout_CloudGlobalScale"), 18.0f);
-    CloudMID->SetScalarParameterValue(TEXT("CloudTextureWeight"), 0.82f);
-    CloudMID->SetScalarParameterValue(TEXT("Noise_Strength"), 0.56f);
-    CloudMID->SetScalarParameterValue(TEXT("Noise_Bias"), -0.10f);
-    CloudMID->SetVectorParameterValue(TEXT("Cloud_AlbedoColor"), FLinearColor(0.96f, 0.97f, 0.93f));
-
-    Clouds->SetMaterial(CloudMID);
-    UE_LOG(LogTemp, Display, TEXT("Configured Yarlung volumetric clouds: coverage=0.24 density=0.065 scale=18.0"));
-}
 
 }
 
@@ -178,59 +97,19 @@ ACoasterRideActor::ACoasterRideActor()
 
     SkyLight = CreateDefaultSubobject<USkyLightComponent>(TEXT("SkyLight"));
     SkyLight->SetupAttachment(SceneRoot);
-    // Real-time-capture skylight: intensity is a multiplier on the captured
-    // physical sky. 1.1 still over-filled the gorge and erased forest/rock
-    // separation; 0.45 preserves the hard sun/shadow contrast seen in refs.
-    SkyLight->SetIntensity(0.45f);
-    SkyLight->SetRealTimeCapture(true);
 
     SunLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("SunLight"));
     SunLight->SetupAttachment(SceneRoot);
-    SunLight->SetRelativeRotation(FRotator(-55.0f, -18.0f, 0.0f));
-    SunLight->SetIntensity(120000.0f);
-    SunLight->SetUseTemperature(true);
-    SunLight->SetTemperature(6500.0f);
-    SunLight->SetLightColor(FLinearColor(1.0f, 1.0f, 1.0f));
-    SunLight->SetAtmosphereSunLight(true);
-    SunLight->SetAtmosphereSunLightIndex(0);
 
     SkyAtmosphere = CreateDefaultSubobject<USkyAtmosphereComponent>(TEXT("SkyAtmosphere"));
     SkyAtmosphere->SetupAttachment(SceneRoot);
 
     VolumetricClouds = CreateDefaultSubobject<UVolumetricCloudComponent>(TEXT("VolumetricClouds"));
     VolumetricClouds->SetupAttachment(SceneRoot);
-    VolumetricClouds->SetLayerBottomAltitude(3.90f);
-    VolumetricClouds->SetLayerHeight(2.00f);
-    VolumetricClouds->SetTracingStartMaxDistance(170.0f);
-    VolumetricClouds->SetTracingMaxDistance(150.0f);
-    VolumetricClouds->SetbUsePerSampleAtmosphericLightTransmittance(true);
-    VolumetricClouds->SetSkyLightCloudBottomOcclusion(0.10f);
-    VolumetricClouds->SetViewSampleCountScale(2.35f);
-    VolumetricClouds->SetShadowViewSampleCountScale(0.80f);
-    VolumetricClouds->SetGroundAlbedo(FColor(34, 54, 43));
-    static ConstructorHelpers::FObjectFinder<UMaterialInterface> CloudMaterial(
-        TEXT("/Engine/EngineSky/VolumetricClouds/m_SimpleVolumetricCloud_Inst.m_SimpleVolumetricCloud_Inst"));
-    if (CloudMaterial.Succeeded())
-    {
-        VolumetricClouds->SetMaterial(CloudMaterial.Object);
-    }
 
     ValleyFog = CreateDefaultSubobject<UExponentialHeightFogComponent>(TEXT("ValleyFog"));
     ValleyFog->SetupAttachment(SceneRoot);
-    ValleyFog->SetRelativeLocation(FVector::ZeroVector);
-    // Aerial perspective: real gorge refs (L2/L3) show distant ranges receding into
-    // pale blue haze, layer behind layer. The old near-zero fog gave no depth
-    // separation. Raise density/opacity for tonal recession but keep a long start
-    // distance so near textured terrain stays crisp (avoid pushing washed back up).
-    ValleyFog->SetFogDensity(0.000090f);
-    ValleyFog->SetFogHeightFalloff(0.10f);
-    ValleyFog->SetFogMaxOpacity(0.55f);
-    ValleyFog->SetStartDistance(9000.0f);
-    ValleyFog->SetFogInscatteringColor(FLinearColor(0.60f, 0.72f, 0.86f));
-    ValleyFog->SetVolumetricFog(true);
-    ValleyFog->SetVolumetricFogScatteringDistribution(0.38f);
-    ValleyFog->SetVolumetricFogExtinctionScale(0.032f);
-    ValleyFog->SetVolumetricFogDistance(65000.0f);
+    YarlungAtmosphere::ConfigureComponents(SkyLight, SunLight, SkyAtmosphere, VolumetricClouds, ValleyFog);
 
     LeftRail = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("LeftRail"));
     LeftRail->SetupAttachment(SceneRoot);
@@ -240,25 +119,7 @@ ACoasterRideActor::ACoasterRideActor()
     Ties->SetupAttachment(SceneRoot);
     Supports = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Supports"));
     Supports->SetupAttachment(SceneRoot);
-
-    // Rails, ties and support columns are round tubular steel, not square bars.
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-    if (CylinderMesh.Succeeded())
-    {
-        LeftRail->SetStaticMesh(CylinderMesh.Object);
-        RightRail->SetStaticMesh(CylinderMesh.Object);
-        Ties->SetStaticMesh(CylinderMesh.Object);
-        Supports->SetStaticMesh(CylinderMesh.Object);
-    }
-
-    static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
-    if (BasicMaterial.Succeeded())
-    {
-        LeftRail->SetMaterial(0, BasicMaterial.Object);
-        RightRail->SetMaterial(0, BasicMaterial.Object);
-        Ties->SetMaterial(0, BasicMaterial.Object);
-        Supports->SetMaterial(0, BasicMaterial.Object);
-    }
+    CoasterTrackVisuals::ConfigureMeshes(LeftRail, RightRail, Ties, Supports);
 
     CurrentSpeedCms = 450.0f;
 }
@@ -267,63 +128,24 @@ void ACoasterRideActor::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
     RebuildSpline();
-    ApplyVisualMaterials();
     RebuildVisuals();
 }
 
 void ACoasterRideActor::BeginPlay()
 {
     Super::BeginPlay();
-    SetConsoleVariableIfAvailable(TEXT("r.VolumetricCloud"), 1);
-    SetConsoleVariableIfAvailable(TEXT("r.VolumetricCloud.ShadowMap"), 1);
-    SetConsoleVariableIfAvailable(TEXT("r.VolumetricFog"), 1);
-    ConfigureYarlungCloudMaterial(VolumetricClouds, this);
+    YarlungAtmosphere::BeginPlay(VolumetricClouds, this);
 
     RebuildSpline();
-    ApplyVisualMaterials();
     RebuildVisuals();
 
     const TCHAR* CommandLine = FCommandLine::Get();
     if (FParse::Param(CommandLine, TEXT("YarlungHideRide")))
     {
-        LeftRail->SetVisibility(false, true);
-        RightRail->SetVisibility(false, true);
-        Ties->SetVisibility(false, true);
-        Supports->SetVisibility(false, true);
-    }
-    if (FParse::Param(CommandLine, TEXT("YarlungHideFog")))
-    {
-        ValleyFog->SetVisibility(false, true);
-    }
-    if (FParse::Param(CommandLine, TEXT("YarlungHideClouds")))
-    {
-        VolumetricClouds->SetVisibility(false, true);
-    }
-    // --- Pivot cut #2 diagnostics: localize the "styrofoam white" terrain ---
-    // Terrain vertex albedo is already dark humid green-grey (~0.08), so the
-    // white must come from the lighting/exposure chain. These command-line
-    // knobs isolate which lever clips it, without re-baking anything.
-    float DiagExposureBias = 0.0f;
-    if (FParse::Value(CommandLine, TEXT("YarlungExposureBias="), DiagExposureBias))
-    {
-        RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-        RideCamera->PostProcessSettings.AutoExposureBias = DiagExposureBias;
-        UE_LOG(LogTemp, Display, TEXT("[diag] YarlungExposureBias=%.2f"), DiagExposureBias);
-    }
-    float DiagSkyLightIntensity = 0.0f;
-    if (FParse::Value(CommandLine, TEXT("YarlungSkyLightIntensity="), DiagSkyLightIntensity))
-    {
-        SkyLight->SetIntensity(DiagSkyLightIntensity);
-        UE_LOG(LogTemp, Display, TEXT("[diag] YarlungSkyLightIntensity=%.2f"), DiagSkyLightIntensity);
-    }
-    float DiagSunIntensity = 0.0f;
-    if (FParse::Value(CommandLine, TEXT("YarlungSunIntensity="), DiagSunIntensity))
-    {
-        SunLight->SetIntensity(DiagSunIntensity);
-        UE_LOG(LogTemp, Display, TEXT("[diag] YarlungSunIntensity=%.2f"), DiagSunIntensity);
+        CoasterTrackVisuals::SetVisible(LeftRail, RightRail, Ties, Supports, false);
     }
 
-    SkyLight->RecaptureSky();
+    YarlungAtmosphere::ApplyCommandLineOverrides(RideCamera, SkyLight, SunLight, ValleyFog, VolumetricClouds);
     StartRideFromCommandLine(0.34f, 18.0f);
     ConfigureBatchScreenshotsFromCommandLine();
 }
@@ -540,161 +362,24 @@ void ACoasterRideActor::RebuildSpline()
     }
 
     TrackLengthCm = TrackSpline->GetTrackLengthCm();
-
-    float RiverSurfaceZCm = 0.0f;
-    if (LoadGeneratedRiverAverageZCm(RiverSurfaceZCm))
-    {
-        ValleyFog->SetVisibility(true, true);
-        ValleyFog->SetRelativeLocation(FVector(0.0f, 0.0f, RiverSurfaceZCm + 70.0f));
-        UE_LOG(LogTemp, Display, TEXT("Anchored valley fog to generated Yarlung river average Z: %.1fcm"), RiverSurfaceZCm);
-        return;
-    }
-
-    ValleyFog->SetVisibility(false, true);
-    UE_LOG(LogTemp, Error, TEXT("Generated Yarlung river CSV is required for valley fog; fog disabled."));
+    YarlungAtmosphere::AnchorFogToGeneratedRiver(ValleyFog);
 }
 
 void ACoasterRideActor::RebuildVisuals()
 {
-    LeftRail->ClearInstances();
-    RightRail->ClearInstances();
-    Ties->ClearInstances();
-    Supports->ClearInstances();
-
-    const float RailHalfGauge = RailGaugeCm * 0.5f;
-    const float SegmentStep = 180.0f;
-    const float TieStep = 360.0f;
-    const float SupportStep = 14400.0f;
-
-    for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += SegmentStep)
-    {
-        FVector LocationA;
-        FVector ForwardA;
-        FVector RightA;
-        FVector UpA;
-        FRotator RotationA;
-        SampleFrame(Distance, LocationA, RotationA, ForwardA, RightA, UpA);
-
-        FVector LocationB;
-        FVector ForwardB;
-        FVector RightB;
-        FVector UpB;
-        FRotator RotationB;
-        SampleFrame(FMath::Fmod(Distance + SegmentStep, TrackLengthCm), LocationB, RotationB, ForwardB, RightB, UpB);
-
-        const FVector RailDropA = UpA * 18.0f;
-        const FVector RailDropB = UpB * 18.0f;
-        LeftRail->AddInstance(MakeTubeTransform(LocationA - RightA * RailHalfGauge - RailDropA, LocationB - RightB * RailHalfGauge - RailDropB, 12.0f));
-        RightRail->AddInstance(MakeTubeTransform(LocationA + RightA * RailHalfGauge - RailDropA, LocationB + RightB * RailHalfGauge - RailDropB, 12.0f));
-    }
-
-    for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += TieStep)
-    {
-        FVector Location;
-        FVector Forward;
-        FVector Right;
-        FVector Up;
-        FRotator Rotation;
-        SampleFrame(Distance, Location, Rotation, Forward, Right, Up);
-
-        const FVector TieCenter = Location - Up * 42.0f;
-        const FVector TieStart = TieCenter - Right * (RailHalfGauge - 8.0f);
-        const FVector TieEnd = TieCenter + Right * (RailHalfGauge - 8.0f);
-        Ties->AddInstance(MakeTubeTransform(TieStart, TieEnd, 6.0f));
-    }
-
-    for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += SupportStep)
-    {
-        FVector Location;
-        FVector Forward;
-        FVector Right;
-        FVector Up;
-        FRotator Rotation;
-        SampleFrame(Distance, Location, Rotation, Forward, Right, Up);
-
-        if (Location.Z > 250.0f)
+    CoasterTrackVisuals::ApplyMaterials(LeftRail, RightRail, Ties, Supports);
+    CoasterTrackVisuals::Rebuild(
+        LeftRail,
+        RightRail,
+        Ties,
+        Supports,
+        TrackSpline,
+        TrackLengthCm,
+        RailGaugeCm,
+        [this](float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp)
         {
-            const FVector YokeCenter = Location - Up * 62.0f;
-            const FVector YokeLeft = YokeCenter - Right * (RailHalfGauge + 34.0f);
-            const FVector YokeRight = YokeCenter + Right * (RailHalfGauge + 34.0f);
-            // Sink the feet well below the heightfield reference Z so they always
-            // meet the visible Nanite terrain (which carries up to ~49 m of sub-30 m
-            // rock displacement not present in the track CSV's terrain_z) instead of
-            // floating above it. The buried length is occluded by the terrain surface
-            // from the on-rails camera, so there is no visual cost.
-            const float TerrainRefZ = TrackSpline->GetGeneratedTerrainZAtDistance(Distance);
-            const float TerrainFootZ = TerrainRefZ - 6000.0f;
-            const FVector LeftFoot = FVector(YokeLeft.X, YokeLeft.Y, TerrainFootZ);
-            const FVector RightFoot = FVector(YokeRight.X, YokeRight.Y, TerrainFootZ);
-
-            // Keep the near-camera support steel in coaster/trestle scale. The
-            // earlier 1.4%-of-height rule produced 1.5-4.7m diameter cylinders; at
-            // first-person range their caps filled the frame and read as a greybox
-            // car nose. Tall canyon supports need repetition/bracing, not huge tubes.
-            const float PierHeight = FMath::Max(YokeCenter.Z - TerrainRefZ, 1.0f);
-            const float LegThickness = FMath::Clamp(PierHeight * 0.004f, 42.0f, 120.0f);
-
-            // Do not add a top cross-yoke directly under the rails. In first-person
-            // downhill frames its cylinder cap sits at the bottom of the camera and
-            // reads as a fake silver car body. The visible trestle legs/braces carry
-            // the support read without polluting the cockpit foreground.
-            Supports->AddInstance(MakeTubeTransform(LeftFoot, YokeLeft, LegThickness));
-            Supports->AddInstance(MakeTubeTransform(RightFoot, YokeRight, LegThickness));
-
-            // Horizontal cross-ties up the legs read as an engineered trestle ladder
-            // and break up the otherwise blank tall pier face. Place them along the
-            // visible span only (surface -> yoke), not the buried portion.
-            const FVector LeftSurface = FVector(YokeLeft.X, YokeLeft.Y, TerrainRefZ);
-            const FVector RightSurface = FVector(YokeRight.X, YokeRight.Y, TerrainRefZ);
-            const int32 BraceCount = FMath::Clamp(FMath::FloorToInt(PierHeight / 9000.0f), 0, 2);
-            for (int32 BraceIndex = 1; BraceIndex <= BraceCount; ++BraceIndex)
-            {
-                const float BraceT = static_cast<float>(BraceIndex) / static_cast<float>(BraceCount + 1);
-                const FVector BraceLeft = FMath::Lerp(LeftSurface, YokeLeft, BraceT);
-                const FVector BraceRight = FMath::Lerp(RightSurface, YokeRight, BraceT);
-                Supports->AddInstance(MakeTubeTransform(BraceLeft, BraceRight, LegThickness * 0.35f));
-            }
-        }
-    }
-}
-
-void ACoasterRideActor::ApplyVisualMaterials()
-{
-    UMaterialInterface* TintMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
-
-    auto TintComponent = [TintMaterial](UMeshComponent* Component, const FLinearColor& Color, float Metallic, float Roughness)
-    {
-        if (!Component)
-        {
-            return;
-        }
-
-        if (TintMaterial)
-        {
-            Component->SetMaterial(0, TintMaterial);
-        }
-
-        UMaterialInstanceDynamic* Material = Component->CreateAndSetMaterialInstanceDynamic(0);
-        if (!Material)
-        {
-            return;
-        }
-
-        Material->SetVectorParameterValue(TEXT("Color"), Color);
-        Material->SetVectorParameterValue(TEXT("BaseColor"), Color);
-        Material->SetScalarParameterValue(TEXT("Metallic"), Metallic);
-        Material->SetScalarParameterValue(TEXT("Roughness"), Roughness);
-        Material->SetScalarParameterValue(TEXT("Specular"), 0.5f);
-    };
-
-    // Steel coaster: rails are bright polished steel, the structure is painted/
-    // galvanized metal, ties read as weathered metal-composite. Rendering these
-    // as flat non-metallic matte (old Roughness 0.88, Metallic 0) was the single
-    // biggest reason the track itself never read as a real coaster.
-    TintComponent(LeftRail, FLinearColor(0.52f, 0.54f, 0.57f), 1.0f, 0.24f);     // polished running rail
-    TintComponent(RightRail, FLinearColor(0.52f, 0.54f, 0.57f), 1.0f, 0.24f);
-    TintComponent(Ties, FLinearColor(0.20f, 0.21f, 0.23f), 0.85f, 0.55f);        // galvanized cross-ties
-    TintComponent(Supports, FLinearColor(0.26f, 0.30f, 0.34f), 0.9f, 0.45f);     // painted steel columns
+            SampleFrame(DistanceCm, OutLocation, OutRotation, OutForward, OutRight, OutUp);
+        });
 }
 
 void ACoasterRideActor::AdvanceRide(float DeltaSeconds)
