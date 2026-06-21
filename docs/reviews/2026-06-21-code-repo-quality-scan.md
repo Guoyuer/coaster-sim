@@ -1,0 +1,65 @@
+# Code / Repo Quality Scan — 2026-06-21
+
+- Reviewer: Codex
+- Scope: `Source/CoasterSim`, `scripts`, generated-asset worktree behavior
+- Context: after the Yarlung pipeline cleanup and before the next visual asset pass
+
+## Verdict
+
+The repo is cleaner than the previous architecture review state. The severe split-brain terrain/track config issue is already fixed, `CoasterRideActor` has been split down, and legacy procedural river/canyon actors are gone.
+
+There are still useful cleanup opportunities, but they should stay separate from visual iteration commits.
+
+## Implemented in this pass
+
+- Removed local ignored `scripts/__pycache__` noise so file scans do not surface stale bytecode.
+- Refactored `ACoasterRideActor` command-line ride positioning: `StartRideFromCommandLine()` and batch screenshot positioning now share `ComputeAdvancedTrackRatio()`. This removes duplicated start-distance / speed / wraparound math without changing behavior.
+- Validation: `git diff --check` PASS; C++ build PASS; `.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Quick -Build -SkipCapture -NamePrefix ride-start-helper-smoke` PASS. Generated `.umap` dirt from the smoke run was reverted.
+
+## Recommended next cleanup
+
+### 1. Deepen scenery placement
+
+- Files: `Source/CoasterSim/YarlungSceneryActor.cpp`, `Source/CoasterSim/YarlungAssetConfig.*`
+- Problem: `AddScatterRule()` and `AddCanopyBelt()` both know too much about height sampling, bounds, river clearance, authored profile height, slope gates, yaw, scale, and placement transforms. The interface is config-driven, but the implementation is still two parallel placement pipelines.
+- Solution: extract a scenery placement module that owns the shared terrain/river/profile sampling and returns accepted transforms. Keep rock/cliff/canopy style differences as small policy inputs.
+- Benefit: locality for placement bugs; one test surface for river clearance and slope gates; easier to add PCG/foliage or whole-tree StaticMesh later.
+- Recommendation: Strong.
+
+### 2. Make the generated-map dirty contract explicit
+
+- Files: `scripts/iterate-yarlung.ps1`, `scripts/import-yarlung-landscape.ps1`, `Content/Generated/YarlungLandscape/YarlungLandscape_Level.umap`
+- Problem: Actor-mode smoke/import rewrites the tracked `.umap` even for code-only or config-only validation. This is expected but keeps creating dirty generated state that must be manually reverted when the source change is unrelated.
+- Solution: add an explicit validation mode or post-step that distinguishes "verify generated map in place" from "intentional generated-map update". The script should report generated dirt separately and optionally restore it for smoke-only runs.
+- Benefit: cleaner worktree; fewer accidental generated commits; clearer agent handoff.
+- Recommendation: Strong.
+
+### 3. Fix the UE 5.8 `Rename` deprecation warning
+
+- Files: `Source/CoasterSim/YarlungLandscapeImportCommandlet.cpp`
+- Problem: every build reports `Rename will no longer call ResetLoaders...` at the generated asset replacement path.
+- Solution: update the rename flags/API to the UE 5.8-preferred form and validate a map rebuild.
+- Benefit: build logs become quieter; future UE upgrades carry less risk.
+- Recommendation: Worth exploring.
+
+### 4. Split terrain mesh coloring from map import orchestration
+
+- Files: `Source/CoasterSim/YarlungLandscapeImportCommandlet.cpp`
+- Problem: the commandlet is no longer a god object, but terrain color/mask computation still sits beside package save/map actor orchestration.
+- Solution: move terrain vertex color and wet-rock/ravine masks behind a small terrain surface module. Keep package creation and actor spawning in the commandlet.
+- Benefit: locality for mountain material experiments; safer tests for color/mask changes without touching map import.
+- Recommendation: Worth exploring.
+
+### 5. Consolidate Python diagnostic geometry helpers
+
+- Files: `scripts/verify-track-clearance.py`, `scripts/inspect-yarlung-spatial-contract.py`, `scripts/diagnose-yarlung-scenery-overlay.py`
+- Problem: small vector math, normalization, and CSV-reading helpers are repeated across diagnostics.
+- Solution: extend `scripts/yarlung_track_lib.py` or add a focused `scripts/yarlung_geometry.py` for shared diagnostic math.
+- Benefit: less drift across diagnostics; easier to trust spatial contract reports.
+- Recommendation: Speculative.
+
+## Not worth doing right now
+
+- Do not split `ACoasterRideActor` further just to make it smaller. After camera/capture/visuals/atmosphere extraction, the remaining actor mostly owns ride simulation and orchestration.
+- Do not remove tracked `Content/Generated/*` wholesale. The repo intentionally tracks generated UE assets for reproducible local iteration; the problem is dirty-state handling, not the presence of generated assets.
+- Do not spend cleanup time on visual constants until the asset path decision is resolved. That would mix architecture work with failed mountain tuning.

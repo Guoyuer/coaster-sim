@@ -138,6 +138,7 @@ private:
     void RebuildSpline();
     void RebuildVisuals();
     void AdvanceRide(float DeltaSeconds);
+    float ComputeAdvancedTrackRatio(float TrackRatio, float SpeedMps, float StartSeconds) const;
     void PositionRideForCommandLineSeconds(float StartSeconds);
     void UpdateFirstPersonCamera();
     void SampleFrame(float DistanceCm, FVector& OutLocation, FRotator& OutRotation, FVector& OutForward, FVector& OutRight, FVector& OutUp) const;

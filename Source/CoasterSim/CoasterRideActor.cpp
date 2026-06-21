@@ -146,19 +146,24 @@ void ACoasterRideActor::StartRideFromCommandLine(float DefaultTrackRatio, float 
     if (FParse::Value(CommandLine, TEXT("CoasterStartSeconds="), StartSeconds))
     {
         RebuildSpline();
-        const float ClampedRatio = FMath::Clamp(TrackRatio, 0.0f, 0.999f);
-        const float StartDistanceCm = TrackLengthCm * ClampedRatio;
-        const float AdvanceCm = FMath::Max(SpeedMps, NumericalStallFloorMps) * CmPerMeter * StartSeconds;
-        float AdvancedRatio = FMath::Fmod((StartDistanceCm + AdvanceCm) / TrackLengthCm, 1.0f);
-        if (AdvancedRatio < 0.0f)
-        {
-            AdvancedRatio += 1.0f;
-        }
-        StartRideAt(AdvancedRatio, SpeedMps);
+        StartRideAt(ComputeAdvancedTrackRatio(TrackRatio, SpeedMps, StartSeconds), SpeedMps);
         return;
     }
 
     StartRideAt(TrackRatio, SpeedMps);
+}
+
+float ACoasterRideActor::ComputeAdvancedTrackRatio(float TrackRatio, float SpeedMps, float StartSeconds) const
+{
+    const float ClampedRatio = FMath::Clamp(TrackRatio, 0.0f, 0.999f);
+    const float StartDistanceCm = TrackLengthCm * ClampedRatio;
+    const float AdvanceCm = FMath::Max(SpeedMps, NumericalStallFloorMps) * CmPerMeter * StartSeconds;
+    float AdvancedRatio = FMath::Fmod((StartDistanceCm + AdvanceCm) / TrackLengthCm, 1.0f);
+    if (AdvancedRatio < 0.0f)
+    {
+        AdvancedRatio += 1.0f;
+    }
+    return AdvancedRatio;
 }
 
 void ACoasterRideActor::PositionRideForCommandLineSeconds(float StartSeconds)
@@ -169,14 +174,7 @@ void ACoasterRideActor::PositionRideForCommandLineSeconds(float StartSeconds)
     FParse::Value(CommandLine, TEXT("CoasterStartRatio="), TrackRatio);
     FParse::Value(CommandLine, TEXT("CoasterStartSpeed="), SpeedMps);
 
-    const float ClampedRatio = FMath::Clamp(TrackRatio, 0.0f, 0.999f);
-    const float StartDistanceCm = TrackLengthCm * ClampedRatio;
-    const float AdvanceCm = FMath::Max(SpeedMps, NumericalStallFloorMps) * CmPerMeter * StartSeconds;
-    float AdvancedRatio = FMath::Fmod((StartDistanceCm + AdvanceCm) / TrackLengthCm, 1.0f);
-    if (AdvancedRatio < 0.0f)
-    {
-        AdvancedRatio += 1.0f;
-    }
+    const float AdvancedRatio = ComputeAdvancedTrackRatio(TrackRatio, SpeedMps, StartSeconds);
     StartRideAt(AdvancedRatio, SpeedMps);
 }
 
