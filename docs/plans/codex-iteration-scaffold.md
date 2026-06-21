@@ -22,6 +22,18 @@ This prints the current branch, HEAD, dirty files, latest iteration manifests,
 the top of `photoreal-progress.md`, and the recommended next command. Use
 `-Json` when another script or agent needs machine-readable state.
 
+The dirty list is grouped. Treat the groups differently:
+
+- `source/docs/config`: normal implementation surface; stage only intentional
+  files for the current task.
+- `generated tracked outputs`: UE/generated assets under `Content/Generated/`
+  or `SourceAssets/Generated/`; commit them only when the producing source,
+  commandlet, material script, or explicit regenerated evidence is part of the
+  same task.
+- `local-only refs/clutter`: reference images and local-only files. Do not
+  commit them.
+- `other`: inspect manually before proceeding.
+
 ## Default Entry Point
 
 Use `scripts/iterate-yarlung.ps1` for normal visual iterations:
@@ -88,6 +100,10 @@ Each iteration should put these in `docs/plans/photoreal-progress.md`:
 - visual verdict after opening the contact sheet
 - next concrete step
 
+Keep `photoreal-progress.md` as a current dashboard, not a full transcript. Move
+long historical scoring logs to `docs/plans/archive/` or the relevant
+`docs/reviews/` file, then link them from the dashboard.
+
 ## Risk Gate
 
 `iterate-yarlung.ps1` computes a cheap risk gate from the screenshot metrics.
@@ -119,6 +135,26 @@ Stop instead of continuing when:
 - the next change would require paid/login-gated assets
 - dirty files make the intended commit ambiguous
 - a `NEEDS-HUMAN` review block is unresolved
+
+## Generated Asset Policy
+
+Tracked generated assets are part of the runnable UE project, but they are not
+free-for-all commit ballast. The intended tracked outputs are declared in
+`Config/yarlung-iteration.json` under `generated_asset_policy`.
+
+Commit generated outputs when:
+
+- the task changed the generator, commandlet, material script, source model, or
+  config that produced them
+- the iteration evidence says the assets were regenerated intentionally
+- the generated file is needed for another machine to run the same map
+
+Do not commit generated outputs when:
+
+- UE merely touched binary asset metadata during an unrelated smoke
+- the output belongs to a failed visual experiment that was not accepted
+- the status script still shows unrelated source/doc dirty files mixed into the
+  same commit
 
 ## Fast Loop Rationale
 

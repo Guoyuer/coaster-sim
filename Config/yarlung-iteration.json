@@ -60,5 +60,39 @@
     "docs/refs/local/",
     "ChatGPT Image Jun 20, 2026, 08_39_11 PM.png",
     "Gemini_Generated_Image_ak3rnak3rnak3rna.png"
-  ]
+  ],
+  "dirty_classification": {
+    "generated_tracked_prefixes": [
+      "Content/Generated/",
+      "SourceAssets/Generated/"
+    ],
+    "local_only_prefixes": [
+      "docs/refs/local/"
+    ],
+    "source_doc_prefixes": [
+      "AGENTS.md",
+      "Config/",
+      "Source/",
+      "scripts/",
+      "docs/"
+    ],
+    "root_reference_names": [
+      "ChatGPT Image Jun 20, 2026, 08_39_11 PM.png",
+      "Gemini_Generated_Image_ak3rnak3rnak3rna.png"
+    ]
+  },
+  "generated_asset_policy": {
+    "intentional_tracked_outputs": [
+      "Content/Generated/YarlungLandscape/YarlungLandscape_Level.umap",
+      "Content/Generated/YarlungLandscape/SM_YarlungCorridorTerrain.uasset",
+      "Content/Generated/YarlungLandscape/YarlungTrack.csv",
+      "Content/Generated/YarlungLandscape/YarlungRiver.csv",
+      "Content/Generated/YarlungLandscape/YarlungTsangpo_1009.r16",
+      "Content/Generated/YarlungLandscape/YarlungTsangpo_hillshade.png",
+      "Content/Generated/YarlungLandscape/manifest.json",
+      "Content/Generated/Materials/",
+      "Content/Generated/Models/"
+    ],
+    "rule": "Generated assets may be committed only when the producing source/script change is in the same task or the run evidence explicitly says they were regenerated intentionally."
+  }
 }

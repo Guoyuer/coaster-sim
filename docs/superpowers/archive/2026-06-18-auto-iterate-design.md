@@ -1,4 +1,6 @@
-# Auto-Iterate 半自动驱动器 — 设计 Spec
+# Auto-Iterate 半自动驱动器 — 设计 Spec（Historical）
+
+> **历史归档，不是当前路线。** 这份 spec 描述的是 2026-06-18 的半自动 `auto-iterate.ps1` / `AUTOSTATE` / Claude verifier 方案。当前无人值守入口已经改为 `scripts/yarlung-agent-status.ps1` + `scripts/iterate-yarlung.ps1` + `Config/yarlung-iteration.json`；接棒 agent 应按 `AGENTS.md`、`docs/plans/codex-iteration-scaffold.md`、`docs/plans/photoreal-progress.md` 执行。
 
 > 把现在"人工编排 Claude（架构/验收/外援）+ Codex（执行/记进度）"的接力，换成一个驱动脚本，半自动跑、每个任务停一次。
 > 配套：流程 `docs/plans/photoreal-overhaul.md` · 验收量规 `docs/specs/photoreal-acceptance.md` · 进度/状态 `docs/plans/photoreal-progress.md` · 操作手册 `AGENTS.md`。
