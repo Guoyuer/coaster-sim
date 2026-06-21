@@ -40,7 +40,8 @@
 （顺序：生成高度图/macro → 建材质 → 导模型 → commandlet 重建 .umap。**.umap 是生成物，关卡 actor 改动必须改 `YarlungLandscapeImportCommandlet.cpp` 再重跑，手摆会被覆盖。**）
 **默认迭代入口（优先用这个，不要手拼慢命令）：**
 ```powershell
-.\scripts\iterate-yarlung.ps1 -Mode Actor -Build -NamePrefix "iterN" -Times 30,90,150 -ResX 1280 -ResY 720
+.\scripts\yarlung-agent-status.ps1
+.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Standard -Build -NamePrefix "iterN"
 ```
 模式选择见 `docs/plans/codex-iteration-scaffold.md`。只改 actor/灯光/水/相机/后处理用 `Actor`（复用 terrain）；只改材质用 `Material`；只有 terrain 几何/顶点色/位移变化才用 `Terrain` 或 `Full`。
 **画面验收（高分辨率第一人称截图）：**

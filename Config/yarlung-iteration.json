@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "visual_target": "Yarlung Tsangpo / Nyingchi first-person coaster; match docs/refs/local L1-L3 and docs/refs references.",
+  "default_mode": "Actor",
+  "presets": {
+    "Quick": {
+      "times": [30],
+      "resolution": { "x": 640, "y": 360 },
+      "timeout_seconds": 160,
+      "purpose": "Fast smoke while editing harnesses or checking that the map still loads."
+    },
+    "Standard": {
+      "times": [30, 90, 150],
+      "resolution": { "x": 1280, "y": 720 },
+      "timeout_seconds": 240,
+      "purpose": "Default Codex visual iteration loop."
+    },
+    "Route": {
+      "times": [15, 60, 120, 180, 240],
+      "resolution": { "x": 1280, "y": 720 },
+      "timeout_seconds": 300,
+      "purpose": "Broader ride coverage after track, camera, scenery, or visibility changes."
+    },
+    "Hero": {
+      "times": [12, 30, 90, 150],
+      "resolution": { "x": 1920, "y": 1080 },
+      "timeout_seconds": 360,
+      "purpose": "Pre-commit or reviewer-facing visual evidence."
+    },
+    "Final": {
+      "times": [12, 30, 60, 90, 120, 150, 180, 240],
+      "resolution": { "x": 2560, "y": 1440 },
+      "timeout_seconds": 600,
+      "purpose": "Stage exit validation, not day-to-day iteration."
+    }
+  },
+  "risk_thresholds": {
+    "visual_risk_warn": 1.1,
+    "visual_risk_fail": 1.45,
+    "forest_green_min": 0.03,
+    "flat_block_warn": 0.45,
+    "washed_warn": 0.18
+  },
+  "mode_guidance": {
+    "Actor": "C++ actor placement, scenery actors, water actor, lighting, camera, postprocess. Reuses terrain.",
+    "Material": "Generated material graph or material parameter changes. Reuses terrain.",
+    "Terrain": "Corridor terrain geometry, vertex color, displacement, Nanite mesh generation.",
+    "Full": "DEM/source asset generation, material regeneration, model import, and map import.",
+    "ScreenshotOnly": "Inspect current built map without import."
+  },
+  "local_reference_anchors": [
+    "docs/refs/local/01_yarlung_valley_river_blossom.jpeg",
+    "docs/refs/local/02_fp_yarlung_coaster_canyon.png",
+    "docs/refs/local/03_fp_mountain_coaster_valley.png"
+  ],
+  "must_update": [
+    "docs/plans/photoreal-progress.md"
+  ],
+  "must_not_stage_without_intent": [
+    "docs/refs/local/",
+    "ChatGPT Image Jun 20, 2026, 08_39_11 PM.png",
+    "Gemini_Generated_Image_ak3rnak3rnak3rna.png"
+  ]
+}

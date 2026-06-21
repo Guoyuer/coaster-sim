@@ -1,23 +1,48 @@
 param(
-    [ValidateSet("Actor", "Material", "Terrain", "Full", "ScreenshotOnly")]
-    [string]$Mode = "Actor",
+    [ValidateSet("Auto", "Actor", "Material", "Terrain", "Full", "ScreenshotOnly")]
+    [string]$Mode = "Auto",
+    [ValidateSet("Quick", "Standard", "Route", "Hero", "Final")]
+    [string]$Preset = "Standard",
     [string]$NamePrefix = "",
-    [int[]]$Times = @(30, 90, 150),
-    [int]$ResX = 1280,
-    [int]$ResY = 720,
-    [int]$TimeoutSeconds = 240,
+    [int[]]$Times = @(),
+    [int]$ResX = 0,
+    [int]$ResY = 0,
+    [int]$TimeoutSeconds = 0,
     [switch]$Build,
     [switch]$SkipCapture,
+    [switch]$NoHandoff,
     [string[]]$ExtraArgs = @()
 )
 
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
+$ConfigPath = Join-Path $RepoRoot "Config\yarlung-iteration.json"
+if (-not (Test-Path -LiteralPath $ConfigPath)) {
+    throw "Missing iteration config: $ConfigPath"
+}
+$Config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+if ($Mode -eq "Auto") {
+    $Mode = [string]$Config.default_mode
+}
+$PresetConfig = $Config.presets.$Preset
+if ($Times.Count -eq 0) {
+    $Times = @($PresetConfig.times | ForEach-Object { [int]$_ })
+}
+if ($ResX -le 0) {
+    $ResX = [int]$PresetConfig.resolution.x
+}
+if ($ResY -le 0) {
+    $ResY = [int]$PresetConfig.resolution.y
+}
+if ($TimeoutSeconds -le 0) {
+    $TimeoutSeconds = [int]$PresetConfig.timeout_seconds
+}
+
 $StartedAt = Get-Date
 if ([string]::IsNullOrWhiteSpace($NamePrefix)) {
     $Stamp = $StartedAt.ToString("yyyyMMdd-HHmmss")
-    $NamePrefix = "iter-$($Mode.ToLowerInvariant())-$Stamp"
+    $NamePrefix = "iter-$($Preset.ToLowerInvariant())-$($Mode.ToLowerInvariant())-$Stamp"
 }
 
 function Invoke-Step {
@@ -84,6 +109,7 @@ if ($Mode -ne "ScreenshotOnly") {
 $SurveyCsv = Join-Path $RepoRoot "Saved\Diagnostics\$NamePrefix.csv"
 $SurveyJson = Join-Path $RepoRoot "Saved\Diagnostics\$NamePrefix.json"
 $SurveySheet = Join-Path $RepoRoot "Saved\Diagnostics\$NamePrefix.png"
+$HandoffPath = Join-Path $RepoRoot "Saved\Diagnostics\$NamePrefix-handoff.md"
 
 if (-not $SkipCapture) {
     $SurveyParams = @{
@@ -110,10 +136,25 @@ if (Test-Path -LiteralPath $SurveyJson) {
     }
 }
 
+$RiskGate = "UNKNOWN"
+if ($Worst) {
+    $Risk = [double]$Worst.visual_risk
+    if ($Risk -ge [double]$Config.risk_thresholds.visual_risk_fail) {
+        $RiskGate = "FAIL"
+    } elseif ($Risk -ge [double]$Config.risk_thresholds.visual_risk_warn) {
+        $RiskGate = "WARN"
+    } else {
+        $RiskGate = "OK"
+    }
+}
+
 $ManifestPath = Join-Path $RepoRoot "Saved\Diagnostics\$NamePrefix-run.json"
 $Manifest = [pscustomobject]@{
+    schema_version = 1
     name_prefix = $NamePrefix
     mode = $Mode
+    preset = $Preset
+    preset_purpose = [string]$PresetConfig.purpose
     started_at = $StartedAt.ToString("o")
     finished_at = (Get-Date).ToString("o")
     times = $Times
@@ -126,12 +167,55 @@ $Manifest = [pscustomobject]@{
         survey_csv = $SurveyCsv
         survey_json = $SurveyJson
         contact_sheet = $SurveySheet
+        handoff = $HandoffPath
     }
+    risk_gate = $RiskGate
     worst = $Worst
 }
 $Manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $ManifestPath -Encoding UTF8
 
+if (-not $NoHandoff) {
+    $WorstFrameName = if ($Worst) { Split-Path -Leaf $Worst.path } else { "" }
+    $WorstLine = if ($Worst) {
+        "- Worst frame: $WorstFrameName risk=$($Worst.visual_risk) washed=$($Worst.washed_frac) green=$($Worst.forest_green_frac) flat=$($Worst.flat_block_frac) edge=$($Worst.edge_density)"
+    } else {
+        "- Worst frame: not available (capture skipped or analysis missing)"
+    }
+    $StartedIso = $StartedAt.ToString("o")
+    $FinishedIso = (Get-Date).ToString("o")
+    $TimesText = $Times -join ", "
+    $Handoff = @(
+        "# Yarlung Iteration Handoff",
+        "",
+        "- Name: $NamePrefix",
+        "- Mode: $Mode",
+        "- Preset: $Preset - $($PresetConfig.purpose)",
+        "- Started: $StartedIso",
+        "- Finished: $FinishedIso",
+        "- Times: $TimesText",
+        "- Resolution: ${ResX}x${ResY}",
+        "- Risk gate: $RiskGate",
+        $WorstLine,
+        "",
+        "## Outputs",
+        "",
+        "- Manifest: $ManifestPath",
+        "- Contact sheet: $SurveySheet",
+        "- Survey CSV: $SurveyCsv",
+        "- Survey JSON: $SurveyJson",
+        "",
+        "## Required Follow-up",
+        "",
+        "1. Open the contact sheet as an image.",
+        '2. Compare against `docs/refs/local/` L1-L3 and `docs/specs/photoreal-acceptance.md`.',
+        '3. Update `docs/plans/photoreal-progress.md` with command, contact sheet, risk gate, visual verdict, and next step.',
+        "4. If committing, stage only intentional source/docs/generated map assets; do not stage local reference images or unrelated dirty files."
+    )
+    $Handoff | Set-Content -LiteralPath $HandoffPath -Encoding UTF8
+}
+
 Write-Host "YarlungIterationManifest=$ManifestPath"
+Write-Host "RiskGate=$RiskGate"
 if ($Worst) {
     Write-Host ("WorstFrame={0} risk={1} washed={2} green={3} flat={4} edge={5}" -f `
         (Split-Path -Leaf $Worst.path), `
@@ -143,4 +227,7 @@ if ($Worst) {
 }
 if (Test-Path -LiteralPath $SurveySheet) {
     Write-Host "ContactSheet=$SurveySheet"
+}
+if (Test-Path -LiteralPath $HandoffPath) {
+    Write-Host "Handoff=$HandoffPath"
 }
