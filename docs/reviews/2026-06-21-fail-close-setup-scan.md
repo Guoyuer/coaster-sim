@@ -19,7 +19,7 @@ This pass tightened the default path so missing config, broken material generati
 
 ## Non-Blocking Suggestions
 
-1. Extend config validation from required top-level objects to required scalar fields with explicit field names.
+1. None remaining from this scan. Continue with new targeted scans instead of reopening this checklist.
 
 ## Required Next Action
 
@@ -40,3 +40,4 @@ Continue AAA visual iteration, but keep `scripts/test-yarlung.ps1` as the setup/
 - `import-yarlung-landscape.ps1` now requires Unreal commandlets/Python scripts to report `Success - 0 error(s)` in addition to process exit code 0.
 - `create-coaster-materials.py` now uses `set_base_material_usage(...)` instead of deprecated material usage APIs, reuses existing material assets instead of deleting/recreating them, and reaches material generation `Success - 0 error(s), 0 warning(s)`.
 - `inspect-yarlung-assets.py` now checks `does_asset_exist(...)` before loading optional assets, so missing local-only assets are reported as diagnostics instead of UE Error log noise.
+- `YarlungAssetConfig` now treats scatter kind, canopy belt, water, component count/seed, and present optional color fields as explicit JSON contracts; missing or mistyped scalar fields fail close with field-specific messages instead of silently defaulting to zero.
