@@ -23,6 +23,8 @@ redistribution in a public repo.
 | ID | File | Source / License | Use |
 |---|---|---|---|
 | L1 | `docs/refs/local/01_yarlung_valley_river_blossom.jpeg` | User-provided aerial photo; license UNVERIFIED (do not redistribute) | **Primary palette/atmosphere anchor.** Turquoise braided river + rapids/foam (D3), cloud bands + distant snow peaks + humid haze (D2), wet gray rock cliffs + river terraces (D1, D5), spring forest + farmland + peach blossom palette (D4). NOTE: this is a **broad open valley** composition — use for color/water/sky/material tone, but for the narrow deepest-gorge hero shot take the canyon **width/silhouette** (D1) from R2/R3, not from this wide-valley framing. |
+| L2 | `docs/refs/local/02_fp_yarlung_coaster_canyon.png` | User-provided/generated reference; license UNVERIFIED (do not redistribute) | **First-person canyon coaster spatial anchor.** Track is attached to a real mountain slope, not floating over a void; visible scene has layered canyon walls, a readable river corridor far below, broken ridges/buttresses, cloud bands, and dense vegetation patches. Use to reject any screenshot where the terrain reads as a flat wall, blue plane, or camera-clipping slab. |
+| L3 | `docs/refs/local/03_fp_mountain_coaster_valley.png` | User-provided/generated reference; license UNVERIFIED (do not redistribute) | **First-person ride + mountain panorama anchor.** Track/vehicle are close and plausible, but the dominant read is mountain silhouettes, forested slopes, snow peaks, and river valley depth. Use to check that future airtime/looping track profiles still have plausible surrounding terrain from all ride attitudes. |
 
 Scoring use:
 

@@ -14,17 +14,17 @@ bool FYarlungCorridorProfileEnvelopeTest::RunTest(const FString& Parameters)
     const float TrackBaseHeight = 360000.0f;
 
     TestEqual(
-        TEXT("Near-track authored profile fully blends to the ride envelope"),
+        TEXT("Near-track terrain is no longer force-carved into a ride-envelope trough"),
         YarlungCorridorProfile::NearTrackBlend(0.0f),
-        1.0f);
+        0.0f);
     TestEqual(
         TEXT("Far corridor authored profile does not use the ride envelope"),
         YarlungCorridorProfile::NearTrackBlend(42000.0f),
         0.0f);
     TestEqual(
-        TEXT("Ride envelope stays below the track"),
+        TEXT("Ride envelope helper preserves the DEM track-base height"),
         YarlungCorridorProfile::RideEnvelopeHeightCm(TrackBaseHeight),
-        TrackBaseHeight - 9500.0f);
+        TrackBaseHeight);
 
     return true;
 }
@@ -42,10 +42,14 @@ bool FYarlungCorridorProfileAuthoredHeightTest::RunTest(const FString& Parameter
 
     const float NearHeight = YarlungCorridorProfile::AuthoredHeightCm(Center, 24000.0f, TrackBaseHeight, BaseHeight);
     const float WallHeight = YarlungCorridorProfile::AuthoredHeightCm(Center, 90000.0f, TrackBaseHeight, BaseHeight);
+    const float RaisedBaseWallHeight = YarlungCorridorProfile::AuthoredHeightCm(Center, 90000.0f, TrackBaseHeight, BaseHeight + 50000.0f);
 
     TestTrue(TEXT("Authored corridor height is finite"), FMath::IsFinite(NearHeight) && FMath::IsFinite(WallHeight));
-    TestTrue(TEXT("Wall profile rises above the talus apron"), WallHeight > NearHeight + 8000.0f);
-    TestTrue(TEXT("Authored wall remains in a plausible Yarlung canyon range"), WallHeight > 350000.0f && WallHeight < 430000.0f);
+    TestTrue(TEXT("Authored profile remains DEM-led instead of becoming a track-height wall"), FMath::Abs(WallHeight - BaseHeight) <= 7000.0f);
+    TestTrue(TEXT("Near track remains close to the sampled DEM surface"), FMath::Abs(NearHeight - BaseHeight) <= 7000.0f);
+    TestTrue(
+        TEXT("Authored profile preserves broad DEM elevation deltas"),
+        FMath::Abs((RaisedBaseWallHeight - WallHeight) - 50000.0f) <= 1.0f);
 
     return true;
 }

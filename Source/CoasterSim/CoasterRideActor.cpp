@@ -93,16 +93,16 @@ void ConfigureYarlungCloudMaterial(UVolumetricCloudComponent* Clouds, UObject* O
         return;
     }
 
-    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"), 0.46f);
-    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalDensity"), 0.14f);
-    CloudMID->SetScalarParameterValue(TEXT("Layout_CloudGlobalScale"), 7.5f);
-    CloudMID->SetScalarParameterValue(TEXT("CloudTextureWeight"), 0.55f);
-    CloudMID->SetScalarParameterValue(TEXT("Noise_Strength"), 0.28f);
-    CloudMID->SetScalarParameterValue(TEXT("Noise_Bias"), 0.08f);
-    CloudMID->SetVectorParameterValue(TEXT("Cloud_AlbedoColor"), FLinearColor(0.84f, 0.88f, 0.86f));
+    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"), 0.24f);
+    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalDensity"), 0.065f);
+    CloudMID->SetScalarParameterValue(TEXT("Layout_CloudGlobalScale"), 18.0f);
+    CloudMID->SetScalarParameterValue(TEXT("CloudTextureWeight"), 0.82f);
+    CloudMID->SetScalarParameterValue(TEXT("Noise_Strength"), 0.56f);
+    CloudMID->SetScalarParameterValue(TEXT("Noise_Bias"), -0.10f);
+    CloudMID->SetVectorParameterValue(TEXT("Cloud_AlbedoColor"), FLinearColor(0.96f, 0.97f, 0.93f));
 
     Clouds->SetMaterial(CloudMID);
-    UE_LOG(LogTemp, Display, TEXT("Configured Yarlung volumetric clouds: coverage=0.46 density=0.14 scale=7.5"));
+    UE_LOG(LogTemp, Display, TEXT("Configured Yarlung volumetric clouds: coverage=0.24 density=0.065 scale=18.0"));
 }
 
 }
@@ -198,15 +198,15 @@ ACoasterRideActor::ACoasterRideActor()
 
     VolumetricClouds = CreateDefaultSubobject<UVolumetricCloudComponent>(TEXT("VolumetricClouds"));
     VolumetricClouds->SetupAttachment(SceneRoot);
-    VolumetricClouds->SetLayerBottomAltitude(4.10f);
-    VolumetricClouds->SetLayerHeight(1.60f);
-    VolumetricClouds->SetTracingStartMaxDistance(140.0f);
-    VolumetricClouds->SetTracingMaxDistance(120.0f);
+    VolumetricClouds->SetLayerBottomAltitude(3.90f);
+    VolumetricClouds->SetLayerHeight(2.00f);
+    VolumetricClouds->SetTracingStartMaxDistance(170.0f);
+    VolumetricClouds->SetTracingMaxDistance(150.0f);
     VolumetricClouds->SetbUsePerSampleAtmosphericLightTransmittance(true);
-    VolumetricClouds->SetSkyLightCloudBottomOcclusion(0.28f);
-    VolumetricClouds->SetViewSampleCountScale(2.0f);
-    VolumetricClouds->SetShadowViewSampleCountScale(0.65f);
-    VolumetricClouds->SetGroundAlbedo(FColor(42, 58, 48));
+    VolumetricClouds->SetSkyLightCloudBottomOcclusion(0.10f);
+    VolumetricClouds->SetViewSampleCountScale(2.35f);
+    VolumetricClouds->SetShadowViewSampleCountScale(0.80f);
+    VolumetricClouds->SetGroundAlbedo(FColor(34, 54, 43));
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> CloudMaterial(
         TEXT("/Engine/EngineSky/VolumetricClouds/m_SimpleVolumetricCloud_Inst.m_SimpleVolumetricCloud_Inst"));
     if (CloudMaterial.Succeeded())
@@ -217,15 +217,15 @@ ACoasterRideActor::ACoasterRideActor()
     ValleyFog = CreateDefaultSubobject<UExponentialHeightFogComponent>(TEXT("ValleyFog"));
     ValleyFog->SetupAttachment(SceneRoot);
     ValleyFog->SetRelativeLocation(FVector::ZeroVector);
-    ValleyFog->SetFogDensity(0.000050f);
-    ValleyFog->SetFogHeightFalloff(0.24f);
-    ValleyFog->SetFogMaxOpacity(0.16f);
-    ValleyFog->SetStartDistance(5000.0f);
-    ValleyFog->SetFogInscatteringColor(FLinearColor(0.62f, 0.72f, 0.82f));
-    ValleyFog->SetVolumetricFog(false);
-    ValleyFog->SetVolumetricFogScatteringDistribution(0.28f);
-    ValleyFog->SetVolumetricFogExtinctionScale(0.02f);
-    ValleyFog->SetVolumetricFogDistance(22000.0f);
+    ValleyFog->SetFogDensity(0.000040f);
+    ValleyFog->SetFogHeightFalloff(0.16f);
+    ValleyFog->SetFogMaxOpacity(0.18f);
+    ValleyFog->SetStartDistance(6200.0f);
+    ValleyFog->SetFogInscatteringColor(FLinearColor(0.58f, 0.70f, 0.82f));
+    ValleyFog->SetVolumetricFog(true);
+    ValleyFog->SetVolumetricFogScatteringDistribution(0.38f);
+    ValleyFog->SetVolumetricFogExtinctionScale(0.032f);
+    ValleyFog->SetVolumetricFogDistance(65000.0f);
 
     LeftRail = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("LeftRail"));
     LeftRail->SetupAttachment(SceneRoot);
@@ -272,6 +272,7 @@ void ACoasterRideActor::BeginPlay()
     Super::BeginPlay();
     SetConsoleVariableIfAvailable(TEXT("r.VolumetricCloud"), 1);
     SetConsoleVariableIfAvailable(TEXT("r.VolumetricCloud.ShadowMap"), 1);
+    SetConsoleVariableIfAvailable(TEXT("r.VolumetricFog"), 1);
     ConfigureYarlungCloudMaterial(VolumetricClouds, this);
 
     RebuildSpline();
@@ -295,7 +296,6 @@ void ACoasterRideActor::BeginPlay()
     {
         VolumetricClouds->SetVisibility(false, true);
     }
-
     // --- Pivot cut #2 diagnostics: localize the "styrofoam white" terrain ---
     // Terrain vertex albedo is already dark humid green-grey (~0.08), so the
     // white must come from the lighting/exposure chain. These command-line

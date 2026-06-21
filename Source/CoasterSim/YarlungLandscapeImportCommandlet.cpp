@@ -5,7 +5,6 @@
 #include "CoasterRideActor.h"
 #include "YarlungRiverActor.h"
 #include "YarlungSceneryActor.h"
-#include "YarlungCorridorProfile.h"
 #include "YarlungMeshTerrainActor.h"
 #include "YarlungTerrainProfile.h"
 #include "YarlungTerrainRelief.h"
@@ -201,57 +200,63 @@ bool LoadYarlungTerrainTrackPoints(TArray<YarlungViewCorridor::FTrackPoint>& Out
     return true;
 }
 
-// Corridor mesh tessellation constants (shared by surface generation + triangle emission).
-constexpr int32 RingsPerTrackSegment = 4;
-constexpr int32 LanesPerSide = 72;
-constexpr int32 LaneCount = LanesPerSide * 2 + 1;
-constexpr float AlongStepCm = 650.0f;
-constexpr float HalfWidthCm = 125000.0f;
-constexpr float TrackTerrainVoidHalfWidthCm = 68000.0f;
+// Continuous canyon base mesh. The track-view corridor is still the visual
+// priority, but the foundation must be a non-self-intersecting world surface.
+// A track-swept strip folded over itself on loops/turns and clipped the camera.
+constexpr int32 BaseTerrainStride = 1;
 
-struct FCorridorMeshStats
+struct FBaseTerrainMeshStats
 {
     int32 DisplacedVertexCount = 0;
     float MaxAbsDisplacementCm = 0.0f;
-    float MaxAbsAuthoredDeltaCm = 0.0f;
 };
 
-// Phase 1: authored profile + relief-displaced corridor surface positions and UVs.
-void ComputeCorridorPositions(
+int32 BaseTerrainSampleCount()
+{
+    const int32 Size = YarlungTerrain::Config().GridSize;
+    return (Size - 1) / BaseTerrainStride + 1;
+}
+
+float BaseTerrainWorldX(int32 XIndex)
+{
+    const YarlungTerrain::FConfig& Tc = YarlungTerrain::Config();
+    const float U = static_cast<float>(XIndex * BaseTerrainStride) / static_cast<float>(Tc.GridSize - 1);
+    return FMath::Lerp(Tc.MinXCm, Tc.MaxXCm, U);
+}
+
+float BaseTerrainWorldY(int32 YIndex)
+{
+    const YarlungTerrain::FConfig& Tc = YarlungTerrain::Config();
+    const float V = static_cast<float>(YIndex * BaseTerrainStride) / static_cast<float>(Tc.GridSize - 1);
+    return FMath::Lerp(Tc.MinYCm, Tc.MaxYCm, V);
+}
+
+int32 BaseTerrainVertexIndex(int32 XIndex, int32 YIndex, int32 SampleCount)
+{
+    return YIndex * SampleCount + XIndex;
+}
+
+// Phase 1: continuous DEM-led surface positions and UVs.
+void ComputeBaseTerrainPositions(
     const TArray<uint16>& HeightData,
     const TArray<YarlungViewCorridor::FTrackPoint>& TrackPoints,
     TArray<FVector>& Positions,
     TArray<float>& Us,
     TArray<float>& Vs,
-    FCorridorMeshStats& Stats)
+    FBaseTerrainMeshStats& Stats)
 {
-    const int32 RingCount = TrackPoints.Num() * RingsPerTrackSegment;
+    const int32 SampleCount = BaseTerrainSampleCount();
 
-    const auto SampleTrackPosition = [&TrackPoints](int32 RingIndex) -> FVector2D
+    for (int32 YIndex = 0; YIndex < SampleCount; ++YIndex)
     {
-        const int32 SegmentIndex = (RingIndex / RingsPerTrackSegment) % TrackPoints.Num();
-        const int32 NextIndex = (SegmentIndex + 1) % TrackPoints.Num();
-        const float T = static_cast<float>(RingIndex % RingsPerTrackSegment) / static_cast<float>(RingsPerTrackSegment);
-        return FMath::Lerp(TrackPoints[SegmentIndex].Position, TrackPoints[NextIndex].Position, T);
-    };
-
-    for (int32 RingIndex = 0; RingIndex < RingCount; ++RingIndex)
-    {
-        const FVector2D Previous = SampleTrackPosition((RingIndex + RingCount - 1) % RingCount);
-        const FVector2D Center = SampleTrackPosition(RingIndex);
-        const FVector2D Next = SampleTrackPosition((RingIndex + 1) % RingCount);
-        const FVector2D Tangent = (Next - Previous).GetSafeNormal();
-        const FVector2D Right(Tangent.Y, -Tangent.X);
-        const float TrackBaseHeight = YarlungHeightAtWorldXY(HeightData, Center.X, Center.Y);
-
-        for (int32 LaneIndex = 0; LaneIndex < LaneCount; ++LaneIndex)
+        const float Y = BaseTerrainWorldY(YIndex);
+        for (int32 XIndex = 0; XIndex < SampleCount; ++XIndex)
         {
-            const float LaneT = static_cast<float>(LaneIndex - LanesPerSide) / static_cast<float>(LanesPerSide);
-            const float SignedOffsetCm = LaneT * HalfWidthCm;
-            const FVector2D Position2D = Center + Right * SignedOffsetCm;
+            const float X = BaseTerrainWorldX(XIndex);
+            const FVector2D Position2D(X, Y);
             const float BaseHeight = YarlungHeightAtWorldXY(HeightData, Position2D.X, Position2D.Y);
             const FVector BaseNormal = YarlungSmoothNormalAtWorldXY(HeightData, Position2D.X, Position2D.Y);
-            const float TrackDistance = FMath::Abs(SignedOffsetCm);
+            const float TrackDistance = YarlungViewCorridor::DistanceToTrackCm(TrackPoints, Position2D);
             const float ViewCorridorMask = YarlungViewCorridor::ComputeMask(TrackPoints, Position2D);
             const float DisplacementCm = YarlungTerrainRelief::ComputeReliefCm(
                 Position2D,
@@ -259,55 +264,46 @@ void ComputeCorridorPositions(
                 BaseNormal,
                 TrackDistance,
                 ViewCorridorMask);
-            const float LandformCm = YarlungCorridorLandformDeltaCm(Center, SignedOffsetCm, BaseHeight);
-            const float AuthoredProfileHeight = YarlungCorridorProfile::AuthoredHeightCm(Center, SignedOffsetCm, TrackBaseHeight, BaseHeight);
-            const float ClosestTrackDistance = YarlungViewCorridor::DistanceToTrackCm(TrackPoints, Position2D);
-            const float OverlapSuppression = YarlungTerrain::Smooth01((TrackDistance - ClosestTrackDistance - 3000.0f) / 9000.0f);
-            const float AuthoredBaseHeight = FMath::Lerp(AuthoredProfileHeight, BaseHeight, OverlapSuppression);
-            const float AuthoredDeltaCm = AuthoredBaseHeight - BaseHeight;
 
-            const float NearTrackBlend = YarlungCorridorProfile::NearTrackBlend(FMath::Abs(SignedOffsetCm));
-            const float RideEnvelopeHeight = YarlungCorridorProfile::RideEnvelopeHeightCm(TrackBaseHeight);
-            const float Height = FMath::Lerp(AuthoredBaseHeight + DisplacementCm + LandformCm, RideEnvelopeHeight, NearTrackBlend);
-            const int32 VertexIndex = RingIndex * LaneCount + LaneIndex;
+            const int32 VertexIndex = BaseTerrainVertexIndex(XIndex, YIndex, SampleCount);
+            const float Height = BaseHeight + DisplacementCm;
             Positions[VertexIndex] = FVector(Position2D.X, Position2D.Y, Height + 25.0f);
-            Us[VertexIndex] = static_cast<float>(RingIndex) * AlongStepCm / 120000.0f;
-            Vs[VertexIndex] = (LaneT + 1.0f) * 0.5f;
+            Us[VertexIndex] = static_cast<float>(XIndex) / static_cast<float>(SampleCount - 1);
+            Vs[VertexIndex] = static_cast<float>(YIndex) / static_cast<float>(SampleCount - 1);
             if (FMath::Abs(DisplacementCm) > 1.0f)
             {
                 ++Stats.DisplacedVertexCount;
                 Stats.MaxAbsDisplacementCm = FMath::Max(Stats.MaxAbsDisplacementCm, FMath::Abs(DisplacementCm));
             }
-            Stats.MaxAbsAuthoredDeltaCm = FMath::Max(Stats.MaxAbsAuthoredDeltaCm, FMath::Abs(AuthoredDeltaCm));
         }
     }
 }
 
 // Phase 2: central-difference vertex normals + per-vertex landform colour.
-void ComputeCorridorNormalsAndColors(
+void ComputeBaseTerrainNormalsAndColors(
     const TArray<uint16>& HeightData,
     const TArray<YarlungViewCorridor::FTrackPoint>& TrackPoints,
     const TArray<FVector>& Positions,
     TArray<FVector>& Normals,
     TArray<FLinearColor>& Colors)
 {
-    const int32 RingCount = TrackPoints.Num() * RingsPerTrackSegment;
+    const int32 SampleCount = BaseTerrainSampleCount();
 
-    const auto PositionAt = [&Positions, RingCount](int32 RingIndex, int32 LaneIndex) -> const FVector&
+    const auto PositionAt = [&Positions, SampleCount](int32 XIndex, int32 YIndex) -> const FVector&
     {
-        const int32 ClampedRing = (RingIndex + RingCount) % RingCount;
-        const int32 ClampedLane = FMath::Clamp(LaneIndex, 0, LaneCount - 1);
-        return Positions[ClampedRing * LaneCount + ClampedLane];
+        const int32 ClampedX = FMath::Clamp(XIndex, 0, SampleCount - 1);
+        const int32 ClampedY = FMath::Clamp(YIndex, 0, SampleCount - 1);
+        return Positions[BaseTerrainVertexIndex(ClampedX, ClampedY, SampleCount)];
     };
 
-    for (int32 RingIndex = 0; RingIndex < RingCount; ++RingIndex)
+    for (int32 YIndex = 0; YIndex < SampleCount; ++YIndex)
     {
-        for (int32 LaneIndex = 0; LaneIndex < LaneCount; ++LaneIndex)
+        for (int32 XIndex = 0; XIndex < SampleCount; ++XIndex)
         {
-            const int32 VertexIndex = RingIndex * LaneCount + LaneIndex;
-            const FVector Along = PositionAt(RingIndex + 1, LaneIndex) - PositionAt(RingIndex - 1, LaneIndex);
-            const FVector Across = PositionAt(RingIndex, LaneIndex + 1) - PositionAt(RingIndex, LaneIndex - 1);
-            FVector Normal = FVector::CrossProduct(Across, Along).GetSafeNormal();
+            const int32 VertexIndex = BaseTerrainVertexIndex(XIndex, YIndex, SampleCount);
+            const FVector AlongX = PositionAt(XIndex + 1, YIndex) - PositionAt(XIndex - 1, YIndex);
+            const FVector AlongY = PositionAt(XIndex, YIndex + 1) - PositionAt(XIndex, YIndex - 1);
+            FVector Normal = FVector::CrossProduct(AlongY, AlongX).GetSafeNormal();
             if (Normal.Z < 0.0f)
             {
                 Normal *= -1.0f;
@@ -372,8 +368,8 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
     Builder.SetMeshDescription(MeshDescription);
     Builder.SetNumUVLayers(1);
 
-    const int32 RingCount = TrackPoints.Num() * RingsPerTrackSegment;
-    const int32 VertexCount = RingCount * LaneCount;
+    const int32 SampleCount = BaseTerrainSampleCount();
+    const int32 VertexCount = SampleCount * SampleCount;
 
     TArray<FVector> Positions;
     TArray<FVector> Normals;
@@ -386,9 +382,9 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
     Us.SetNumUninitialized(VertexCount);
     Vs.SetNumUninitialized(VertexCount);
 
-    FCorridorMeshStats Stats;
-    ComputeCorridorPositions(HeightData, TrackPoints, Positions, Us, Vs, Stats);
-    ComputeCorridorNormalsAndColors(HeightData, TrackPoints, Positions, Normals, Colors);
+    FBaseTerrainMeshStats Stats;
+    ComputeBaseTerrainPositions(HeightData, TrackPoints, Positions, Us, Vs, Stats);
+    ComputeBaseTerrainNormalsAndColors(HeightData, TrackPoints, Positions, Normals, Colors);
 
     FPolygonGroupID PolygonGroup = Builder.AppendPolygonGroup(TEXT("YarlungCorridorTerrain"));
     TArray<FVertexID> Vertices;
@@ -398,36 +394,11 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
         Vertices.Add(Builder.AppendVertex(Position));
     }
 
-    const auto LaneOffsetCm = [](int32 LaneIndex) -> float
+    const auto AppendTerrainTriangle = [&](int32 X0, int32 Y0, int32 X1, int32 Y1, int32 X2, int32 Y2)
     {
-        const float LaneT = static_cast<float>(LaneIndex - LanesPerSide) / static_cast<float>(LanesPerSide);
-        return LaneT * HalfWidthCm;
-    };
-
-    const auto ShouldEmitTerrainQuad = [&LaneOffsetCm, &Positions, &TrackPoints](int32 RingIndex, int32 NextRing, int32 LaneIndex) -> bool
-    {
-        const float QuadMidOffsetCm = 0.5f * (LaneOffsetCm(LaneIndex) + LaneOffsetCm(LaneIndex + 1));
-        if (FMath::Abs(QuadMidOffsetCm) < TrackTerrainVoidHalfWidthCm)
-        {
-            return false;
-        }
-
-        const FVector& P00 = Positions[RingIndex * LaneCount + LaneIndex];
-        const FVector& P01 = Positions[RingIndex * LaneCount + LaneIndex + 1];
-        const FVector& P10 = Positions[NextRing * LaneCount + LaneIndex];
-        const FVector& P11 = Positions[NextRing * LaneCount + LaneIndex + 1];
-        const FVector2D QuadCenter(
-            (P00.X + P01.X + P10.X + P11.X) * 0.25f,
-            (P00.Y + P01.Y + P10.Y + P11.Y) * 0.25f);
-        const float ClosestTrackDistanceCm = YarlungViewCorridor::DistanceToTrackCm(TrackPoints, QuadCenter);
-        return ClosestTrackDistanceCm >= TrackTerrainVoidHalfWidthCm;
-    };
-
-    const auto AppendCorridorTriangle = [&](int32 Ring0, int32 Lane0, int32 Ring1, int32 Lane1, int32 Ring2, int32 Lane2)
-    {
-        const int32 I0 = Ring0 * LaneCount + Lane0;
-        const int32 I1 = Ring1 * LaneCount + Lane1;
-        const int32 I2 = Ring2 * LaneCount + Lane2;
+        const int32 I0 = BaseTerrainVertexIndex(X0, Y0, SampleCount);
+        const int32 I1 = BaseTerrainVertexIndex(X1, Y1, SampleCount);
+        const int32 I2 = BaseTerrainVertexIndex(X2, Y2, SampleCount);
         const FVertexInstanceID VI0 = Builder.AppendInstance(Vertices[I0]);
         const FVertexInstanceID VI1 = Builder.AppendInstance(Vertices[I1]);
         const FVertexInstanceID VI2 = Builder.AppendInstance(Vertices[I2]);
@@ -446,19 +417,12 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
         Builder.AppendTriangle(VI0, VI1, VI2, PolygonGroup);
     };
 
-    int32 SkippedNearTrackQuadCount = 0;
-    for (int32 RingIndex = 0; RingIndex < RingCount; ++RingIndex)
+    for (int32 YIndex = 0; YIndex < SampleCount - 1; ++YIndex)
     {
-        const int32 NextRing = (RingIndex + 1) % RingCount;
-        for (int32 LaneIndex = 0; LaneIndex < LaneCount - 1; ++LaneIndex)
+        for (int32 XIndex = 0; XIndex < SampleCount - 1; ++XIndex)
         {
-            if (!ShouldEmitTerrainQuad(RingIndex, NextRing, LaneIndex))
-            {
-                ++SkippedNearTrackQuadCount;
-                continue;
-            }
-            AppendCorridorTriangle(RingIndex, LaneIndex, NextRing, LaneIndex, NextRing, LaneIndex + 1);
-            AppendCorridorTriangle(RingIndex, LaneIndex, NextRing, LaneIndex + 1, RingIndex, LaneIndex + 1);
+            AppendTerrainTriangle(XIndex, YIndex, XIndex, YIndex + 1, XIndex + 1, YIndex + 1);
+            AppendTerrainTriangle(XIndex, YIndex, XIndex + 1, YIndex + 1, XIndex + 1, YIndex);
         }
     }
 
@@ -490,14 +454,12 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Built Nanite Yarlung corridor terrain: %s vertices=%d triangles=%d skipped_near_track_quads=%d displaced_vertices=%d max_displacement_cm=%.1f max_authored_delta_cm=%.1f nanite=%s"),
+        TEXT("Built Nanite Yarlung continuous canyon terrain: %s vertices=%d triangles=%d displaced_vertices=%d max_displacement_cm=%.1f nanite=%s"),
         *StaticMesh->GetPathName(),
         VertexCount,
-        (RingCount * (LaneCount - 1) - SkippedNearTrackQuadCount) * 2,
-        SkippedNearTrackQuadCount,
+        (SampleCount - 1) * (SampleCount - 1) * 2,
         Stats.DisplacedVertexCount,
         Stats.MaxAbsDisplacementCm,
-        Stats.MaxAbsAuthoredDeltaCm,
         StaticMesh->IsNaniteEnabled() ? TEXT("true") : TEXT("false"));
     return StaticMesh;
 }

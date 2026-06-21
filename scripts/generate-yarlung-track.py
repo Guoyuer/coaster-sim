@@ -142,6 +142,7 @@ def build_out_and_back(
     outbound_offset_m: float,
     return_offset_m: float,
     return_extra_height_m: float,
+    outbound_descent_m: float,
     design_speed_mps: float,
     max_bank_deg: float,
 ) -> list[TrackPoint]:
@@ -155,7 +156,7 @@ def build_out_and_back(
     points: list[TrackPoint] = []
     station_z = None
     station_extra_cm = 30000.0
-    outbound_descent_cm = 30000.0
+    outbound_descent_cm = outbound_descent_m * 100.0
     outbound_distances_cm = cumulative_distances(outbound_center)
     for index, center in enumerate(outbound_center):
         ratio = index / max(1, len(outbound_center) - 1)
@@ -373,6 +374,7 @@ def main() -> None:
     parser.add_argument("--outbound-offset-m", type=float, default=72.0)
     parser.add_argument("--return-offset-m", type=float, default=148.0)
     parser.add_argument("--return-extra-height-m", type=float, default=12.0)
+    parser.add_argument("--outbound-descent-m", type=float, default=260.0)
     parser.add_argument("--design-speed-mps", type=float, default=22.0)
     parser.add_argument("--max-bank-deg", type=float, default=70.0)
     parser.add_argument("--out", default="Content/Generated/YarlungLandscape/YarlungTrack.csv")
@@ -391,6 +393,7 @@ def main() -> None:
         outbound_offset_m=args.outbound_offset_m,
         return_offset_m=args.return_offset_m,
         return_extra_height_m=args.return_extra_height_m,
+        outbound_descent_m=args.outbound_descent_m,
         design_speed_mps=args.design_speed_mps,
         max_bank_deg=args.max_bank_deg,
     )
