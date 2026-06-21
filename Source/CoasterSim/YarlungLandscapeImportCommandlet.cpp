@@ -3,6 +3,7 @@
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "CoasterRideActor.h"
+#include "YarlungCanyonWallActor.h"
 #include "YarlungRiverActor.h"
 #include "YarlungSceneryActor.h"
 #include "YarlungMeshTerrainActor.h"
@@ -581,6 +582,18 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
     return StaticMesh;
 }
 
+UStaticMesh* LoadExistingYarlungCorridorTerrainStaticMesh()
+{
+    UStaticMesh* StaticMesh = LoadObject<UStaticMesh>(nullptr, YarlungCorridorTerrainMeshObjectPath);
+    if (!StaticMesh)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Unable to reuse missing Yarlung corridor terrain asset: %s"), YarlungCorridorTerrainMeshObjectPath);
+        return nullptr;
+    }
+    UE_LOG(LogTemp, Display, TEXT("Reusing existing Yarlung corridor terrain: %s"), *StaticMesh->GetPathName());
+    return StaticMesh;
+}
+
 bool LoadYarlungHeightmap(TArray<uint16>& OutHeightData)
 {
     const int32 Size = YarlungTerrain::Config().GridSize;
@@ -630,6 +643,7 @@ void SpawnYarlungWorldActors(UWorld* World, UStaticMesh* CorridorTerrainAsset)
     Spawn(ACoasterRideActor::StaticClass(), TEXT("YarlungCoasterRide"));
     Spawn(AYarlungRiverActor::StaticClass(), TEXT("YarlungRiverScenery"));
     Spawn(AYarlungSceneryActor::StaticClass(), TEXT("YarlungForestRockScenery"));
+    Spawn(AYarlungCanyonWallActor::StaticClass(), TEXT("YarlungAuthoredCanyonWalls"));
 }
 }
 #endif
@@ -646,14 +660,22 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
 {
 #if WITH_EDITOR
     const FString MapPackagePath = TEXT("/Game/Generated/YarlungLandscape/YarlungLandscape_Level");
+    const bool bSkipTerrainMeshBuild = Params.Contains(TEXT("SkipTerrainMeshBuild"), ESearchCase::IgnoreCase);
 
-    TArray<uint16> HeightData;
-    if (!LoadYarlungHeightmap(HeightData))
+    UStaticMesh* CorridorTerrainAsset = nullptr;
+    if (bSkipTerrainMeshBuild)
     {
-        return 1;
+        CorridorTerrainAsset = LoadExistingYarlungCorridorTerrainStaticMesh();
     }
-
-    UStaticMesh* CorridorTerrainAsset = BuildYarlungCorridorTerrainStaticMesh(HeightData);
+    else
+    {
+        TArray<uint16> HeightData;
+        if (!LoadYarlungHeightmap(HeightData))
+        {
+            return 1;
+        }
+        CorridorTerrainAsset = BuildYarlungCorridorTerrainStaticMesh(HeightData);
+    }
     if (!CorridorTerrainAsset)
     {
         return 1;

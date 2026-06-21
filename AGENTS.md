@@ -18,6 +18,7 @@
 | `docs/plans/photoreal-overhaul.md` | 顺序计划：阶段 0→F，每步目标/改动/验收 |
 | `docs/specs/photoreal-acceptance.md` | 验收 spec：到位定义 + 打分量规 + 每阶段出口标准 |
 | `docs/plans/photoreal-progress.md` | 进度状态（**你每轮都要更新它**，断点续跑靠它） |
+| `docs/plans/codex-iteration-scaffold.md` | Codex 迭代脚手架：按改动类型选 Actor/Material/Terrain/Full/ScreenshotOnly 快循环 |
 | `docs/reviews/README.md` / `docs/reviews/*.md` | 独立外审入口、模板与原文归档；reviewer 意见不混进打分记录 |
 | `docs/refs/README.md` | 参照照片收集说明 + 评分锚点 |
 | `CONTEXT.md` / `docs/specs/visual.md` | 视觉锚点与规范 |
@@ -37,6 +38,11 @@
 ```
 **重建资产+关卡管线：** `.\scripts\import-yarlung-landscape.ps1 -Build`
 （顺序：生成高度图/macro → 建材质 → 导模型 → commandlet 重建 .umap。**.umap 是生成物，关卡 actor 改动必须改 `YarlungLandscapeImportCommandlet.cpp` 再重跑，手摆会被覆盖。**）
+**默认迭代入口（优先用这个，不要手拼慢命令）：**
+```powershell
+.\scripts\iterate-yarlung.ps1 -Mode Actor -Build -NamePrefix "iterN" -Times 30,90,150 -ResX 1280 -ResY 720
+```
+模式选择见 `docs/plans/codex-iteration-scaffold.md`。只改 actor/灯光/水/相机/后处理用 `Actor`（复用 terrain）；只改材质用 `Material`；只有 terrain 几何/顶点色/位移变化才用 `Terrain` 或 `Full`。
 **画面验收（高分辨率第一人称截图）：**
 ```powershell
 .\scripts\offscreen-shot.ps1 -Build -Name "iterN" -ResX 2560 -ResY 1440 -WaitSeconds <英雄段时间点>
@@ -47,8 +53,8 @@
 2. **读外审**：若 `photoreal-progress.md` 的“独立外审 / Reviewer Notes”有未处理或 FAIL/NEEDS-HUMAN 裁决，先读对应 `docs/reviews/*.md`，外审阻断项优先于继续迭代。
 3. **取任务**：从 `photoreal-overhaul.md` 取该任务的目标/改动/验收。
 4. **改一处**：只做这一个任务的最小改动（high-ceiling 方法，见 §4 禁令）。
-5. **构建**：编译 C++ / 跑相关管线步骤；失败先修构建。
-6. **出图**：跑 `offscreen-shot.ps1` @1440p，在**固定英雄段时间点**低打扰截图到 `Saved\OffscreenShots\iterN.png`。
+5. **构建/导入**：优先跑 `iterate-yarlung.ps1` 并按改动类型选模式；失败先修构建/导入/inspect。
+6. **出图**：默认用 `iterate-yarlung.ps1` 多时点截图，最终验收再跑 `offscreen-shot.ps1` @1440p。
 7. **看图（强制）**：用 **Read 工具把每张 PNG 当图片打开**，按 `photoreal-acceptance.md` 的量规逐维打分，并和 `docs/refs/` 参照图对比。**只跑脚本不看图 = 没做验收，不允许。**
 8. **判定**：
    - 达到该任务/阶段出口标准 → 标记完成。

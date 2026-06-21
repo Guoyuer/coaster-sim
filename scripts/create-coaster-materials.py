@@ -7,6 +7,7 @@ TINT_MATERIAL_NAME = "M_CoasterTint"
 RIVER_WATER_MATERIAL_NAME = "M_YarlungRiverWater"
 RIVER_FOAM_MATERIAL_NAME = "M_YarlungRiverFoam"
 MESH_TERRAIN_MATERIAL_NAME = "M_YarlungMeshTerrain"
+CANYON_WALL_MATERIAL_NAME = "M_YarlungCanyonWall"
 SUCCESS_MARKER = "material-generation-ok.txt"
 AERIAL_GRASS_ROCK_SOURCE_DIR = "SourceAssets/PolyHaven/aerial_grass_rock"
 AERIAL_GRASS_ROCK_TEXTURES = {
@@ -351,7 +352,7 @@ def create_translucent_vertex_color_material(name, opacity, roughness, specular)
 def create_opaque_vertex_color_material(name, roughness, specular):
     material = create_material_asset(name, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
-    material.set_editor_property("two_sided", True)
+    material.set_editor_property("two_sided", False)
 
     vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
@@ -379,6 +380,7 @@ def create_opaque_vertex_color_material(name, roughness, specular):
     )
     set_optional_material_usage(material, "MATUSAGE_STATIC_MESH")
     set_optional_material_usage(material, "MATUSAGE_NANITE")
+    set_optional_material_usage(material, "MATUSAGE_PROCEDURAL_MESHES")
     finalize_material(material)
 
 
@@ -474,6 +476,7 @@ def main():
     ensure_folder(AERIAL_GRASS_ROCK_PACKAGE_PATH)
     create_tint_material()
     create_river_materials()
+    create_opaque_vertex_color_material(CANYON_WALL_MATERIAL_NAME, 0.94, 0.03)
     aerial_grass_rock_textures = import_textures(
         AERIAL_GRASS_ROCK_PACKAGE_PATH,
         AERIAL_GRASS_ROCK_SOURCE_DIR,

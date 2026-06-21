@@ -150,6 +150,30 @@ def main():
             raise RuntimeError(f"Known-bad shrub proxy scatter must stay disabled: {forest_shrub_instances} instances")
         emit("[YARLUNG-INSPECT] proxy_scenery_disabled=true real_forest_and_cliff_assets_required=true")
 
+    canyon_wall_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungCanyonWallActor")]
+    if len(canyon_wall_actors) != 1:
+        raise RuntimeError(f"Expected exactly one YarlungCanyonWallActor, found {len(canyon_wall_actors)}")
+    for actor in canyon_wall_actors:
+        emit(f"[YARLUNG-INSPECT] canyon_wall={actor.get_actor_label()} class={actor.get_class().get_name()}")
+        component_names = set()
+        for component in actor.get_components_by_class(unreal.MeshComponent):
+            component_names.add(component.get_name())
+            material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
+            hidden = component.get_editor_property("hidden_in_game")
+            emit(
+                f"[YARLUNG-INSPECT] canyon_wall_component={component.get_name()} "
+                f"class={component.get_class().get_name()} hidden={hidden} "
+                f"materials={material_names}"
+            )
+            if hidden:
+                raise RuntimeError(f"Yarlung canyon wall component is hidden: {component.get_name()}")
+            if not any("M_YarlungCanyonWall" in material_name for material_name in material_names):
+                raise RuntimeError(f"Yarlung canyon wall component missing canyon material: {component.get_name()}")
+        expected_components = {"ForestApronMesh", "WetCliffMesh"}
+        missing_components = expected_components - component_names
+        if missing_components:
+            raise RuntimeError(f"Yarlung canyon wall missing components: {sorted(missing_components)}")
+
     cliff_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungCliffActor")]
     if cliff_actors:
         raise RuntimeError(f"Unexpected YarlungCliffActor still present: {len(cliff_actors)}")
