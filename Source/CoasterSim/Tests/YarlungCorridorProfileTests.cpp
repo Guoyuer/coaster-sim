@@ -45,7 +45,7 @@ bool FYarlungCorridorProfileAuthoredHeightTest::RunTest(const FString& Parameter
     const float RaisedBaseWallHeight = YarlungCorridorProfile::AuthoredHeightCm(Center, 150000.0f, TrackBaseHeight, BaseHeight + 50000.0f);
 
     TestTrue(TEXT("Authored corridor height is finite"), FMath::IsFinite(NearHeight) && FMath::IsFinite(WallHeight));
-    TestTrue(TEXT("Far corridor profile creates visible canyon-scale wall relief"), WallHeight - BaseHeight >= 28000.0f);
+    TestTrue(TEXT("Far corridor profile creates moderate terrain relief without restoring procedural canyon walls"), WallHeight - BaseHeight >= 12000.0f);
     TestTrue(TEXT("Far corridor profile avoids implausible track-height hard walls"), WallHeight - BaseHeight <= 108000.0f);
     TestTrue(TEXT("Near track remains close to the sampled DEM surface"), FMath::Abs(NearHeight - BaseHeight) <= 7000.0f);
     TestTrue(

@@ -55,6 +55,23 @@ function Invoke-TimedStep {
     }
 }
 
+function Invoke-UnrealPythonScript {
+    param(
+        [Parameter(Mandatory = $true)][string]$ScriptPath,
+        [switch]$NullRHI
+    )
+
+    $Args = @($Project, "-run=pythonscript", "-script=$ScriptPath", "-unattended", "-nop4", "-NoSplash")
+    if ($NullRHI) {
+        $Args += "-NullRHI"
+    }
+    $Args += $EditorCommonArgs
+    & $EditorCmd @Args
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unreal Python script failed with exit code $LASTEXITCODE`: $ScriptPath"
+    }
+}
+
 function Test-AllPathsExist {
     param([Parameter(Mandatory = $true)][string[]]$Paths)
 
@@ -136,10 +153,7 @@ if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOut
     Invoke-TimedStep "import materials" {
         Remove-Item -LiteralPath $MaterialSuccessMarker -ErrorAction SilentlyContinue
 
-        & $EditorCmd $Project "-ExecutePythonScript=$MaterialScript" -unattended -nop4 -NullRHI -NoSplash @EditorCommonArgs
-        if ($LASTEXITCODE -ne 0) {
-            throw "Coaster material generation failed with exit code $LASTEXITCODE"
-        }
+        Invoke-UnrealPythonScript -ScriptPath $MaterialScript -NullRHI
         if (-not (Test-Path -LiteralPath $MaterialSuccessMarker)) {
             throw "Coaster material generation did not complete successfully; missing marker $MaterialSuccessMarker"
         }
@@ -186,9 +200,6 @@ if ($Verify) {
         Write-Host "[YARLUNG-TIME] verify existing map without reimport"
     }
     Invoke-TimedStep "verify map" {
-        & $EditorCmd $Project "-run=pythonscript" "-script=$InspectScript" -unattended -nop4 -NoSplash @EditorCommonArgs
-        if ($LASTEXITCODE -ne 0) {
-            throw "Yarlung landscape verification failed with exit code $LASTEXITCODE"
-        }
+        Invoke-UnrealPythonScript -ScriptPath $InspectScript
     }
 }

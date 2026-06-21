@@ -8,9 +8,8 @@
 // so the runtime mesh and the generated heightmap/textures can never silently
 // drift apart. There are deliberately NO compiled-in constants here: the fields
 // default to zero and are populated only from the JSON. A missing/invalid file is
-// a hard setup error — Config() logs it and yields a zeroed config, which the
-// CoasterSim.Yarlung.TerrainConfigParity test and the heightmap byte-count check
-// catch loudly rather than running on silently-wrong numbers.
+// a hard setup error: Config() fails the process rather than returning a zeroed
+// config that could generate plausible-looking but wrong terrain.
 namespace YarlungTerrain
 {
 struct FCenterlineTerm

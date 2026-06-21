@@ -23,10 +23,6 @@
 			"Enabled": true
 		},
 		{
-			"Name": "ProceduralMeshComponent",
-			"Enabled": true
-		},
-		{
 			"Name": "ProceduralVegetationEditor",
 			"Enabled": true
 		},

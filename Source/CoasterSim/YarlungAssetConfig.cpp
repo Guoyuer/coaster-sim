@@ -10,6 +10,21 @@ namespace YarlungAssets
 {
 namespace
 {
+void FatalAssetConfigError(const FString& Message)
+{
+    UE_LOG(LogTemp, Fatal, TEXT("YarlungAssets config setup error: %s"), *Message);
+}
+
+TSharedPtr<FJsonObject> RequiredObject(const TSharedPtr<FJsonObject>& Object, const TCHAR* Name, const FString& Path)
+{
+    const TSharedPtr<FJsonObject>* Child = nullptr;
+    if (!Object.IsValid() || !Object->TryGetObjectField(Name, Child) || !Child || !Child->IsValid())
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s is missing required object '%s'"), *Path, Name));
+    }
+    return *Child;
+}
+
 float NumberField(const TSharedPtr<FJsonObject>& Object, const TCHAR* Name, float DefaultValue = 0.0f)
 {
     double Value = 0.0;
@@ -95,7 +110,7 @@ FYarlungAssetConfig LoadConfigFromDisk()
     FString Raw;
     if (!FFileHelper::LoadFileToString(Raw, *Path))
     {
-        UE_LOG(LogTemp, Error, TEXT("YarlungAssets: required config missing: %s"), *DefaultPath);
+        FatalAssetConfigError(FString::Printf(TEXT("required config is missing: %s"), *DefaultPath));
         return Config;
     }
 
@@ -103,20 +118,24 @@ FYarlungAssetConfig LoadConfigFromDisk()
     const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Raw);
     if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
     {
-        UE_LOG(LogTemp, Error, TEXT("YarlungAssets: failed to parse %s"), *Path);
+        FatalAssetConfigError(FString::Printf(TEXT("failed to parse %s"), *Path));
         return Config;
     }
 
-    const TSharedPtr<FJsonObject> Scenery = Root->GetObjectField(TEXT("scenery"));
+    const TSharedPtr<FJsonObject> Scenery = RequiredObject(Root, TEXT("scenery"), Path);
     const TArray<TSharedPtr<FJsonValue>>* Components = nullptr;
-    if (Scenery->TryGetArrayField(TEXT("components"), Components) && Components)
+    if (!Scenery->TryGetArrayField(TEXT("components"), Components) || !Components)
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s is missing required array 'scenery.components'"), *Path));
+    }
+    if (Components)
     {
         for (const TSharedPtr<FJsonValue>& Value : *Components)
         {
             const TSharedPtr<FJsonObject> ComponentObject = Value->AsObject();
             if (!ComponentObject.IsValid())
             {
-                continue;
+                FatalAssetConfigError(FString::Printf(TEXT("%s has a non-object scenery component"), *Path));
             }
 
             FYarlungSceneryComponentConfig Component;
@@ -128,17 +147,44 @@ FYarlungAssetConfig LoadConfigFromDisk()
             Component.bUseCanopyBelt = ComponentObject->HasField(TEXT("canopy_belt_seed"));
             Component.CanopyBeltSeed = NumberField(ComponentObject, TEXT("canopy_belt_seed"));
             Component.bUseTint = ColorArrayField(ComponentObject, TEXT("tint"), Component.Tint);
+            if (Component.Name.IsEmpty())
+            {
+                FatalAssetConfigError(FString::Printf(TEXT("%s has a scenery component without a name"), *Path));
+            }
+            if (Component.Kind.IsEmpty())
+            {
+                FatalAssetConfigError(FString::Printf(TEXT("%s component '%s' has no kind"), *Path, *Component.Name));
+            }
+            if (Component.Count < 0)
+            {
+                FatalAssetConfigError(FString::Printf(TEXT("%s component '%s' has negative count"), *Path, *Component.Name));
+            }
+            if (Component.Count > 0 && Component.MeshPath.IsEmpty())
+            {
+                FatalAssetConfigError(FString::Printf(TEXT("%s component '%s' is enabled but has no mesh path"), *Path, *Component.Name));
+            }
             Config.SceneryComponents.Add(Component);
         }
     }
 
-    const TSharedPtr<FJsonObject> Kinds = Scenery->GetObjectField(TEXT("kinds"));
+    const TSharedPtr<FJsonObject> Kinds = RequiredObject(Scenery, TEXT("kinds"), Path);
     for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Kinds->Values)
     {
         Config.ScatterKinds.Add(Pair.Key, ParseScatterKind(Pair.Value->AsObject()));
     }
+    if (Config.ScatterKinds.IsEmpty())
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s has no scenery.kinds"), *Path));
+    }
+    for (const FYarlungSceneryComponentConfig& Component : Config.SceneryComponents)
+    {
+        if (!Config.ScatterKinds.Contains(Component.Kind))
+        {
+            FatalAssetConfigError(FString::Printf(TEXT("%s component '%s' references unknown kind '%s'"), *Path, *Component.Name, *Component.Kind));
+        }
+    }
 
-    const TSharedPtr<FJsonObject> CanopyBelt = Scenery->GetObjectField(TEXT("canopy_belt"));
+    const TSharedPtr<FJsonObject> CanopyBelt = RequiredObject(Scenery, TEXT("canopy_belt"), Path);
     Config.CanopyBelt.SampleStride = IntegerField(CanopyBelt, TEXT("sample_stride"), 2);
     Config.CanopyBelt.LateralBandsCm = NumberArrayField(CanopyBelt, TEXT("lateral_bands_cm"));
     Config.CanopyBelt.NearBandCount = IntegerField(CanopyBelt, TEXT("near_band_count"));
@@ -152,7 +198,7 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.CanopyBelt.ScaleMax = NumberField(CanopyBelt, TEXT("scale_max"), 1.0f);
     Config.CanopyBelt.HeightOffsetCm = NumberField(CanopyBelt, TEXT("height_offset_cm"));
 
-    const TSharedPtr<FJsonObject> Water = Root->GetObjectField(TEXT("water"));
+    const TSharedPtr<FJsonObject> Water = RequiredObject(Root, TEXT("water"), Path);
     Config.Water.RiverMaterialPath = StringField(Water, TEXT("river_material"));
     Config.Water.FallbackRiverMaterialPath = StringField(Water, TEXT("fallback_river_material"));
     Config.Water.SurfaceMaterialPath = StringField(Water, TEXT("surface_material"));
@@ -166,6 +212,27 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.Water.MaxWidthCm = NumberField(Water, TEXT("max_width_cm"));
     Config.Water.ShapeDilation = NumberField(Water, TEXT("shape_dilation"));
     Config.Water.AudioIntensity = NumberField(Water, TEXT("audio_intensity"));
+
+    if (Config.SceneryComponents.IsEmpty())
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s has no scenery.components"), *Path));
+    }
+    if (Config.Water.RiverMaterialPath.IsEmpty())
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s is missing water.river_material"), *Path));
+    }
+    if (Config.Water.SurfaceMaterialPath.IsEmpty())
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s is missing water.surface_material"), *Path));
+    }
+    if (Config.Water.MinWidthCm <= 0.0f || Config.Water.MaxWidthCm < Config.Water.MinWidthCm)
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid water width bounds"), *Path));
+    }
+    if (Config.Water.DefaultDepthCm <= 0.0f || Config.Water.ZoneRenderTargetResolution <= 0)
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid water depth or render target resolution"), *Path));
+    }
 
     UE_LOG(LogTemp, Display, TEXT("YarlungAssets: loaded %d scenery components, %d scatter kinds from %s"),
         Config.SceneryComponents.Num(),

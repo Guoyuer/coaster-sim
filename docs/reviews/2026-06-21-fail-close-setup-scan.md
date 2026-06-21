@@ -1,0 +1,34 @@
+# Fail-Close Setup Scan
+
+- Date: 2026-06-21
+- Reviewer: Codex
+- Review target: Yarlung water/material/config/test pipeline after the "no visible water" bug
+- Reviewed artifacts: `scripts/import-yarlung-landscape.ps1`, `scripts/create-coaster-materials.py`, `scripts/test-yarlung.ps1`, `Source/CoasterSim/YarlungAssetConfig.cpp`, `Source/CoasterSim/YarlungTerrainProfile.cpp`, `CoasterSim.uproject`, `Source/CoasterSim/Tests/YarlungCorridorProfileTests.cpp`
+- Verdict: COMMENT
+- Related phase/task: D water/track and cross-cutting repo setup gates
+
+## Summary
+
+The water visibility bug was not just a single rendering issue. It exposed a partially fail-open project setup: Unreal Python was invoked through multiple command-line shapes, config loaders could continue with empty/default values after setup errors, material generation used noisy missing-asset probes, stale plugin metadata remained after code cleanup, and Yarlung automation tests were not wrapped in a first-class repo gate.
+
+This pass tightened the default path so missing config, broken material generation, stale Water plugin assumptions, and red Yarlung tests fail close instead of silently producing misleading screenshots.
+
+## Blocking Issues
+
+1. None remaining from this scan. The current source/build/test path is green.
+
+## Non-Blocking Suggestions
+
+1. Replace deprecated Unreal Python APIs in `inspect-yarlung-map.py` and material generation so the project can later treat selected warnings as errors.
+2. Make map import verification parse and require the commandlet `Success - 0 error(s)` line, not just the process exit code.
+3. Extend config validation from required top-level objects to required scalar fields with explicit field names.
+
+## Required Next Action
+
+Continue AAA visual iteration, but keep `scripts/test-yarlung.ps1` as the setup/test gate before commits that touch terrain, water, config, or generated map behavior.
+
+## Agent Disposition
+
+- Status: Done
+- Progress link: `docs/plans/photoreal-progress.md`
+- Follow-up evidence: C++ build PASS; `scripts/import-yarlung-landscape.ps1` material+verify PASS; `scripts/test-yarlung.ps1 -Build` PASS with 10 Yarlung automation tests; generated UE Water/material assets regenerated.

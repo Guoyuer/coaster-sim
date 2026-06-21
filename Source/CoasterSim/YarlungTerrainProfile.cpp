@@ -10,6 +10,21 @@ namespace YarlungTerrain
 {
 namespace
 {
+void FatalTerrainConfigError(const FString& Message)
+{
+    UE_LOG(LogTemp, Fatal, TEXT("YarlungTerrain config setup error: %s"), *Message);
+}
+
+TSharedPtr<FJsonObject> RequiredObject(const TSharedPtr<FJsonObject>& Object, const TCHAR* Name, const FString& Path)
+{
+    const TSharedPtr<FJsonObject>* Child = nullptr;
+    if (!Object.IsValid() || !Object->TryGetObjectField(Name, Child) || !Child || !Child->IsValid())
+    {
+        FatalTerrainConfigError(FString::Printf(TEXT("%s is missing required object '%s'"), *Path, Name));
+    }
+    return *Child;
+}
+
 FConfig LoadConfigFromDisk()
 {
     FConfig Cfg; // zero-initialized; the JSON is the only source of real values
@@ -18,9 +33,7 @@ FConfig LoadConfigFromDisk()
     FString Raw;
     if (!FFileHelper::LoadFileToString(Raw, *Path))
     {
-        UE_LOG(LogTemp, Error,
-            TEXT("YarlungTerrain: required config %s is missing; terrain config is zeroed (TerrainConfigParity test will flag this)"),
-            *Path);
+        FatalTerrainConfigError(FString::Printf(TEXT("required config is missing: %s"), *Path));
         return Cfg;
     }
 
@@ -28,23 +41,23 @@ FConfig LoadConfigFromDisk()
     const TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Raw);
     if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
     {
-        UE_LOG(LogTemp, Error, TEXT("YarlungTerrain: failed to parse %s; terrain config is zeroed"), *Path);
+        FatalTerrainConfigError(FString::Printf(TEXT("failed to parse %s"), *Path));
         return Cfg;
     }
 
     Cfg.GridSize = Root->GetIntegerField(TEXT("grid_size"));
 
-    const TSharedPtr<FJsonObject> Bounds = Root->GetObjectField(TEXT("world_bounds_cm"));
+    const TSharedPtr<FJsonObject> Bounds = RequiredObject(Root, TEXT("world_bounds_cm"), Path);
     Cfg.MinXCm = Bounds->GetNumberField(TEXT("min_x"));
     Cfg.MaxXCm = Bounds->GetNumberField(TEXT("max_x"));
     Cfg.MinYCm = Bounds->GetNumberField(TEXT("min_y"));
     Cfg.MaxYCm = Bounds->GetNumberField(TEXT("max_y"));
 
-    const TSharedPtr<FJsonObject> Height = Root->GetObjectField(TEXT("encoded_height_cm"));
+    const TSharedPtr<FJsonObject> Height = RequiredObject(Root, TEXT("encoded_height_cm"), Path);
     Cfg.EncodedMinZCm = Height->GetNumberField(TEXT("min"));
     Cfg.EncodedMaxZCm = Height->GetNumberField(TEXT("max"));
 
-    const TSharedPtr<FJsonObject> River = Root->GetObjectField(TEXT("river"));
+    const TSharedPtr<FJsonObject> River = RequiredObject(Root, TEXT("river"), Path);
     Cfg.RiverAnchorXCm = River->GetNumberField(TEXT("anchor_x_cm"));
     Cfg.RiverAnchorYCm = River->GetNumberField(TEXT("anchor_y_cm"));
     Cfg.RiverZCm = River->GetNumberField(TEXT("z_cm"));
@@ -67,6 +80,23 @@ FConfig LoadConfigFromDisk()
             Out.Phase = Term->GetNumberField(TEXT("phase"));
             Cfg.RiverCenterlineTerms.Add(Out);
         }
+    }
+
+    if (Cfg.GridSize <= 0)
+    {
+        FatalTerrainConfigError(FString::Printf(TEXT("%s has invalid grid_size=%d"), *Path, Cfg.GridSize));
+    }
+    if (Cfg.MinXCm >= Cfg.MaxXCm || Cfg.MinYCm >= Cfg.MaxYCm)
+    {
+        FatalTerrainConfigError(FString::Printf(TEXT("%s has invalid world_bounds_cm"), *Path));
+    }
+    if (Cfg.EncodedMinZCm >= Cfg.EncodedMaxZCm)
+    {
+        FatalTerrainConfigError(FString::Printf(TEXT("%s has invalid encoded_height_cm range"), *Path));
+    }
+    if (Cfg.RiverCenterlineTerms.IsEmpty())
+    {
+        FatalTerrainConfigError(FString::Printf(TEXT("%s has no river.centerline_terms"), *Path));
     }
 
     return Cfg;

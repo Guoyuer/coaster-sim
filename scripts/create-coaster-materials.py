@@ -10,6 +10,7 @@ MESH_TERRAIN_MATERIAL_NAME = "M_YarlungMeshTerrain"
 WATER_RIVER_MATERIAL_INSTANCE_NAME = "MI_YarlungWaterRiver"
 WATER_SURFACE_MATERIAL_NAME = "M_YarlungWaterSurface"
 UE_WATER_RIVER_PARENT_PATH = "/Water/Materials/WaterSurface/Water_Material_River.Water_Material_River"
+PROJECT_WATER_PARENT_PATH = f"{PACKAGE_PATH}/{WATER_SURFACE_MATERIAL_NAME}.{WATER_SURFACE_MATERIAL_NAME}"
 SUCCESS_MARKER = "material-generation-ok.txt"
 
 
@@ -31,9 +32,10 @@ def create_material_asset(name, package_path, replace_existing=False):
         if not unreal.EditorAssetLibrary.delete_asset(asset_path):
             raise RuntimeError(f"Unable to delete stale material: {asset_path}")
 
-    material = unreal.EditorAssetLibrary.load_asset(asset_path)
-    if material:
-        return material
+    if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
+        material = unreal.EditorAssetLibrary.load_asset(asset_path)
+        if material:
+            return material
 
     material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
         name,
@@ -48,11 +50,11 @@ def create_material_asset(name, package_path, replace_existing=False):
 
 def create_material_instance_asset(name, package_path, parent_path):
     asset_path = f"{package_path}/{name}"
-    parent = unreal.EditorAssetLibrary.load_asset(parent_path)
+    parent = unreal.EditorAssetLibrary.load_asset(parent_path) if unreal.EditorAssetLibrary.does_asset_exist(parent_path) else None
     if parent is None:
         raise RuntimeError(f"Unable to load material instance parent: {parent_path}")
 
-    instance = unreal.EditorAssetLibrary.load_asset(asset_path)
+    instance = unreal.EditorAssetLibrary.load_asset(asset_path) if unreal.EditorAssetLibrary.does_asset_exist(asset_path) else None
     if instance is None:
         instance = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
             name,
@@ -191,10 +193,17 @@ def set_instance_vector(instance, name, value):
 
 
 def create_yarlung_water_material_instance():
+    parent_path = UE_WATER_RIVER_PARENT_PATH
+    if not unreal.EditorAssetLibrary.does_asset_exist(parent_path):
+        parent_path = PROJECT_WATER_PARENT_PATH
+        if not unreal.EditorAssetLibrary.does_asset_exist(parent_path):
+            raise RuntimeError(f"Unable to load UE Water parent or project water parent: {UE_WATER_RIVER_PARENT_PATH} / {PROJECT_WATER_PARENT_PATH}")
+        print(f"[WATER-MATERIAL] UE Water plugin parent unavailable; using project parent {PROJECT_WATER_PARENT_PATH}")
+
     instance = create_material_instance_asset(
         WATER_RIVER_MATERIAL_INSTANCE_NAME,
         PACKAGE_PATH,
-        UE_WATER_RIVER_PARENT_PATH,
+        parent_path,
     )
 
     # Keep the UE Water shader/render path, but bias it toward glacial Yarlung
@@ -359,8 +368,8 @@ def main():
     ensure_folder(PACKAGE_PATH)
     enable_imported_material_usages()
     create_tint_material()
-    create_yarlung_water_material_instance()
     create_yarlung_water_surface_material()
+    create_yarlung_water_material_instance()
     create_mesh_terrain_material()
     marker_path = unreal.Paths.convert_relative_path_to_full(
         unreal.Paths.project_saved_dir() + SUCCESS_MARKER
