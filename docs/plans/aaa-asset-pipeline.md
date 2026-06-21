@@ -21,7 +21,7 @@
 | **下层植被** | "fern", "grass", "understory", "bush" | 3–4 种 | 地面层次、近景绿量 |
 | **地表 Surface** | "forest floor", "alpine grass", "mossy ground", "rocky ground", "scree" | 4–5 张 | 多层混合地形材质（替换单张平铺贴图）|
 | **（可选）远山雪峰** | Fab "mountain backdrop" / "snow peak"，或保留地形 mesh + 大气 | 1 套 | 远景雪山层次（refs 地平线雪峰）|
-| **（可选）过山车** | Fab "roller coaster track"/"steel coaster"，或后续自做管轨 mesh | 1 套 | 前景车体/安全杆 + authored 轨道结构（替换 BasicShapes placeholder）|
+| **（可选）过山车** | Fab "roller coaster track"/"steel coaster"，或后续自做管轨 mesh | 1 套 | 新增 authored cockpit/train/安全杆，并逐步替换运行时 cylinder 管轨结构 |
 
 导入后在这里打钩或留言资产实际路径，我据此接线。
 
@@ -31,7 +31,7 @@
 2. **森林系统**：`YarlungSceneryActor` 读取 `Config/yarlung-assets.json` 做 instanced foliage / canopy belt；乔木、下层植被、数量、seed、clearance 都应走配置，不在 C++ 里手改。
 3. **多层地形材质**：用 Megascans 地表做 height/slope 混合（rock/scree/grass/forest-floor），替换当前单张 `M_YarlungMeshTerrain`。
 4. **江水**：在 UE Water `WaterBodyRiver` 上升级真实河流材质（翡翠色 + 流动 + 岸边泡沫），不回到旧 procedural river actor。
-5. **结构去灰盒**：过山车车体 + authored 管轨 mesh 替换引擎 BasicShapes placeholder。
+5. **结构去灰盒**：新增 authored cockpit/train/安全杆；后续用真实钢轨/支撑网格替换当前运行时 cylinder 管轨。
 6. **成像收尾**：复核 Lumen/TSR/曝光/雾，保住已得的峡谷纵深与 aerial perspective。
 
 ## 验收（AAA 照片级）

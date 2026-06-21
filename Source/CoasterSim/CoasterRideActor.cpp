@@ -9,9 +9,9 @@
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/MeshComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
 #include "Components/SkyLightComponent.h"
-#include "Components/StaticMeshComponent.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Engine/Scene.h"
 #include "Engine/Engine.h"
@@ -122,15 +122,6 @@ ACoasterRideActor::ACoasterRideActor()
 
     TrainRoot = CreateDefaultSubobject<USceneComponent>(TEXT("TrainRoot"));
     TrainRoot->SetupAttachment(SceneRoot);
-
-    TrainBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TrainBody"));
-    TrainBody->SetupAttachment(TrainRoot);
-    TrainBody->SetRelativeScale3D(FVector(1.05f, 0.52f, 0.08f));
-    TrainBody->SetRelativeLocation(FVector(175.0f, 0.0f, -188.0f));
-    // This is only a BasicShapes cube placeholder, not a real car/cockpit asset.
-    // Hide it by default so first-person visual iteration is not judged against a
-    // greybox block; D-stage work should replace it with an authored train mesh.
-    TrainBody->SetVisibility(false, true);
 
     RideCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("RideCamera"));
     RideCamera->SetupAttachment(TrainRoot);
@@ -250,12 +241,6 @@ ACoasterRideActor::ACoasterRideActor()
     Supports = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Supports"));
     Supports->SetupAttachment(SceneRoot);
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
-    if (CubeMesh.Succeeded())
-    {
-        TrainBody->SetStaticMesh(CubeMesh.Object);
-    }
-
     // Rails, ties and support columns are round tubular steel, not square bars.
     static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
     if (CylinderMesh.Succeeded())
@@ -269,7 +254,6 @@ ACoasterRideActor::ACoasterRideActor()
     static ConstructorHelpers::FObjectFinder<UMaterialInterface> BasicMaterial(TEXT("/Engine/BasicShapes/BasicShapeMaterial_Inst.BasicShapeMaterial_Inst"));
     if (BasicMaterial.Succeeded())
     {
-        TrainBody->SetMaterial(0, BasicMaterial.Object);
         LeftRail->SetMaterial(0, BasicMaterial.Object);
         RightRail->SetMaterial(0, BasicMaterial.Object);
         Ties->SetMaterial(0, BasicMaterial.Object);
@@ -298,12 +282,10 @@ void ACoasterRideActor::BeginPlay()
     RebuildSpline();
     ApplyVisualMaterials();
     RebuildVisuals();
-    TrainBody->SetVisibility(false, true);
 
     const TCHAR* CommandLine = FCommandLine::Get();
     if (FParse::Param(CommandLine, TEXT("YarlungHideRide")))
     {
-        TrainBody->SetVisibility(false, true);
         LeftRail->SetVisibility(false, true);
         RightRail->SetVisibility(false, true);
         Ties->SetVisibility(false, true);
@@ -709,7 +691,6 @@ void ACoasterRideActor::ApplyVisualMaterials()
     // galvanized metal, ties read as weathered metal-composite. Rendering these
     // as flat non-metallic matte (old Roughness 0.88, Metallic 0) was the single
     // biggest reason the track itself never read as a real coaster.
-    TintComponent(TrainBody, FLinearColor(0.16f, 0.015f, 0.012f), 0.55f, 0.32f); // deep red car shell
     TintComponent(LeftRail, FLinearColor(0.52f, 0.54f, 0.57f), 1.0f, 0.24f);     // polished running rail
     TintComponent(RightRail, FLinearColor(0.52f, 0.54f, 0.57f), 1.0f, 0.24f);
     TintComponent(Ties, FLinearColor(0.20f, 0.21f, 0.23f), 0.85f, 0.55f);        // galvanized cross-ties

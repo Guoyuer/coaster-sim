@@ -67,9 +67,6 @@ protected:
     TObjectPtr<USceneComponent> TrainRoot;
 
     UPROPERTY(VisibleAnywhere, Category = "Components")
-    TObjectPtr<UStaticMeshComponent> TrainBody;
-
-    UPROPERTY(VisibleAnywhere, Category = "Components")
     TObjectPtr<UCameraComponent> RideCamera;
 
     UPROPERTY(VisibleAnywhere, Category = "Lighting")
