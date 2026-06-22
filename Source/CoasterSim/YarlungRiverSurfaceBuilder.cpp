@@ -4,6 +4,7 @@
 
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "YarlungAssetConfig.h"
+#include "YarlungDeterministicNoise.h"
 #include "YarlungGeneratedPaths.h"
 #include "YarlungRiverField.h"
 #include "YarlungTerrainProfile.h"
@@ -14,19 +15,6 @@
 #include "MeshDescriptionBuilder.h"
 #include "StaticMeshAttributes.h"
 #include "UObject/Linker.h"
-
-namespace
-{
-float RiverSurfaceValueNoise(float X, float Y)
-{
-    return FMath::Frac(FMath::Sin(X * 0.00173f + Y * 0.00291f) * 43758.5453f);
-}
-
-float RiverSurfaceSignedValueNoise(float X, float Y)
-{
-    return RiverSurfaceValueNoise(X, Y) * 2.0f - 1.0f;
-}
-}
 
 namespace YarlungRiverSurfaceBuilder
 {
@@ -122,17 +110,17 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
         const float SlopeRapid = YarlungTerrain::Smooth01((SegmentDropCm / SegmentLengthCm - 0.018f) / 0.055f);
         const float LeftBankScale = FMath::Clamp(
             0.95f
-                + 0.16f * RiverSurfaceSignedValueNoise(Flow * 93000.0f + 17.0f, Flow * 51000.0f)
-                + 0.08f * RiverSurfaceSignedValueNoise(Flow * 311000.0f, Flow * 177000.0f + 41.0f),
+                + 0.16f * YarlungDeterministicNoise::Signed(Flow * 93000.0f + 17.0f, Flow * 51000.0f)
+                + 0.08f * YarlungDeterministicNoise::Signed(Flow * 311000.0f, Flow * 177000.0f + 41.0f),
             0.78f,
             1.16f);
         const float RightBankScale = FMath::Clamp(
             0.96f
-                + 0.15f * RiverSurfaceSignedValueNoise(Flow * 87000.0f + 83.0f, Flow * 61000.0f + 29.0f)
-                + 0.08f * RiverSurfaceSignedValueNoise(Flow * 293000.0f + 19.0f, Flow * 193000.0f),
+                + 0.15f * YarlungDeterministicNoise::Signed(Flow * 87000.0f + 83.0f, Flow * 61000.0f + 29.0f)
+                + 0.08f * YarlungDeterministicNoise::Signed(Flow * 293000.0f + 19.0f, Flow * 193000.0f),
             0.78f,
             1.15f);
-        const float CenterWanderCm = HalfWidth * 0.055f * RiverSurfaceSignedValueNoise(Flow * 71000.0f, Flow * 139000.0f + 11.0f);
+        const float CenterWanderCm = HalfWidth * 0.055f * YarlungDeterministicNoise::Signed(Flow * 71000.0f, Flow * 139000.0f + 11.0f);
 
         for (int32 CrossIndex = 0; CrossIndex < CrossSamples; ++CrossIndex)
         {
@@ -142,14 +130,14 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
             const float CenterRapid = (1.0f - YarlungTerrain::Smooth01(FMath::Abs(AcrossSigned) / 0.34f))
                 * (0.45f + 0.55f * SlopeRapid);
             const float PatchNoise = FMath::Clamp(
-                RiverSurfaceValueNoise(Flow * 220000.0f + AcrossSigned * 31000.0f, Flow * 113000.0f - AcrossSigned * 47000.0f) * 0.62f
-                    + RiverSurfaceValueNoise(Flow * 790000.0f - AcrossSigned * 19000.0f, Flow * 470000.0f + AcrossSigned * 29000.0f) * 0.38f,
+                YarlungDeterministicNoise::Value01(Flow * 220000.0f + AcrossSigned * 31000.0f, Flow * 113000.0f - AcrossSigned * 47000.0f) * 0.62f
+                    + YarlungDeterministicNoise::Value01(Flow * 790000.0f - AcrossSigned * 19000.0f, Flow * 470000.0f + AcrossSigned * 29000.0f) * 0.38f,
                 0.0f,
                 1.0f);
             const float PatchGate = YarlungTerrain::Smooth01((PatchNoise - 0.48f) / 0.28f);
             const float BoilSource = FMath::Clamp(
-                0.58f * RiverSurfaceValueNoise(Flow * 620000.0f + AcrossSigned * 81000.0f, Flow * 270000.0f - AcrossSigned * 191000.0f)
-                    + 0.42f * RiverSurfaceValueNoise(Flow * 1310000.0f - AcrossSigned * 126000.0f, Flow * 880000.0f + AcrossSigned * 73000.0f),
+                0.58f * YarlungDeterministicNoise::Value01(Flow * 620000.0f + AcrossSigned * 81000.0f, Flow * 270000.0f - AcrossSigned * 191000.0f)
+                    + 0.42f * YarlungDeterministicNoise::Value01(Flow * 1310000.0f - AcrossSigned * 126000.0f, Flow * 880000.0f + AcrossSigned * 73000.0f),
                 0.0f,
                 1.0f);
             const float BoilPatch = YarlungTerrain::Smooth01((BoilSource - 0.52f) / 0.24f)
@@ -157,8 +145,8 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
             const float BrokenRapid = FMath::Pow(
                 FMath::Clamp(
                     0.42f
-                        * RiverSurfaceValueNoise(Flow * 1710000.0f + AcrossSigned * 263000.0f, Flow * 690000.0f)
-                        + 0.34f * RiverSurfaceValueNoise(Flow * 930000.0f, AcrossSigned * 377000.0f + Flow * 110000.0f)
+                        * YarlungDeterministicNoise::Value01(Flow * 1710000.0f + AcrossSigned * 263000.0f, Flow * 690000.0f)
+                        + 0.34f * YarlungDeterministicNoise::Value01(Flow * 930000.0f, AcrossSigned * 377000.0f + Flow * 110000.0f)
                         + 0.24f * PatchGate,
                     0.0f,
                     1.0f),
@@ -173,7 +161,7 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
                 0.24f);
             const float RawRippleZ = (5.0f + 8.0f * CrossWake) * FMath::Sin(Flow * 287.0f + AcrossSigned * 23.0f + PatchNoise * 5.0f)
                 + 5.0f * FMath::Sin(Flow * 431.0f - AcrossSigned * 47.0f + BrokenRapid * 2.0f)
-                + 8.0f * RiverSurfaceSignedValueNoise(Flow * 360000.0f, AcrossSigned * 64000.0f)
+                + 8.0f * YarlungDeterministicNoise::Signed(Flow * 360000.0f, AcrossSigned * 64000.0f)
                 + 4.0f * BoilPatch;
             const float RippleZ = FMath::Clamp(RawRippleZ, -10.0f, 18.0f);
             const float SurfaceZ = Center.Z + FYarlungRiverField::DefaultWaterSurfaceLiftCm + RippleZ;
@@ -183,7 +171,7 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
             const float SideWidthFactor = AcrossSigned >= 0.0f ? LeftBankScale : RightBankScale;
             const float EdgeIrregularityCm = HalfWidth
                 * 0.045f
-                * RiverSurfaceSignedValueNoise(Flow * 410000.0f + AcrossSigned * 57000.0f, Flow * 233000.0f - AcrossSigned * 99000.0f)
+                * YarlungDeterministicNoise::Signed(Flow * 410000.0f + AcrossSigned * 57000.0f, Flow * 233000.0f - AcrossSigned * 99000.0f)
                 * FMath::Pow(FMath::Abs(AcrossSigned), 1.7f);
             const float AcrossOffsetCm = CenterWanderCm + AcrossSigned * HalfWidth * SideWidthFactor + EdgeIrregularityCm;
             const FVector Position(

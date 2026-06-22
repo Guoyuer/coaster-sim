@@ -38,7 +38,7 @@ bool FindWallBandDivergenceFixture(
     const TArray<YarlungViewCorridor::FTrackPoint>& TrackPoints,
     const FYarlungRiverField& RiverField,
     FVector2D& OutPosition,
-    float& OutOldFullProfileHeight,
+    float& OutLegacyFullProfileHeight,
     float& OutSharedSurfaceHeight,
     float& OutBaseHeight)
 {
@@ -63,7 +63,7 @@ bool FindWallBandDivergenceFixture(
                 EncodedHeights,
                 ProfileCenter.X,
                 ProfileCenter.Y);
-            const float OldFullProfileHeight = YarlungCorridorProfile::CorridorTerrainHeightCm(
+            const float LegacyFullProfileHeight = YarlungCorridorProfile::CorridorTerrainHeightCm(
                 ProfileCenter,
                 SignedOffsetCm,
                 TrackBaseHeight,
@@ -74,11 +74,11 @@ bool FindWallBandDivergenceFixture(
                 RiverField,
                 Position);
 
-            if (OldFullProfileHeight - BaseHeight > 40000.0f
-                && OldFullProfileHeight - SharedSurfaceHeight > 10000.0f)
+            if (LegacyFullProfileHeight - BaseHeight > 40000.0f
+                && LegacyFullProfileHeight - SharedSurfaceHeight > 10000.0f)
             {
                 OutPosition = Position;
-                OutOldFullProfileHeight = OldFullProfileHeight;
+                OutLegacyFullProfileHeight = LegacyFullProfileHeight;
                 OutSharedSurfaceHeight = SharedSurfaceHeight;
                 OutBaseHeight = BaseHeight;
                 return true;
@@ -102,7 +102,7 @@ bool FYarlungTerrainSurfaceUsesRenderedHeightModelTest::RunTest(const FString& P
     const FYarlungRiverField EmptyRiverField;
 
     FVector2D WallBandPosition = FVector2D::ZeroVector;
-    float OldFullProfileHeight = 0.0f;
+    float LegacyFullProfileHeight = 0.0f;
     float SharedSurfaceHeight = 0.0f;
     float BaseHeight = 0.0f;
     const bool bFoundFixture = FindWallBandDivergenceFixture(
@@ -110,7 +110,7 @@ bool FYarlungTerrainSurfaceUsesRenderedHeightModelTest::RunTest(const FString& P
         TrackPoints,
         EmptyRiverField,
         WallBandPosition,
-        OldFullProfileHeight,
+        LegacyFullProfileHeight,
         SharedSurfaceHeight,
         BaseHeight);
 
@@ -120,10 +120,10 @@ bool FYarlungTerrainSurfaceUsesRenderedHeightModelTest::RunTest(const FString& P
         return false;
     }
 
-    TestTrue(TEXT("Fixture has a large legacy full-profile wall lift"), OldFullProfileHeight - BaseHeight > 40000.0f);
+    TestTrue(TEXT("Fixture has a large legacy full-profile wall lift"), LegacyFullProfileHeight - BaseHeight > 40000.0f);
     TestTrue(
         TEXT("Shared surface uses the rendered relaxed/blended terrain model, not the old full-profile scenery height"),
-        OldFullProfileHeight - SharedSurfaceHeight > 10000.0f);
+        LegacyFullProfileHeight - SharedSurfaceHeight > 10000.0f);
     TestTrue(
         TEXT("Surface normal is finite and normalized"),
         YarlungTerrainSurface::SurfaceNormal(EncodedHeights, TrackPoints, EmptyRiverField, WallBandPosition).IsNormalized());

@@ -4,6 +4,7 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "CoasterRideActor.h"
 #include "YarlungAssetConfig.h"
+#include "YarlungDeterministicNoise.h"
 #include "YarlungRiverField.h"
 #include "YarlungRiverSurfaceBuilder.h"
 #include "YarlungSceneryActor.h"
@@ -36,11 +37,6 @@ const TCHAR* YarlungCorridorTerrainMeshPackagePath = YarlungGeneratedPaths::Corr
 const TCHAR* YarlungCorridorTerrainMeshAssetName = YarlungGeneratedPaths::CorridorTerrainMeshAssetName;
 const TCHAR* YarlungCorridorTerrainMeshObjectPath = YarlungGeneratedPaths::CorridorTerrainMeshObjectPath;
 
-float YarlungValueNoise(float X, float Y)
-{
-    return FMath::Frac(FMath::Sin(X * 0.00173f + Y * 0.00291f) * 43758.5453f);
-}
-
 float YarlungCanyonWetRockMask(float X, float Y, float Height, const FVector& SurfaceNormal, const FYarlungRiverField& RiverField)
 {
     const float SlopeMask = YarlungTerrain::Smooth01(((1.0f - SurfaceNormal.Z) - 0.08f) / 0.30f);
@@ -65,7 +61,7 @@ float YarlungTerrainBreakup(float X, float Y, float Height)
 {
     const float Broad = 0.5f + 0.5f * FMath::Sin(X * 0.00042f - Y * 0.00058f + Height * 0.00072f);
     const float Mid = 0.5f + 0.5f * FMath::Sin(X * 0.00115f + Y * 0.00173f - Height * 0.0011f);
-    const float Fine = YarlungValueNoise(X * 2.9f + Height * 0.17f, Y * 2.1f - Height * 0.13f);
+    const float Fine = YarlungDeterministicNoise::Value01(X * 2.9f + Height * 0.17f, Y * 2.1f - Height * 0.13f);
     return FMath::Clamp(Broad * 0.45f + Mid * 0.35f + Fine * 0.20f, 0.0f, 1.0f);
 }
 
@@ -84,12 +80,12 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
     const float MossBank = (1.0f - YarlungTerrain::Smooth01((RiverDistance - 12000.0f) / 48000.0f))
         * (1.0f - YarlungTerrain::Smooth01((Height01 - 0.90f) / 0.10f));
     const float BroadCanopyPatch = 0.5f + 0.5f * FMath::Sin(X * 0.00088f - Y * 0.00116f + Height * 0.0011f);
-    const float FineCanopyPatch = YarlungValueNoise(X * 1.7f, Y * 1.7f);
+    const float FineCanopyPatch = YarlungDeterministicNoise::Value01(X * 1.7f, Y * 1.7f);
     const float CanopyMask = YarlungTerrain::Smooth01((BroadCanopyPatch * 0.72f + FineCanopyPatch * 0.28f - 0.22f) / 0.48f);
     const float Breakup = YarlungTerrainBreakup(X, Y, Height);
     const float MacroPatchNoise = FMath::Clamp(
-        YarlungValueNoise(X * 0.052f + Height * 0.018f, Y * 0.041f - Height * 0.013f) * 0.62f
-            + YarlungValueNoise(X * 0.118f - Height * 0.011f, Y * 0.093f + Height * 0.017f) * 0.38f,
+        YarlungDeterministicNoise::Value01(X * 0.052f + Height * 0.018f, Y * 0.041f - Height * 0.013f) * 0.62f
+            + YarlungDeterministicNoise::Value01(X * 0.118f - Height * 0.011f, Y * 0.093f + Height * 0.017f) * 0.38f,
         0.0f,
         1.0f);
     const float CanyonSlopeBand = YarlungTerrain::Smooth01((RiverDistance - 18000.0f) / 90000.0f)
@@ -118,7 +114,7 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
     const float RavineStreak = FMath::Pow(
         FMath::Clamp(0.5f + 0.5f * FMath::Sin(X * 0.0025f - Y * 0.0014f + Height * 0.0038f), 0.0f, 1.0f),
         4.0f);
-    const float Noise = YarlungValueNoise(X, Y);
+    const float Noise = YarlungDeterministicNoise::Value01(X, Y);
 
     const FLinearColor DeepForest(0.018f + Noise * 0.012f, 0.080f + Noise * 0.050f, 0.038f + Noise * 0.030f, 1.0f);
     const FLinearColor SunForest(0.030f + Noise * 0.018f, 0.155f + Noise * 0.070f, 0.068f + Noise * 0.044f, 1.0f);
