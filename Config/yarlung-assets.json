@@ -1,75 +1,90 @@
 {
   "scenery": {
     "material_usage_roots": [
-      "/Game/Fab/Materials"
+      "/Game/Fab/Materials",
+      "/Game/Fab/Alaskan_Cliff_Rock_1_Free/alaskan_cliff_rock_1_free/Materials",
+      "/Game/PN_interactiveSpruceForest/Materials",
+      "/Game/PN_interactiveSpruceForest/ExampleContent/Winter/Materials"
     ],
     "components": [
       {
         "name": "RockOutcrops",
         "mesh": "/Game/Fab/Megascans/3D/Beach_Boulder_uisjbbis/Medium/uisjbbis_tier_2/StaticMeshes/uisjbbis_tier_2.uisjbbis_tier_2",
         "kind": "boulder",
-        "count": 90,
+        "count": 120,
         "seed": 0.0
       },
       {
         "name": "UnderstoryClumps",
-        "mesh": "",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_05.spruce_small_05",
         "kind": "shrub",
-        "count": 0,
+        "count": 620,
         "seed": 3.0,
-        "tint": [0.035, 0.160, 0.055]
+        "tint": [
+          0.035,
+          0.16,
+          0.055
+        ]
       },
       {
         "name": "CliffRockFacesA",
         "mesh": "/Game/Fab/Megascans/3D/Nordic_Forest_Cliff_Large_xibsff1/Raw/xibsff1_tier_0/StaticMeshes/xibsff1_tier_0.xibsff1_tier_0",
         "kind": "cliff",
-        "count": 72,
+        "count": 110,
         "seed": 17.0
       },
       {
         "name": "CliffRockFacesB",
         "mesh": "/Game/Fab/Megascans/3D/Quarry_Cliff_uchwaffda/High/uchwaffda_tier_1/StaticMeshes/uchwaffda_tier_1.uchwaffda_tier_1",
         "kind": "cliff",
-        "count": 72,
+        "count": 110,
         "seed": 31.0
       },
       {
         "name": "ForestShrubsA",
-        "mesh": "",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_06.spruce_small_06",
         "kind": "shrub",
-        "count": 0,
+        "count": 520,
         "seed": 43.0,
-        "tint": [0.026, 0.130, 0.048]
+        "tint": [
+          0.026,
+          0.13,
+          0.048
+        ]
       },
       {
         "name": "ForestShrubsB",
-        "mesh": "",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_07.spruce_small_07",
         "kind": "shrub",
-        "count": 0,
+        "count": 520,
         "seed": 59.0,
-        "tint": [0.045, 0.180, 0.068]
+        "tint": [
+          0.045,
+          0.18,
+          0.068
+        ]
       },
       {
         "name": "CanopyTreesA",
-        "mesh": "",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/full/high/spruce_full_01.spruce_full_01",
         "kind": "canopy_tree",
-        "count": 0,
+        "count": 450,
         "seed": 71.0,
         "canopy_belt_seed": 131.0
       },
       {
         "name": "CanopyTreesB",
-        "mesh": "",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/full/high/spruce_full_02.spruce_full_02",
         "kind": "canopy_tree",
-        "count": 0,
+        "count": 450,
         "seed": 83.0,
         "canopy_belt_seed": 149.0
       },
       {
         "name": "CanopyTreesC",
-        "mesh": "",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/full/high/spruce_full_03.spruce_full_03",
         "kind": "canopy_tree",
-        "count": 0,
+        "count": 450,
         "seed": 97.0,
         "canopy_belt_seed": 167.0
       }
@@ -91,68 +106,77 @@
         "align_to_surface": true
       },
       "cliff": {
-        "side_bias": 0.70,
-        "distance_power": 0.78,
-        "min_lateral_cm": 5200.0,
-        "max_lateral_cm": 42000.0,
-        "river_clearance_cm": 96000.0,
+        "side_bias": 0.7,
+        "distance_power": 1.05,
+        "min_lateral_cm": 14000.0,
+        "max_lateral_cm": 86000.0,
+        "river_clearance_cm": 24000.0,
         "min_height_cm": 262000.0,
         "max_height_cm": 520000.0,
-        "min_slope": 0.075,
+        "min_slope": 0.025,
         "max_slope": 1.0,
-        "scale_min": 9.0,
-        "scale_max": 20.0,
+        "scale_min": 3.5,
+        "scale_max": 8.0,
         "height_offset_cm": 18.0,
         "align_to_surface": true
       },
       "canopy_tree": {
         "side_bias": 0.62,
-        "distance_power": 1.38,
-        "min_lateral_cm": 26000.0,
-        "max_lateral_cm": 126000.0,
-        "river_clearance_cm": 52000.0,
+        "distance_power": 1.08,
+        "min_lateral_cm": 11000.0,
+        "max_lateral_cm": 70000.0,
+        "river_clearance_cm": 18000.0,
         "min_height_cm": 262000.0,
         "max_height_cm": 470000.0,
         "min_slope": 0.0,
-        "max_slope": 0.62,
-        "scale_min": 10.0,
-        "scale_max": 24.0,
-        "height_offset_cm": 85.0,
+        "max_slope": 0.88,
+        "scale_min": 1.15,
+        "scale_max": 2.55,
+        "height_offset_cm": 45.0,
         "align_to_surface": false
       },
       "shrub": {
         "side_bias": 0.58,
-        "distance_power": 1.18,
-        "min_lateral_cm": 3600.0,
-        "max_lateral_cm": 108000.0,
-        "river_clearance_cm": 42000.0,
+        "distance_power": 1.05,
+        "min_lateral_cm": 7000.0,
+        "max_lateral_cm": 60000.0,
+        "river_clearance_cm": 16000.0,
         "min_height_cm": 262000.0,
         "max_height_cm": 455000.0,
         "min_slope": 0.0,
         "max_slope": 1.0,
-        "scale_min": 6.5,
-        "scale_max": 22.0,
-        "height_offset_cm": 6.0,
+        "scale_min": 0.85,
+        "scale_max": 1.85,
+        "height_offset_cm": 24.0,
         "align_to_surface": true
       }
     },
     "canopy_belt": {
-      "sample_stride": 2,
-      "lateral_bands_cm": [26000.0, 42000.0, 62000.0, 88000.0, 118000.0],
-      "near_band_count": 3,
-      "near_occupancy": 0.78,
-      "far_occupancy": 0.54,
-      "river_clearance_cm": 56000.0,
+      "sample_stride": 1,
+      "lateral_bands_cm": [
+        10000.0,
+        16000.0,
+        23000.0,
+        32000.0,
+        46000.0,
+        64000.0,
+        86000.0,
+        112000.0
+      ],
+      "near_band_count": 4,
+      "near_occupancy": 0.88,
+      "far_occupancy": 0.62,
+      "river_clearance_cm": 18000.0,
       "min_height_cm": 262000.0,
       "max_height_cm": 476000.0,
-      "max_slope": 0.78,
-      "scale_min": 14.0,
-      "scale_max": 34.0,
-      "height_offset_cm": 120.0
+      "max_slope": 0.9,
+      "scale_min": 1.22,
+      "scale_max": 2.85,
+      "height_offset_cm": 50.0
     }
   },
   "water": {
-    "river_material": "/Game/Generated/Materials/MI_YarlungWaterRiver.MI_YarlungWaterRiver",
+    "river_material": "/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface",
     "fallback_river_material": "/Water/Materials/WaterSurface/Water_Material_River.Water_Material_River",
     "surface_material": "/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface",
     "zone_render_target_resolution": 1024,
@@ -160,10 +184,10 @@
     "default_depth_cm": 2200.0,
     "base_velocity_cm_per_sec": 480.0,
     "flow_velocity_jitter_cm_per_sec": 260.0,
-    "width_scale": 0.55,
-    "min_width_cm": 9000.0,
-    "max_width_cm": 16000.0,
-    "shape_dilation": 8192.0,
+    "width_scale": 1.65,
+    "min_width_cm": 32000,
+    "max_width_cm": 52000,
+    "shape_dilation": 24000,
     "audio_intensity": 0.65
   }
 }

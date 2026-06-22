@@ -6,7 +6,7 @@
 namespace
 {
 const FVector CameraOffsetCm(-146.0f, 0.0f, 372.0f);
-const FRotator CameraLookRotation(-14.0f, 0.0f, 0.0f);
+const FRotator CameraLookRotation(-24.0f, 0.0f, 0.0f);
 }
 
 namespace CoasterRideCamera
@@ -19,7 +19,7 @@ void Configure(UCameraComponent* RideCamera)
     }
 
     ApplyRigTransform(RideCamera);
-    RideCamera->SetFieldOfView(86.0f);
+    RideCamera->SetFieldOfView(90.0f);
     RideCamera->bUsePawnControlRotation = false;
 
     RideCamera->PostProcessSettings.bOverride_MotionBlurAmount = true;

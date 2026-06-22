@@ -5,9 +5,7 @@ import unreal
 
 
 def load_config():
-    config_dir = Path(unreal.Paths.project_config_dir())
-    local_path = config_dir / "yarlung-assets.local.json"
-    path = local_path if local_path.exists() else config_dir / "yarlung-assets.json"
+    path = Path(unreal.Paths.project_config_dir()) / "yarlung-assets.json"
     print(f"[ASSET-CONFIG] {path}")
     return json.loads(path.read_text(encoding="utf-8"))
 

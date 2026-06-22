@@ -84,38 +84,72 @@ FYarlungRiverQuery FYarlungRiverField::QueryNearest(const FVector2D& Position) c
         return Query;
     }
 
-    int32 BestIndex = INDEX_NONE;
-    float BestDistanceSquared = TNumericLimits<float>::Max();
-    for (int32 Index = 0; Index < Rows.Num(); ++Index)
+    if (Rows.Num() == 1)
     {
-        const FVector2D RiverPosition(Rows[Index].PositionCm.X, Rows[Index].PositionCm.Y);
-        const float DistanceSquared = FVector2D::DistSquared(Position, RiverPosition);
+        Query.Row = Rows[0];
+        Query.DistanceCm = FVector2D::Distance(Position, FVector2D(Query.Row.PositionCm.X, Query.Row.PositionCm.Y));
+        Query.SignedDistanceCm = Query.DistanceCm;
+        Query.WaterSurfaceZCm = Query.Row.PositionCm.Z + DefaultWaterSurfaceLiftCm;
+        Query.WaterHalfWidthCm = FMath::Clamp(Query.Row.HalfWidthCm * 1.15f, 24000.0f, 38000.0f);
+        Query.bIsValid = true;
+        return Query;
+    }
+
+    int32 BestSegmentIndex = INDEX_NONE;
+    float BestSegmentT = 0.0f;
+    float BestDistanceSquared = TNumericLimits<float>::Max();
+    FVector2D BestTangent(1.0f, 0.0f);
+    FVector2D BestDelta = FVector2D::ZeroVector;
+    FVector BestPosition = Rows[0].PositionCm;
+
+    for (int32 Index = 0; Index + 1 < Rows.Num(); ++Index)
+    {
+        const FVector2D A(Rows[Index].PositionCm.X, Rows[Index].PositionCm.Y);
+        const FVector2D B(Rows[Index + 1].PositionCm.X, Rows[Index + 1].PositionCm.Y);
+        const FVector2D Segment = B - A;
+        const float SegmentLengthSquared = Segment.SizeSquared();
+        if (SegmentLengthSquared <= KINDA_SMALL_NUMBER)
+        {
+            continue;
+        }
+
+        const float T = FMath::Clamp(FVector2D::DotProduct(Position - A, Segment) / SegmentLengthSquared, 0.0f, 1.0f);
+        const FVector2D Closest = A + Segment * T;
+        const FVector2D Delta = Position - Closest;
+        const float DistanceSquared = Delta.SizeSquared();
         if (DistanceSquared < BestDistanceSquared)
         {
             BestDistanceSquared = DistanceSquared;
-            BestIndex = Index;
+            BestSegmentIndex = Index;
+            BestSegmentT = T;
+            BestTangent = Segment.GetSafeNormal();
+            if (BestTangent.IsNearlyZero())
+            {
+                BestTangent = FVector2D(1.0f, 0.0f);
+            }
+            BestDelta = Delta;
+            BestPosition = FMath::Lerp(Rows[Index].PositionCm, Rows[Index + 1].PositionCm, T);
         }
     }
 
-    if (BestIndex == INDEX_NONE)
+    if (BestSegmentIndex == INDEX_NONE)
     {
         return Query;
     }
 
-    Query.Row = Rows[BestIndex];
+    const FYarlungRiverRow& A = Rows[BestSegmentIndex];
+    const FYarlungRiverRow& B = Rows[BestSegmentIndex + 1];
+    Query.Row.DistanceCm = FMath::Lerp(A.DistanceCm, B.DistanceCm, static_cast<double>(BestSegmentT));
+    Query.Row.PositionCm = BestPosition;
+    Query.Row.HalfWidthCm = FMath::Lerp(A.HalfWidthCm, B.HalfWidthCm, BestSegmentT);
+    Query.Row.Flow = FMath::Lerp(A.Flow, B.Flow, BestSegmentT);
     Query.DistanceCm = FMath::Sqrt(BestDistanceSquared);
     Query.WaterSurfaceZCm = Query.Row.PositionCm.Z + DefaultWaterSurfaceLiftCm;
-    Query.WaterHalfWidthCm = FMath::Clamp(Query.Row.HalfWidthCm * 0.275f, 4500.0f, 8000.0f);
+    Query.WaterHalfWidthCm = FMath::Clamp(Query.Row.HalfWidthCm * 1.15f, 24000.0f, 38000.0f);
     Query.bIsValid = true;
 
-    const int32 PreviousIndex = FMath::Max(0, BestIndex - 1);
-    const int32 NextIndex = FMath::Min(Rows.Num() - 1, BestIndex + 1);
-    const FVector2D Previous(Rows[PreviousIndex].PositionCm.X, Rows[PreviousIndex].PositionCm.Y);
-    const FVector2D Next(Rows[NextIndex].PositionCm.X, Rows[NextIndex].PositionCm.Y);
-    const FVector2D Tangent = (Next - Previous).GetSafeNormal();
-    const FVector2D Right(-Tangent.Y, Tangent.X);
-    const FVector2D Delta = Position - FVector2D(Query.Row.PositionCm.X, Query.Row.PositionCm.Y);
-    Query.SignedDistanceCm = FVector2D::DotProduct(Delta, Right);
+    const FVector2D Right(-BestTangent.Y, BestTangent.X);
+    Query.SignedDistanceCm = FVector2D::DotProduct(BestDelta, Right);
     return Query;
 }
 

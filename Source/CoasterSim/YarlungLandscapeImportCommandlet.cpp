@@ -292,8 +292,8 @@ float CarveRiverChannelCm(
         return HeightCm;
     }
 
-    const float InnerBankCm = River.WaterHalfWidthCm + 1800.0f;
-    const float OuterBankCm = River.WaterHalfWidthCm + 26000.0f;
+    const float InnerBankCm = River.WaterHalfWidthCm + 3600.0f;
+    const float OuterBankCm = River.WaterHalfWidthCm + 36000.0f;
     if (River.DistanceCm >= OuterBankCm)
     {
         return HeightCm;
@@ -301,8 +301,8 @@ float CarveRiverChannelCm(
 
     const float BankT = YarlungTerrain::Smooth01((River.DistanceCm - InnerBankCm) / (OuterBankCm - InnerBankCm));
     const float CarveAlpha = 1.0f - BankT;
-    const float BankRiseCm = FMath::Max(0.0f, River.DistanceCm - River.WaterHalfWidthCm) * 0.46f;
-    const float TargetHeightCm = River.WaterSurfaceZCm - 240.0f + BankRiseCm;
+    const float BankRiseCm = FMath::Max(0.0f, River.DistanceCm - River.WaterHalfWidthCm) * 0.36f;
+    const float TargetHeightCm = River.WaterSurfaceZCm - 520.0f + BankRiseCm;
     const float CarvedHeightCm = FMath::Min(HeightCm, FMath::Lerp(HeightCm, TargetHeightCm, CarveAlpha));
     const float CarveCm = HeightCm - CarvedHeightCm;
     if (CarveCm > 1.0f)
@@ -621,12 +621,14 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Built Nanite Yarlung continuous canyon terrain: %s vertices=%d triangles=%d displaced_vertices=%d max_displacement_cm=%.1f nanite=%s"),
+        TEXT("Built Nanite Yarlung continuous canyon terrain: %s vertices=%d triangles=%d displaced_vertices=%d max_displacement_cm=%.1f river_carved_vertices=%d max_river_carve_cm=%.1f nanite=%s"),
         *StaticMesh->GetPathName(),
         VertexCount,
         (SampleCount - 1) * (SampleCount - 1) * 2,
         Stats.DisplacedVertexCount,
         Stats.MaxAbsDisplacementCm,
+        Stats.RiverCarvedVertexCount,
+        Stats.MaxRiverCarveCm,
         StaticMesh->IsNaniteEnabled() ? TEXT("true") : TEXT("false"));
     return StaticMesh;
 }

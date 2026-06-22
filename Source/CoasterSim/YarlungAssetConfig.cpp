@@ -141,14 +141,12 @@ FYarlungScatterKindConfig ParseScatterKind(const TSharedPtr<FJsonObject>& Object
 FYarlungAssetConfig LoadConfigFromDisk()
 {
     FYarlungAssetConfig Config;
-    const FString LocalPath = FPaths::ProjectDir() / TEXT("Config/yarlung-assets.local.json");
-    const FString DefaultPath = FPaths::ProjectDir() / TEXT("Config/yarlung-assets.json");
-    const FString Path = FPaths::FileExists(LocalPath) ? LocalPath : DefaultPath;
+    const FString Path = FPaths::ProjectDir() / TEXT("Config/yarlung-assets.json");
 
     FString Raw;
     if (!FFileHelper::LoadFileToString(Raw, *Path))
     {
-        FatalAssetConfigError(FString::Printf(TEXT("required config is missing: %s"), *DefaultPath));
+        FatalAssetConfigError(FString::Printf(TEXT("required config is missing: %s"), *Path));
         return Config;
     }
 
