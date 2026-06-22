@@ -355,9 +355,6 @@ FYarlungAssetConfig LoadConfigFromDisk()
     const TSharedPtr<FJsonObject> Water = RequiredObject(Root, TEXT("water"), Path);
     const FString WaterContext = FString::Printf(TEXT("%s water"), *Path);
     Config.Water.SurfaceMaterialPath = RequiredStringField(Water, TEXT("surface_material"), WaterContext);
-    Config.Water.WidthScale = RequiredNumberField(Water, TEXT("width_scale"), WaterContext);
-    Config.Water.MinWidthCm = RequiredNumberField(Water, TEXT("min_width_cm"), WaterContext);
-    Config.Water.MaxWidthCm = RequiredNumberField(Water, TEXT("max_width_cm"), WaterContext);
 
     if (Config.SceneryComponents.IsEmpty())
     {
@@ -366,10 +363,6 @@ FYarlungAssetConfig LoadConfigFromDisk()
     if (Config.Water.SurfaceMaterialPath.IsEmpty())
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s is missing water.surface_material"), *Path));
-    }
-    if (Config.Water.MinWidthCm <= 0.0f || Config.Water.MaxWidthCm < Config.Water.MinWidthCm)
-    {
-        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid water width bounds"), *Path));
     }
     if (Config.CanopyBelt.SampleStride <= 0 || Config.CanopyBelt.LateralBandsCm.IsEmpty() ||
         Config.CanopyBelt.NearOccupancy < 0.0f || Config.CanopyBelt.NearOccupancy > 1.0f ||

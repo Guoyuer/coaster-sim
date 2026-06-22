@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 
-// Yarlung terrain georeferencing + river layout. The numeric values live in a
+// Yarlung terrain georeferencing + encoded elevation range. The numeric values live in a
 // SINGLE source of truth — Config/yarlung-terrain.json — which BOTH this C++ code
 // (via Config()) and the Python asset pipeline (scripts/yarlung_config.py) read,
 // so the runtime mesh and the generated source height data can never silently
@@ -12,13 +12,6 @@
 // config that could generate plausible-looking but wrong terrain.
 namespace YarlungTerrain
 {
-struct FCenterlineTerm
-{
-    float AmpCm = 0.0f;
-    float Freq = 0.0f;
-    float Phase = 0.0f;
-};
-
 struct FConfig
 {
     int32 GridSize = 0;
@@ -28,11 +21,6 @@ struct FConfig
     float MaxYCm = 0.0f;
     float EncodedMinZCm = 0.0f;
     float EncodedMaxZCm = 0.0f;
-    float RiverAnchorXCm = 0.0f;
-    float RiverAnchorYCm = 0.0f;
-    float RiverZCm = 0.0f;
-    float RiverMaskHalfWidthCm = 0.0f;
-    TArray<FCenterlineTerm> RiverCenterlineTerms;
 };
 
 // Lazily loads + caches Config/yarlung-terrain.json on first call.
@@ -46,5 +34,4 @@ inline float Smooth01(float Value)
 
 float HeightValueToCm(uint16 Encoded);
 float NormalizeEncodedHeightCm(float HeightCm);
-float RiverCenterY(float X);
 }

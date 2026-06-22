@@ -142,6 +142,7 @@ bool FYarlungRiverWidthConstantsStayOrderedTest::RunTest(const FString& Paramete
         const float ChannelHalfWidth = FYarlungRiverField::CarvedChannelHalfWidthCm(RiverHalfWidthCm);
         const float VisibleHalfWidth = FYarlungRiverField::VisibleRibbonHalfWidthCm(RiverHalfWidthCm);
         TestTrue(TEXT("Visible water ribbon stays inside carved river channel"), VisibleHalfWidth < ChannelHalfWidth);
+        TestTrue(TEXT("River channel leaves a real bank shelf outside the visible water"), ChannelHalfWidth - VisibleHalfWidth >= 1500.0f);
     }
     return true;
 }

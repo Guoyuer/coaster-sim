@@ -57,31 +57,6 @@ FConfig LoadConfigFromDisk()
     Cfg.EncodedMinZCm = Height->GetNumberField(TEXT("min"));
     Cfg.EncodedMaxZCm = Height->GetNumberField(TEXT("max"));
 
-    const TSharedPtr<FJsonObject> River = RequiredObject(Root, TEXT("river"), Path);
-    Cfg.RiverAnchorXCm = River->GetNumberField(TEXT("anchor_x_cm"));
-    Cfg.RiverAnchorYCm = River->GetNumberField(TEXT("anchor_y_cm"));
-    Cfg.RiverZCm = River->GetNumberField(TEXT("z_cm"));
-    Cfg.RiverMaskHalfWidthCm = River->GetNumberField(TEXT("mask_half_width_cm"));
-
-    const TArray<TSharedPtr<FJsonValue>>* Terms = nullptr;
-    if (River->TryGetArrayField(TEXT("centerline_terms"), Terms) && Terms)
-    {
-        Cfg.RiverCenterlineTerms.Reset();
-        for (const TSharedPtr<FJsonValue>& Value : *Terms)
-        {
-            const TSharedPtr<FJsonObject> Term = Value->AsObject();
-            if (!Term.IsValid())
-            {
-                continue;
-            }
-            FCenterlineTerm Out;
-            Out.AmpCm = Term->GetNumberField(TEXT("amp_cm"));
-            Out.Freq = Term->GetNumberField(TEXT("freq"));
-            Out.Phase = Term->GetNumberField(TEXT("phase"));
-            Cfg.RiverCenterlineTerms.Add(Out);
-        }
-    }
-
     if (Cfg.GridSize <= 0)
     {
         FatalTerrainConfigError(FString::Printf(TEXT("%s has invalid grid_size=%d"), *Path, Cfg.GridSize));
@@ -94,11 +69,6 @@ FConfig LoadConfigFromDisk()
     {
         FatalTerrainConfigError(FString::Printf(TEXT("%s has invalid encoded_height_cm range"), *Path));
     }
-    if (Cfg.RiverCenterlineTerms.IsEmpty())
-    {
-        FatalTerrainConfigError(FString::Printf(TEXT("%s has no river.centerline_terms"), *Path));
-    }
-
     return Cfg;
 }
 } // namespace
@@ -121,15 +91,4 @@ float NormalizeEncodedHeightCm(float HeightCm)
     return FMath::Clamp((HeightCm - C.EncodedMinZCm) / (C.EncodedMaxZCm - C.EncodedMinZCm), 0.0f, 1.0f);
 }
 
-float RiverCenterY(float X)
-{
-    const FConfig& C = Config();
-    const float OffsetX = X - C.RiverAnchorXCm;
-    float Sum = C.RiverAnchorYCm;
-    for (const FCenterlineTerm& Term : C.RiverCenterlineTerms)
-    {
-        Sum += Term.AmpCm * FMath::Sin(OffsetX * Term.Freq + Term.Phase);
-    }
-    return Sum;
-}
 }

@@ -65,8 +65,8 @@ float CarveRiverChannelCm(
         return HeightCm;
     }
 
-    const float InnerBankCm = River.WaterHalfWidthCm + 1000.0f;
-    const float OuterBankCm = River.WaterHalfWidthCm + 12000.0f;
+    const float InnerBankCm = River.WaterHalfWidthCm + 4200.0f;
+    const float OuterBankCm = River.WaterHalfWidthCm + 32000.0f;
     if (River.DistanceCm >= OuterBankCm)
     {
         return HeightCm;
@@ -74,8 +74,11 @@ float CarveRiverChannelCm(
 
     const float BankT = YarlungTerrain::Smooth01((River.DistanceCm - InnerBankCm) / (OuterBankCm - InnerBankCm));
     const float CarveAlpha = 1.0f - BankT;
-    const float BankRiseCm = FMath::Max(0.0f, River.DistanceCm - River.WaterHalfWidthCm) * 0.90f;
-    const float TargetHeightCm = River.WaterSurfaceZCm - 80.0f + BankRiseCm;
+    const float ShoreOffsetCm = FMath::Max(0.0f, River.DistanceCm - River.WaterHalfWidthCm);
+    const float ImmediateBankRiseCm = YarlungTerrain::Smooth01(ShoreOffsetCm / 8500.0f) * 7800.0f;
+    const float OuterBankRiseCm = YarlungTerrain::Smooth01(ShoreOffsetCm / 32000.0f) * 18500.0f;
+    const float BankRiseCm = ImmediateBankRiseCm + OuterBankRiseCm;
+    const float TargetHeightCm = River.WaterSurfaceZCm - 1150.0f + BankRiseCm;
     const float CarvedHeightCm = FMath::Min(HeightCm, FMath::Lerp(HeightCm, TargetHeightCm, CarveAlpha));
     const float CarveCm = HeightCm - CarvedHeightCm;
     if (OutStats && CarveCm > 1.0f)

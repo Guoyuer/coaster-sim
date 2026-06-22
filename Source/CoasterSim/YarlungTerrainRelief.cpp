@@ -172,24 +172,6 @@ float ComputeReliefForRiverDistanceCm(
     return Displacement;
 }
 
-float ComputeReliefCm(
-    const FVector2D& Position,
-    float HeightCm,
-    const FVector& BaseNormal,
-    float TrackDistanceCm,
-    float ViewCorridorMask,
-    const FReliefConfig& Config)
-{
-    return ComputeReliefForRiverDistanceCm(
-        Position,
-        HeightCm,
-        BaseNormal,
-        TrackDistanceCm,
-        FMath::Abs(Position.Y - YarlungTerrain::RiverCenterY(Position.X)),
-        ViewCorridorMask,
-        Config);
-}
-
 FVector ApplyVerticalDisplacement(const FVector& BasePosition, float DisplacementCm)
 {
     return BasePosition + FVector::UpVector * DisplacementCm;

@@ -27,19 +27,12 @@ def main() -> int:
     results.append(_check("grid_size", c.SIZE, 1009, tol=0))
     results.append(_check("encoded_min", c.HEIGHT_MIN, 260000.0, tol=0))
     results.append(_check("encoded_max", c.HEIGHT_MAX, 730000.0, tol=0))
-    results.append(_check("river_anchor_x", c.RIVER_ANCHOR_X, 95543.0, tol=0))
-    results.append(_check("river_anchor_y", c.RIVER_ANCHOR_Y, -142330.0, tol=0))
-    results.append(_check("river_z", c.RIVER_Z, 265200.0, tol=0))
     results.append(_check("river_mask_half_width", c.RIVER_MASK_HALF_WIDTH_CM, 26000.0, tol=0))
     results.append(_check("min_x", c.MIN_X, -337778.4313411617))
     results.append(_check("max_x", c.MAX_X, 337778.4313411617))
     results.append(_check("min_y", c.MIN_Y, -416981.55087574443))
     results.append(_check("max_y", c.MAX_Y, 416981.55087574443))
 
-    # Golden formula outputs (shared with the C++ TerrainConfigParity test).
-    results.append(_check("river_center_y(0)", c.river_center_y(0.0), -154326.115832))
-    results.append(_check("river_center_y(100000)", c.river_center_y(100000.0), -135490.552264))
-    results.append(_check("river_center_y(-150000)", c.river_center_y(-150000.0), -147582.619633))
     results.append(_check("height_value_to_cm(32768)", c.height_value_to_cm(32768), 495003.585870))
 
     if all(results):

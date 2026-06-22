@@ -78,12 +78,18 @@ bool FYarlungRiverField::LoadGeneratedCsv(FString* OutError)
 
 float FYarlungRiverField::CarvedChannelHalfWidthCm(float RiverHalfWidthCm)
 {
-    return FMath::Clamp(RiverHalfWidthCm * ChannelHalfWidthScale, ChannelHalfWidthMinCm, ChannelHalfWidthMaxCm);
+    return FMath::Clamp(
+        RiverHalfWidthCm * ChannelHalfWidthFactor,
+        ChannelHalfWidthLowerBoundCm,
+        ChannelHalfWidthUpperBoundCm);
 }
 
 float FYarlungRiverField::VisibleRibbonHalfWidthCm(float RiverHalfWidthCm)
 {
-    return FMath::Clamp(RiverHalfWidthCm * VisibleRibbonHalfWidthScale, VisibleRibbonHalfWidthMinCm, VisibleRibbonHalfWidthMaxCm);
+    return FMath::Clamp(
+        RiverHalfWidthCm * VisibleRibbonHalfWidthFactor,
+        VisibleRibbonHalfWidthLowerBoundCm,
+        VisibleRibbonHalfWidthUpperBoundCm);
 }
 
 FYarlungRiverQuery FYarlungRiverField::QueryNearest(const FVector2D& Position) const

@@ -118,9 +118,6 @@ struct FYarlungSlopePatchBeltConfig
 struct FYarlungWaterConfig
 {
     FString SurfaceMaterialPath;
-    float WidthScale = 1.0f;
-    float MinWidthCm = 0.0f;
-    float MaxWidthCm = 0.0f;
 };
 
 struct FYarlungAssetConfig

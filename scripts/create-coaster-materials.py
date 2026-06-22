@@ -270,7 +270,7 @@ def create_yarlung_water_surface_material():
         -860,
         -180,
     )
-    vertex_color_gain = create_scalar_parameter(material, "VertexColorBlend", 0.90, -620, -20)
+    vertex_color_gain = create_scalar_parameter(material, "VertexColorBlend", 0.78, -620, -20)
     base_color_param = create_vector_parameter(
         material,
         "BaseColor",
@@ -298,19 +298,19 @@ def create_yarlung_water_surface_material():
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Roughness", 0.11, -500, -40),
+        create_scalar_parameter(material, "Roughness", 0.22, -500, -40),
         unreal.MaterialProperty.MP_ROUGHNESS,
         "yarlung water surface Roughness",
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Specular", 0.92, -500, 120),
+        create_scalar_parameter(material, "Specular", 0.58, -500, 120),
         unreal.MaterialProperty.MP_SPECULAR,
         "yarlung water surface Specular",
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Opacity", 0.62, -500, 280),
+        create_scalar_parameter(material, "Opacity", 0.86, -500, 280),
         unreal.MaterialProperty.MP_OPACITY,
         "yarlung water surface Opacity",
     )
@@ -323,7 +323,7 @@ def create_yarlung_water_surface_material():
     fresnel_tint = create_vector_parameter(
         material,
         "GrazingHighlight",
-        unreal.LinearColor(0.012, 0.034, 0.042, 1.0),
+        unreal.LinearColor(0.008, 0.024, 0.030, 1.0),
         -500,
         640,
     )

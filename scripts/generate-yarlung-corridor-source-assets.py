@@ -27,7 +27,6 @@ from yarlung_config import (
     MIN_Y,
     RIVER_MASK_HALF_WIDTH_CM,
     SIZE,
-    river_center_y,
     smooth01,
 )
 
@@ -120,7 +119,7 @@ def build_dem_river_guide(heights: list[float], search_radius: int = 70) -> list
 
 def guided_river_center_y(x: float, river_guide: list[float] | None) -> float:
     if not river_guide:
-        return river_center_y(x)
+        raise RuntimeError("DEM river guide is required; analytic river centerline fallback has been retired.")
     gx = max(0.0, min(SIZE - 1.0, world_x_to_grid(x)))
     x0 = int(math.floor(gx))
     x1 = min(SIZE - 1, x0 + 1)
@@ -147,7 +146,7 @@ def sample_height_from_grid(heights: list[float], x: float, y: float) -> float:
 
 def write_river_csv(path: Path, heights: list[float], river_guide: list[float] | None) -> None:
     if not river_guide:
-        return
+        raise RuntimeError("DEM river guide is required to write YarlungRiver.csv")
     path.parent.mkdir(parents=True, exist_ok=True)
     step = 4
     half_width_cm = 22000.0
@@ -556,9 +555,8 @@ def soften_ride_corridor_cliff_slope(
     }
 
 
-def forest_amount(x: float, y: float, height: float, river_y: float | None = None) -> float:
-    center_y = river_center_y(x) if river_y is None else river_y
-    lateral = abs(y - center_y)
+def forest_amount(x: float, y: float, height: float, river_y: float) -> float:
+    lateral = abs(y - river_y)
     range_cm = HEIGHT_MAX - HEIGHT_MIN
     forest_band = smooth01((lateral - 26000.0) / 65000.0) * (1.0 - smooth01((lateral - 520000.0) / 130000.0))
     forest_height = 1.0 - smooth01((height - (HEIGHT_MIN + range_cm * 0.45)) / (range_cm * 0.20))
@@ -566,13 +564,12 @@ def forest_amount(x: float, y: float, height: float, river_y: float | None = Non
     return max(0.0, min(1.0, forest_band * forest_height * smooth01((patch_noise - 0.18) / 0.42)))
 
 
-def masks(x: float, y: float, height: float, river_y: float | None = None) -> tuple[int, int, int, int]:
-    center_y = river_center_y(x) if river_y is None else river_y
-    lateral = abs(y - center_y)
+def masks(x: float, y: float, height: float, river_y: float) -> tuple[int, int, int, int]:
+    lateral = abs(y - river_y)
     h01 = height01(height)
     river = int(max(0.0, 1.0 - lateral / RIVER_MASK_HALF_WIDTH_CM) * 255.0)
     snow = int(smooth01((h01 - 0.72) / 0.10) * 255.0)
-    forest = int(forest_amount(x, y, height, center_y) * 255.0)
+    forest = int(forest_amount(x, y, height, river_y) * 255.0)
     rock = int(max(0.0, min(1.0, 0.24 + smooth01((h01 - 0.25) / 0.50) - forest / 390.0)) * 255.0)
     return rock, forest, snow, river
 
@@ -581,9 +578,8 @@ def lerp(a: float, b: float, t: float) -> float:
     return a + (b - a) * t
 
 
-def rgb_for_preview(x: float, y: float, height: float, river_y: float | None = None) -> tuple[int, int, int]:
-    center_y = river_center_y(x) if river_y is None else river_y
-    rock, forest, snow, river = masks(x, y, height, center_y)
+def rgb_for_preview(x: float, y: float, height: float, river_y: float) -> tuple[int, int, int]:
+    rock, forest, snow, river = masks(x, y, height, river_y)
     if river > 8:
         return 12, min(255, 88 + river // 3), min(255, 102 + river // 3)
     if snow > 24:
@@ -592,7 +588,7 @@ def rgb_for_preview(x: float, y: float, height: float, river_y: float | None = N
     if forest > 18:
         canopy = min(118, max(48, forest // 2 + 36))
         return 20, canopy, 34
-    if abs(y - center_y) < 150000.0:
+    if abs(y - river_y) < 150000.0:
         return 54, 76, 68
     shade = int(height01(height) * 70.0)
     grain = int(12.0 * math.sin(x * 0.013 + y * 0.017) + 8.0 * math.sin(x * 0.029 - y * 0.011))

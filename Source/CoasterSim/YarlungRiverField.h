@@ -28,13 +28,13 @@ struct FYarlungRiverQuery
 class FYarlungRiverField
 {
 public:
-    static constexpr float DefaultWaterSurfaceLiftCm = 20.0f;
-    static constexpr float ChannelHalfWidthScale = 0.38f;
-    static constexpr float ChannelHalfWidthMinCm = 4000.0f;
-    static constexpr float ChannelHalfWidthMaxCm = 9000.0f;
-    static constexpr float VisibleRibbonHalfWidthScale = 0.34f;
-    static constexpr float VisibleRibbonHalfWidthMinCm = 3600.0f;
-    static constexpr float VisibleRibbonHalfWidthMaxCm = 8200.0f;
+    static constexpr float DefaultWaterSurfaceLiftCm = -650.0f;
+    static constexpr float ChannelHalfWidthFactor = 0.52f;
+    static constexpr float ChannelHalfWidthLowerBoundCm = 7000.0f;
+    static constexpr float ChannelHalfWidthUpperBoundCm = 13000.0f;
+    static constexpr float VisibleRibbonHalfWidthFactor = 0.42f;
+    static constexpr float VisibleRibbonHalfWidthLowerBoundCm = 5200.0f;
+    static constexpr float VisibleRibbonHalfWidthUpperBoundCm = 10800.0f;
 
     static float CarvedChannelHalfWidthCm(float RiverHalfWidthCm);
     static float VisibleRibbonHalfWidthCm(float RiverHalfWidthCm);

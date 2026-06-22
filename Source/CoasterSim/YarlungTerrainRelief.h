@@ -52,13 +52,6 @@ struct FReliefConfig
     float NearTrackPositiveScale = 0.15f;
 };
 
-float ComputeReliefCm(
-    const FVector2D& Position,
-    float HeightCm,
-    const FVector& BaseNormal,
-    float TrackDistanceCm,
-    float ViewCorridorMask = 1.0f,
-    const FReliefConfig& Config = FReliefConfig());
 float ComputeReliefForRiverDistanceCm(
     const FVector2D& Position,
     float HeightCm,

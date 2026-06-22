@@ -430,10 +430,7 @@
     }
   },
   "water": {
-    "surface_material": "/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface",
-    "width_scale": 1.65,
-    "min_width_cm": 32000,
-    "max_width_cm": 52000
+    "surface_material": "/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface"
   },
   "terrain": {
     "surface": {

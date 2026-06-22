@@ -1,5 +1,4 @@
 #include "../YarlungTerrainRelief.h"
-#include "../YarlungTerrainProfile.h"
 
 #include "Misc/AutomationTest.h"
 
@@ -8,6 +7,7 @@
 namespace
 {
 const FVector SteepNormal = FVector(0.55f, 0.0f, 0.835f).GetSafeNormal();
+constexpr float FarRiverDistanceCm = 180000.0f;
 
 bool FindPositiveFarRelief(FVector2D& OutPosition, float& OutRelief)
 {
@@ -18,7 +18,12 @@ bool FindPositiveFarRelief(FVector2D& OutPosition, float& OutRelief)
             const FVector2D Position(
                 -260000.0f + static_cast<float>(XIndex) * 16000.0f,
                 90000.0f + static_cast<float>(YIndex) * 14000.0f);
-            const float Relief = YarlungTerrainRelief::ComputeReliefCm(Position, 380000.0f, SteepNormal, 60000.0f);
+            const float Relief = YarlungTerrainRelief::ComputeReliefForRiverDistanceCm(
+                Position,
+                380000.0f,
+                SteepNormal,
+                60000.0f,
+                FarRiverDistanceCm);
             if (Relief > 100.0f)
             {
                 OutPosition = Position;
@@ -39,8 +44,20 @@ bool FindViewCorridorSensitiveRelief(FVector2D& OutPosition, float& OutMaskedRel
             const FVector2D Position(
                 -240000.0f + static_cast<float>(XIndex) * 18000.0f,
                 120000.0f + static_cast<float>(YIndex) * 16000.0f);
-            const float Masked = YarlungTerrainRelief::ComputeReliefCm(Position, 410000.0f, SteepNormal, 60000.0f, 0.0f);
-            const float Open = YarlungTerrainRelief::ComputeReliefCm(Position, 410000.0f, SteepNormal, 60000.0f, 1.0f);
+            const float Masked = YarlungTerrainRelief::ComputeReliefForRiverDistanceCm(
+                Position,
+                410000.0f,
+                SteepNormal,
+                60000.0f,
+                FarRiverDistanceCm,
+                0.0f);
+            const float Open = YarlungTerrainRelief::ComputeReliefForRiverDistanceCm(
+                Position,
+                410000.0f,
+                SteepNormal,
+                60000.0f,
+                FarRiverDistanceCm,
+                1.0f);
             if (FMath::Abs(Open - Masked) > 50.0f)
             {
                 OutPosition = Position;
@@ -64,14 +81,23 @@ bool FYarlungTerrainReliefFlatAndRiverProtectionTest::RunTest(const FString& Par
     const FVector2D Upland(180000.0f, 210000.0f);
     TestEqual(
         TEXT("Flat ground receives no synthesized geometry relief"),
-        YarlungTerrainRelief::ComputeReliefCm(Upland, 360000.0f, FVector::UpVector, 60000.0f),
+        YarlungTerrainRelief::ComputeReliefForRiverDistanceCm(
+            Upland,
+            360000.0f,
+            FVector::UpVector,
+            60000.0f,
+            FarRiverDistanceCm),
         0.0f);
 
-    const float RiverX = 50000.0f;
-    const FVector2D RiverCenter(RiverX, YarlungTerrain::RiverCenterY(RiverX));
+    const FVector2D RiverCenter(50000.0f, -100000.0f);
     TestEqual(
-        TEXT("River centerline is protected from relief"),
-        YarlungTerrainRelief::ComputeReliefCm(RiverCenter, 270000.0f, SteepNormal, 60000.0f),
+        TEXT("River field distance protects the thalweg from relief"),
+        YarlungTerrainRelief::ComputeReliefForRiverDistanceCm(
+            RiverCenter,
+            270000.0f,
+            SteepNormal,
+            60000.0f,
+            0.0f),
         0.0f);
 
     return true;
@@ -92,7 +118,12 @@ bool FYarlungTerrainReliefNearTrackProtectionTest::RunTest(const FString& Parame
         return false;
     }
 
-    const float NearRelief = YarlungTerrainRelief::ComputeReliefCm(Position, 380000.0f, SteepNormal, 0.0f);
+    const float NearRelief = YarlungTerrainRelief::ComputeReliefForRiverDistanceCm(
+        Position,
+        380000.0f,
+        SteepNormal,
+        0.0f,
+        FarRiverDistanceCm);
     TestTrue(TEXT("Near-track positive relief is clamped down"), NearRelief <= FarRelief * 0.16f);
     TestTrue(TEXT("Near-track protection does not invert positive relief"), NearRelief >= 0.0f);
     return true;
@@ -115,8 +146,18 @@ bool FYarlungTerrainReliefDeterminismAndBoundsTest::RunTest(const FString& Param
         const FVector2D Position(
             -280000.0f + static_cast<float>((Index * 7919) % 560000),
             -360000.0f + static_cast<float>((Index * 3571) % 720000));
-        const float First = YarlungTerrainRelief::ComputeReliefCm(Position, 390000.0f, SteepNormal, 50000.0f);
-        const float Second = YarlungTerrainRelief::ComputeReliefCm(Position, 390000.0f, SteepNormal, 50000.0f);
+        const float First = YarlungTerrainRelief::ComputeReliefForRiverDistanceCm(
+            Position,
+            390000.0f,
+            SteepNormal,
+            50000.0f,
+            FarRiverDistanceCm);
+        const float Second = YarlungTerrainRelief::ComputeReliefForRiverDistanceCm(
+            Position,
+            390000.0f,
+            SteepNormal,
+            50000.0f,
+            FarRiverDistanceCm);
 
         TestTrue(TEXT("Relief is finite"), FMath::IsFinite(First));
         TestEqual(TEXT("Relief is deterministic"), First, Second);
