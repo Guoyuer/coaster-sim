@@ -110,15 +110,13 @@ bool SpawnYarlungWater(UWorld* World)
     UMaterialInterface* RiverSurfaceMaterial = LoadObject<UMaterialInterface>(nullptr, *WaterConfig.SurfaceMaterialPath);
     if (!RiverSurfaceMaterial)
     {
-        UE_LOG(LogTemp, Error, TEXT("Yarlung UE Water surface material not found: %s"), *WaterConfig.SurfaceMaterialPath);
-        return false;
+        UE_LOG(LogTemp, Fatal, TEXT("Yarlung UE Water surface material not found: %s"), *WaterConfig.SurfaceMaterialPath);
     }
 
     UMaterialInterface* RiverMaterial = LoadObject<UMaterialInterface>(nullptr, *WaterConfig.RiverMaterialPath);
     if (!RiverMaterial)
     {
-        UE_LOG(LogTemp, Error, TEXT("Yarlung UE Water river material not found: %s"), *WaterConfig.RiverMaterialPath);
-        return false;
+        UE_LOG(LogTemp, Fatal, TEXT("Yarlung UE Water river material not found: %s"), *WaterConfig.RiverMaterialPath);
     }
 
     RiverComponent->SetWaterMaterial(RiverMaterial);

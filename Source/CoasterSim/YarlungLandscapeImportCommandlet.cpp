@@ -428,8 +428,7 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
         TEXT("/Game/Generated/Materials/M_YarlungMeshTerrain.M_YarlungMeshTerrain"));
     if (!Material)
     {
-        UE_LOG(LogTemp, Error, TEXT("Missing required mesh terrain material: /Game/Generated/Materials/M_YarlungMeshTerrain.M_YarlungMeshTerrain"));
-        return nullptr;
+        UE_LOG(LogTemp, Fatal, TEXT("Missing required mesh terrain material: /Game/Generated/Materials/M_YarlungMeshTerrain.M_YarlungMeshTerrain"));
     }
 
     TArray<YarlungViewCorridor::FTrackPoint> TrackPoints;
@@ -659,8 +658,7 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
         *WaterConfig.SurfaceMaterialPath);
     if (!Material)
     {
-        UE_LOG(LogTemp, Error, TEXT("Missing required river surface material: %s"), *WaterConfig.SurfaceMaterialPath);
-        return nullptr;
+        UE_LOG(LogTemp, Fatal, TEXT("Missing required river surface material: %s"), *WaterConfig.SurfaceMaterialPath);
     }
 
     const TArray<FYarlungRiverRow>& Rows = RiverField.GetRows();

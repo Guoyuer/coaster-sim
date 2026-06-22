@@ -108,10 +108,10 @@ def length(a: tuple[float, float, float]) -> float:
     return math.sqrt(dot(a, a))
 
 
-def normalize(a: tuple[float, float, float], fallback: tuple[float, float, float]) -> tuple[float, float, float]:
+def normalize(a: tuple[float, float, float], default_vector: tuple[float, float, float]) -> tuple[float, float, float]:
     magnitude = length(a)
     if magnitude < 1.0e-6:
-        return fallback
+        return default_vector
     return a[0] / magnitude, a[1] / magnitude, a[2] / magnitude
 
 

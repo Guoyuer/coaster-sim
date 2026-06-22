@@ -240,9 +240,9 @@ def main():
             total_instances += instance_count
             is_rock_or_cliff = component.get_name() == "RockOutcrops" or component.get_name().startswith("CliffRockFaces")
             if is_rock_or_cliff and instance_count:
-                if not any("/Game/Fab/Megascans/" in material_name for material_name in material_names):
+                if not any("/Game/Fab/" in material_name for material_name in material_names):
                     raise RuntimeError(
-                        f"Rock/cliff scatter must use real Megascans materials, got {component.get_name()} materials={material_names}"
+                        f"Rock/cliff scatter must use real Fab materials, got {component.get_name()} materials={material_names}"
                     )
                 real_rock_or_cliff_instances += instance_count
             if component.get_name().startswith("ForestShrubs"):

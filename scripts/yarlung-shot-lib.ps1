@@ -67,3 +67,36 @@ function Assert-YarlungFreshNonEmptyFile {
         throw "Expected output is missing, stale, or empty: $Path"
     }
 }
+
+function Assert-YarlungNoRuntimeAssetSubstitution {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [Parameter(Mandatory = $true)][string]$Context
+    )
+
+    $FatalPatterns = @(
+        "Default Material will be used in game",
+        "missing usage flag",
+        "Failed to compile Material",
+        "LogMaterial: Error",
+        "Failed to load.*Yarlung",
+        "Unable to load Yarlung"
+    )
+    foreach ($Pattern in $FatalPatterns) {
+        if ($Text -match $Pattern) {
+            throw "$Context hit forbidden runtime asset substitution pattern '$Pattern'. Fix the asset/material setup instead of continuing."
+        }
+    }
+}
+
+function Assert-YarlungLogHasNoRuntimeAssetSubstitution {
+    param(
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [Parameter(Mandatory = $true)][string]$Context
+    )
+
+    if (-not (Test-Path -LiteralPath $LogPath)) {
+        throw "$Context did not produce expected log: $LogPath"
+    }
+    Assert-YarlungNoRuntimeAssetSubstitution -Text (Get-Content -LiteralPath $LogPath -Raw) -Context $Context
+}

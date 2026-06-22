@@ -12,6 +12,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "yarlung-shot-lib.ps1")
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Project = Join-Path $RepoRoot "CoasterSim.uproject"
@@ -86,6 +87,7 @@ function Invoke-UnrealChecked {
     if ($RequireSuccessSummary -and $Text -notmatch "Success - 0 error\(s\)") {
         throw "$FailureLabel did not report 'Success - 0 error(s)': $TargetLabel"
     }
+    Assert-YarlungNoRuntimeAssetSubstitution -Text $Text -Context "$FailureLabel $TargetLabel"
 }
 
 function Test-AllPathsExist {

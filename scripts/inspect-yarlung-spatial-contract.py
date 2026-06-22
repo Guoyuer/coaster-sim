@@ -42,10 +42,10 @@ def distance(a: tuple[float, float, float], b: tuple[float, float, float]) -> fl
     return math.sqrt(sum((a[i] - b[i]) ** 2 for i in range(3)))
 
 
-def normalize(v: tuple[float, float, float], fallback: tuple[float, float, float]) -> tuple[float, float, float]:
+def normalize(v: tuple[float, float, float], default_vector: tuple[float, float, float]) -> tuple[float, float, float]:
     length = math.sqrt(sum(x * x for x in v))
     if length < 1.0e-6:
-        return fallback
+        return default_vector
     return tuple(x / length for x in v)
 
 

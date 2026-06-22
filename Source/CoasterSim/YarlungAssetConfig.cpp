@@ -138,6 +138,25 @@ FYarlungScatterKindConfig ParseScatterKind(const TSharedPtr<FJsonObject>& Object
     return Config;
 }
 
+EYarlungSceneryPlacement ParsePlacement(const FString& Value, const FString& Context)
+{
+    if (Value.Equals(TEXT("scatter"), ESearchCase::IgnoreCase))
+    {
+        return EYarlungSceneryPlacement::Scatter;
+    }
+    if (Value.Equals(TEXT("canopy_belt"), ESearchCase::IgnoreCase))
+    {
+        return EYarlungSceneryPlacement::CanopyBelt;
+    }
+    if (Value.Equals(TEXT("cliff_belt"), ESearchCase::IgnoreCase))
+    {
+        return EYarlungSceneryPlacement::CliffBelt;
+    }
+
+    FatalAssetConfigError(FString::Printf(TEXT("%s has unknown placement '%s'"), *Context, *Value));
+    return EYarlungSceneryPlacement::Scatter;
+}
+
 FYarlungAssetConfig LoadConfigFromDisk()
 {
     FYarlungAssetConfig Config;
@@ -179,13 +198,13 @@ FYarlungAssetConfig LoadConfigFromDisk()
             Component.Name = RequiredStringField(ComponentObject, TEXT("name"), ComponentContext);
             Component.MeshPath = OptionalStringField(ComponentObject, TEXT("mesh"));
             Component.Kind = RequiredStringField(ComponentObject, TEXT("kind"), ComponentContext);
-            Component.Count = RequiredIntegerField(ComponentObject, TEXT("count"), FString::Printf(TEXT("%s component '%s'"), *Path, *Component.Name));
-            Component.Seed = RequiredNumberField(ComponentObject, TEXT("seed"), FString::Printf(TEXT("%s component '%s'"), *Path, *Component.Name));
-            Component.bUseCanopyBelt = ComponentObject->HasField(TEXT("canopy_belt_seed"));
-            Component.CanopyBeltSeed = Component.bUseCanopyBelt
-                ? RequiredNumberField(ComponentObject, TEXT("canopy_belt_seed"), FString::Printf(TEXT("%s component '%s'"), *Path, *Component.Name))
-                : 0.0f;
-            Component.bUseTint = OptionalColorArrayField(ComponentObject, TEXT("tint"), Component.Tint, FString::Printf(TEXT("%s component '%s'"), *Path, *Component.Name));
+            const FString PerComponentContext = FString::Printf(TEXT("%s component '%s'"), *Path, *Component.Name);
+            Component.Placement = ParsePlacement(RequiredStringField(ComponentObject, TEXT("placement"), PerComponentContext), PerComponentContext);
+            Component.Count = Component.Placement == EYarlungSceneryPlacement::Scatter
+                ? RequiredIntegerField(ComponentObject, TEXT("count"), PerComponentContext)
+                : 0;
+            Component.Seed = RequiredNumberField(ComponentObject, TEXT("seed"), PerComponentContext);
+            Component.bUseTint = OptionalColorArrayField(ComponentObject, TEXT("tint"), Component.Tint, PerComponentContext);
             if (Component.Name.IsEmpty())
             {
                 FatalAssetConfigError(FString::Printf(TEXT("%s has a scenery component without a name"), *Path));
@@ -198,7 +217,11 @@ FYarlungAssetConfig LoadConfigFromDisk()
             {
                 FatalAssetConfigError(FString::Printf(TEXT("%s component '%s' has negative count"), *Path, *Component.Name));
             }
-            if (Component.Count > 0 && Component.MeshPath.IsEmpty())
+            if (Component.Placement != EYarlungSceneryPlacement::Scatter && ComponentObject->HasField(TEXT("count")))
+            {
+                FatalAssetConfigError(FString::Printf(TEXT("%s component '%s' uses belt placement but still declares count"), *Path, *Component.Name));
+            }
+            if (Component.MeshPath.IsEmpty())
             {
                 FatalAssetConfigError(FString::Printf(TEXT("%s component '%s' is enabled but has no mesh path"), *Path, *Component.Name));
             }
@@ -243,6 +266,23 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.CanopyBelt.ScaleMax = RequiredNumberField(CanopyBelt, TEXT("scale_max"), CanopyBeltContext);
     Config.CanopyBelt.HeightOffsetCm = RequiredNumberField(CanopyBelt, TEXT("height_offset_cm"), CanopyBeltContext);
 
+    const TSharedPtr<FJsonObject> CliffBelt = RequiredObject(Scenery, TEXT("cliff_belt"), Path);
+    const FString CliffBeltContext = FString::Printf(TEXT("%s scenery.cliff_belt"), *Path);
+    Config.CliffBelt.SampleStride = RequiredIntegerField(CliffBelt, TEXT("sample_stride"), CliffBeltContext);
+    Config.CliffBelt.LateralBandsCm = RequiredNumberArrayField(CliffBelt, TEXT("lateral_bands_cm"), CliffBeltContext);
+    Config.CliffBelt.Occupancy = RequiredNumberField(CliffBelt, TEXT("occupancy"), CliffBeltContext);
+    Config.CliffBelt.RiverClearanceCm = RequiredNumberField(CliffBelt, TEXT("river_clearance_cm"), CliffBeltContext);
+    Config.CliffBelt.MinHeightCm = RequiredNumberField(CliffBelt, TEXT("min_height_cm"), CliffBeltContext);
+    Config.CliffBelt.MaxHeightCm = RequiredNumberField(CliffBelt, TEXT("max_height_cm"), CliffBeltContext);
+    Config.CliffBelt.MinSlope = RequiredNumberField(CliffBelt, TEXT("min_slope"), CliffBeltContext);
+    Config.CliffBelt.MaxSlope = RequiredNumberField(CliffBelt, TEXT("max_slope"), CliffBeltContext);
+    Config.CliffBelt.ScaleMin = RequiredNumberField(CliffBelt, TEXT("scale_min"), CliffBeltContext);
+    Config.CliffBelt.ScaleMax = RequiredNumberField(CliffBelt, TEXT("scale_max"), CliffBeltContext);
+    Config.CliffBelt.HeightOffsetCm = RequiredNumberField(CliffBelt, TEXT("height_offset_cm"), CliffBeltContext);
+    Config.CliffBelt.AlongJitterCm = RequiredNumberField(CliffBelt, TEXT("along_jitter_cm"), CliffBeltContext);
+    Config.CliffBelt.LateralJitterCm = RequiredNumberField(CliffBelt, TEXT("lateral_jitter_cm"), CliffBeltContext);
+    Config.CliffBelt.YawJitterDegrees = RequiredNumberField(CliffBelt, TEXT("yaw_jitter_degrees"), CliffBeltContext);
+
     const TSharedPtr<FJsonObject> Water = RequiredObject(Root, TEXT("water"), Path);
     const FString WaterContext = FString::Printf(TEXT("%s water"), *Path);
     Config.Water.RiverMaterialPath = RequiredStringField(Water, TEXT("river_material"), WaterContext);
@@ -277,6 +317,18 @@ FYarlungAssetConfig LoadConfigFromDisk()
     if (Config.Water.DefaultDepthCm <= 0.0f || Config.Water.ZoneRenderTargetResolution <= 0)
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has invalid water depth or render target resolution"), *Path));
+    }
+    if (Config.CanopyBelt.SampleStride <= 0 || Config.CanopyBelt.LateralBandsCm.IsEmpty() ||
+        Config.CanopyBelt.NearOccupancy < 0.0f || Config.CanopyBelt.NearOccupancy > 1.0f ||
+        Config.CanopyBelt.FarOccupancy < 0.0f || Config.CanopyBelt.FarOccupancy > 1.0f)
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.canopy_belt settings"), *Path));
+    }
+    if (Config.CliffBelt.SampleStride <= 0 || Config.CliffBelt.LateralBandsCm.IsEmpty() ||
+        Config.CliffBelt.Occupancy < 0.0f || Config.CliffBelt.Occupancy > 1.0f ||
+        Config.CliffBelt.ScaleMin <= 0.0f || Config.CliffBelt.ScaleMax < Config.CliffBelt.ScaleMin)
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.cliff_belt settings"), *Path));
     }
 
     UE_LOG(LogTemp, Display, TEXT("YarlungAssets: loaded %d scenery components, %d scatter kinds from %s"),

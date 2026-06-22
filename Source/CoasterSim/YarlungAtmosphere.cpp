@@ -50,19 +50,22 @@ void ConfigureCloudMaterial(UVolumetricCloudComponent* Clouds, UObject* Owner)
     {
         return;
     }
+    if (!Clouds->IsVisible())
+    {
+        UE_LOG(LogTemp, Display, TEXT("Yarlung volumetric clouds are disabled; no cloud material is loaded."));
+        return;
+    }
 
     UMaterialInterface* BaseMaterial = Clouds->GetMaterial();
     if (!BaseMaterial)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Yarlung volumetric clouds have no material; sky will render cloudless."));
-        return;
+        UE_LOG(LogTemp, Fatal, TEXT("Yarlung volumetric clouds are visible but have no explicit material. Assign a cloud material or disable clouds."));
     }
 
     UMaterialInstanceDynamic* CloudMID = UMaterialInstanceDynamic::Create(BaseMaterial, Owner);
     if (!CloudMID)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Unable to create dynamic Yarlung cloud material instance."));
-        return;
+        UE_LOG(LogTemp, Fatal, TEXT("Unable to create dynamic Yarlung cloud material instance from '%s'."), *BaseMaterial->GetPathName());
     }
 
     CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"), 0.02f);
@@ -121,10 +124,6 @@ void ConfigureComponents(
         VolumetricClouds->SetViewSampleCountScale(2.35f);
         VolumetricClouds->SetShadowViewSampleCountScale(0.80f);
         VolumetricClouds->SetGroundAlbedo(FColor(34, 54, 43));
-        if (UMaterialInterface* CloudMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/EngineSky/VolumetricClouds/m_SimpleVolumetricCloud_Inst.m_SimpleVolumetricCloud_Inst")))
-        {
-            VolumetricClouds->SetMaterial(CloudMaterial);
-        }
     }
 
     if (ValleyFog)

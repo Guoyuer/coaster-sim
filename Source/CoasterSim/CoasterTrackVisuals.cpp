@@ -28,15 +28,16 @@ void ApplyTint(UMeshComponent* Component, const FLinearColor& Color, float Metal
     }
 
     UMaterialInterface* TintMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
-    if (TintMaterial)
+    if (!TintMaterial)
     {
-        Component->SetMaterial(0, TintMaterial);
+        UE_LOG(LogTemp, Fatal, TEXT("Required track tint material is missing: /Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
     }
+    Component->SetMaterial(0, TintMaterial);
 
     UMaterialInstanceDynamic* Material = Component->CreateAndSetMaterialInstanceDynamic(0);
     if (!Material)
     {
-        return;
+        UE_LOG(LogTemp, Fatal, TEXT("Unable to create dynamic track material instance."));
     }
 
     Material->SetVectorParameterValue(TEXT("Color"), Color);
@@ -58,7 +59,7 @@ void ConfigureMeshes(
     UStaticMesh* CylinderMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
     if (!CylinderMesh)
     {
-        return;
+        UE_LOG(LogTemp, Fatal, TEXT("Required tube track mesh is missing: /Engine/BasicShapes/Cylinder.Cylinder"));
     }
 
     for (UInstancedStaticMeshComponent* Component : { LeftRail, RightRail, Ties, Supports })

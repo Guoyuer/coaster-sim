@@ -270,22 +270,60 @@ def enable_imported_material_usages():
     components (and Nanite cliffs) in a headless -game run, the engine has no editor
     auto-fix and swaps in the default grey material. Enable the flags on every Fab base
     material and Megaplant material so scanned PBR renders on scattered + Nanite instances."""
-    material_dirs = yarlung_asset_config()["scenery"].get("material_usage_roots", [])
     usage_names = ["MATUSAGE_INSTANCED_STATIC_MESHES", "MATUSAGE_NANITE"]
-    for material_dir in material_dirs:
-        if not unreal.EditorAssetLibrary.does_directory_exist(material_dir):
-            print(f"[IMPORTED-USAGE] no {material_dir} directory; skipping")
+    touched_materials = set()
+
+    def resolve_base_material(asset):
+        current = asset
+        seen = set()
+        while isinstance(current, unreal.MaterialInstance):
+            path = current.get_path_name()
+            if path in seen:
+                raise RuntimeError(f"Material instance parent cycle while enabling usage: {path}")
+            seen.add(path)
+            try:
+                current = current.get_editor_property("parent")
+            except Exception:
+                raise RuntimeError(f"Unable to read material instance parent: {path}")
+            if not current:
+                raise RuntimeError(f"Material instance has no parent: {path}")
+        return current if isinstance(current, unreal.Material) else None
+
+    def configured_material_interfaces():
+        for component in yarlung_asset_config()["scenery"]["components"]:
+            mesh_path = component.get("mesh")
+            name = component.get("name", "<unnamed>")
+            if not mesh_path:
+                raise RuntimeError(f"Configured scenery component has no mesh: {name}")
+            mesh = unreal.EditorAssetLibrary.load_asset(mesh_path)
+            if not mesh:
+                raise RuntimeError(f"Configured scenery mesh does not exist for {name}: {mesh_path}")
+            if not isinstance(mesh, unreal.StaticMesh):
+                raise RuntimeError(f"Configured scenery mesh is not a StaticMesh for {name}: {mesh_path}")
+
+            static_materials = mesh.get_editor_property("static_materials")
+            if not static_materials:
+                raise RuntimeError(f"Configured scenery mesh has no material slots for {name}: {mesh_path}")
+            for slot_index, static_material in enumerate(static_materials):
+                material = static_material.get_editor_property("material_interface")
+                if not material:
+                    raise RuntimeError(f"Configured scenery mesh has empty material slot {slot_index} for {name}: {mesh_path}")
+                yield material
+
+    for asset in configured_material_interfaces():
+        material = resolve_base_material(asset)
+        if not material:
+            raise RuntimeError(f"Unable to resolve base material for configured material: {asset.get_path_name()}")
+        material_path = material.get_path_name()
+        if material_path in touched_materials:
             continue
-        for path in unreal.EditorAssetLibrary.list_assets(material_dir, recursive=True, include_folder=False):
-            asset = unreal.EditorAssetLibrary.load_asset(path)
-            if not isinstance(asset, unreal.Material):
-                continue
-            for name in usage_names:
-                usage = getattr(unreal.MaterialUsage, name, None)
-                if usage is not None:
-                    unreal.MaterialEditingLibrary.set_base_material_usage(asset, usage, True)
-            unreal.EditorAssetLibrary.save_loaded_asset(asset)
-            print(f"[IMPORTED-USAGE] enabled instancing/nanite usage: {path}")
+        for name in usage_names:
+            usage = getattr(unreal.MaterialUsage, name, None)
+            if usage is not None:
+                unreal.MaterialEditingLibrary.set_base_material_usage(material, usage, True)
+        unreal.EditorAssetLibrary.save_loaded_asset(material)
+        touched_materials.add(material_path)
+        print(f"[IMPORTED-USAGE] enabled instancing/nanite usage: {material_path}")
 
 
 def main():

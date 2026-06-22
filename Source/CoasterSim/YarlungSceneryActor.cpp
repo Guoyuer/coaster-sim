@@ -76,6 +76,21 @@ AYarlungSceneryActor::AYarlungSceneryActor()
     CliffRockFacesB->SetCastShadow(true);
     CliffRockFacesB->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+    CliffRockFacesC = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesC"));
+    CliffRockFacesC->SetupAttachment(SceneRoot);
+    CliffRockFacesC->SetCastShadow(true);
+    CliffRockFacesC->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    CliffRockFacesD = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesD"));
+    CliffRockFacesD->SetupAttachment(SceneRoot);
+    CliffRockFacesD->SetCastShadow(true);
+    CliffRockFacesD->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    CliffRockFacesE = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesE"));
+    CliffRockFacesE->SetupAttachment(SceneRoot);
+    CliffRockFacesE->SetCastShadow(true);
+    CliffRockFacesE->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
     ForestShrubsA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ForestShrubsA"));
     ForestShrubsA->SetupAttachment(SceneRoot);
     ForestShrubsA->SetCastShadow(false);
@@ -121,6 +136,9 @@ void AYarlungSceneryActor::BeginPlay()
         UnderstoryClumps->SetVisibility(false, true);
         CliffRockFacesA->SetVisibility(false, true);
         CliffRockFacesB->SetVisibility(false, true);
+        CliffRockFacesC->SetVisibility(false, true);
+        CliffRockFacesD->SetVisibility(false, true);
+        CliffRockFacesE->SetVisibility(false, true);
         ForestShrubsA->SetVisibility(false, true);
         ForestShrubsB->SetVisibility(false, true);
         CanopyTreesA->SetVisibility(false, true);
@@ -153,8 +171,7 @@ void AYarlungSceneryActor::ConfigureMeshesFromAssets(const FYarlungAssetConfig& 
         UHierarchicalInstancedStaticMeshComponent* Component = ComponentByName(ComponentConfig.Name);
         if (!Component)
         {
-            UE_LOG(LogTemp, Warning, TEXT("Yarlung scenery asset config references unknown component: %s"), *ComponentConfig.Name);
-            continue;
+            UE_LOG(LogTemp, Fatal, TEXT("Yarlung scenery asset config references unknown component: %s"), *ComponentConfig.Name);
         }
 
         if (ComponentConfig.MeshPath.IsEmpty())
@@ -166,7 +183,7 @@ void AYarlungSceneryActor::ConfigureMeshesFromAssets(const FYarlungAssetConfig& 
         UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *ComponentConfig.MeshPath);
         if (!Mesh)
         {
-            UE_LOG(LogTemp, Warning, TEXT("Unable to load Yarlung scenery mesh for %s: %s"), *ComponentConfig.Name, *ComponentConfig.MeshPath);
+            UE_LOG(LogTemp, Fatal, TEXT("Unable to load Yarlung scenery mesh for %s: %s"), *ComponentConfig.Name, *ComponentConfig.MeshPath);
         }
         Component->SetStaticMesh(Mesh);
     }
@@ -178,6 +195,9 @@ UHierarchicalInstancedStaticMeshComponent* AYarlungSceneryActor::ComponentByName
     if (Name == TEXT("UnderstoryClumps")) { return UnderstoryClumps; }
     if (Name == TEXT("CliffRockFacesA")) { return CliffRockFacesA; }
     if (Name == TEXT("CliffRockFacesB")) { return CliffRockFacesB; }
+    if (Name == TEXT("CliffRockFacesC")) { return CliffRockFacesC; }
+    if (Name == TEXT("CliffRockFacesD")) { return CliffRockFacesD; }
+    if (Name == TEXT("CliffRockFacesE")) { return CliffRockFacesE; }
     if (Name == TEXT("ForestShrubsA")) { return ForestShrubsA; }
     if (Name == TEXT("ForestShrubsB")) { return ForestShrubsB; }
     if (Name == TEXT("CanopyTreesA")) { return CanopyTreesA; }
@@ -192,6 +212,9 @@ void AYarlungSceneryActor::ClearAllInstances()
     UnderstoryClumps->ClearInstances();
     CliffRockFacesA->ClearInstances();
     CliffRockFacesB->ClearInstances();
+    CliffRockFacesC->ClearInstances();
+    CliffRockFacesD->ClearInstances();
+    CliffRockFacesE->ClearInstances();
     ForestShrubsA->ClearInstances();
     ForestShrubsB->ClearInstances();
     CanopyTreesA->ClearInstances();
@@ -312,26 +335,40 @@ void AYarlungSceneryActor::BuildScatter(
     {
         UHierarchicalInstancedStaticMeshComponent* Component = ComponentByName(ComponentConfig.Name);
         const FYarlungScatterKindConfig* KindConfig = AssetConfig.ScatterKinds.Find(ComponentConfig.Kind);
-        if (!Component || !KindConfig)
+        if (!Component)
         {
-            continue;
+            UE_LOG(LogTemp, Fatal, TEXT("Yarlung scenery build has no component named %s"), *ComponentConfig.Name);
+        }
+        if (!KindConfig)
+        {
+            UE_LOG(LogTemp, Fatal, TEXT("Yarlung scenery component %s references unknown kind %s"), *ComponentConfig.Name, *ComponentConfig.Kind);
         }
 
-        AddScatterRule(Component, ComponentConfig, *KindConfig, TrackSamples, HeightData, RiverField);
-        if (ComponentConfig.bUseCanopyBelt)
+        switch (ComponentConfig.Placement)
         {
-            AddCanopyBelt(Component, AssetConfig.CanopyBelt, ComponentConfig.CanopyBeltSeed, TrackSamples, HeightData, RiverField);
+        case EYarlungSceneryPlacement::Scatter:
+            AddScatterRule(Component, ComponentConfig, *KindConfig, TrackSamples, HeightData, RiverField);
+            break;
+        case EYarlungSceneryPlacement::CanopyBelt:
+            AddCanopyBelt(Component, AssetConfig.CanopyBelt, ComponentConfig.Seed, TrackSamples, HeightData, RiverField);
+            break;
+        case EYarlungSceneryPlacement::CliffBelt:
+            AddCliffBelt(Component, AssetConfig.CliffBelt, ComponentConfig.Seed, TrackSamples, HeightData, RiverField);
+            break;
         }
     }
 
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Yarlung scatter instances: rocks=%d understory=%d cliff_a=%d cliff_b=%d shrubs_a=%d shrubs_b=%d canopy_a=%d canopy_b=%d canopy_c=%d"),
+        TEXT("Yarlung scatter instances: rocks=%d understory=%d cliff_a=%d cliff_b=%d cliff_c=%d cliff_d=%d cliff_e=%d shrubs_a=%d shrubs_b=%d canopy_a=%d canopy_b=%d canopy_c=%d"),
         RockOutcrops->GetInstanceCount(),
         UnderstoryClumps->GetInstanceCount(),
         CliffRockFacesA->GetInstanceCount(),
         CliffRockFacesB->GetInstanceCount(),
+        CliffRockFacesC->GetInstanceCount(),
+        CliffRockFacesD->GetInstanceCount(),
+        CliffRockFacesE->GetInstanceCount(),
         ForestShrubsA->GetInstanceCount(),
         ForestShrubsB->GetInstanceCount(),
         CanopyTreesA->GetInstanceCount(),
@@ -401,7 +438,9 @@ void AYarlungSceneryActor::AddScatterRule(
 
     for (int32 Index = 0; Index < ComponentConfig.Count; ++Index)
     {
-        const float AlongHash = Hash01(Index * 3.171f + Seed, bBoulder ? 17.0f : (bCliff ? 23.0f : (bCanopyTree ? 27.0f : 29.0f)));
+        const float AlongHash = bCliff
+            ? FMath::Frac((Index + Hash01(Index * 3.171f + Seed, 23.0f) * 0.42f) / FMath::Max(1.0f, static_cast<float>(ComponentConfig.Count)))
+            : Hash01(Index * 3.171f + Seed, bBoulder ? 17.0f : (bCanopyTree ? 27.0f : 29.0f));
         const int32 SampleIndex = FMath::Clamp(
             FMath::FloorToInt(AlongHash * static_cast<float>(TrackSamples.Num() - 1)),
             0,
@@ -413,11 +452,18 @@ void AYarlungSceneryActor::AddScatterRule(
         const FVector Forward = HorizontalForward(TrackSamples, SampleIndex);
         const FVector Right = RightFromForward(Forward);
 
-        const float Side = Hash01(Index * 5.991f + Seed, 3.0f) < KindConfig.SideBias ? 1.0f : -1.0f;
+        const float Side = bCliff
+            ? (((Index + FMath::FloorToInt(Seed)) % 2) == 0 ? 1.0f : -1.0f)
+            : (Hash01(Index * 5.991f + Seed, 3.0f) < KindConfig.SideBias ? 1.0f : -1.0f);
         const float DistanceHash = Hash01(Index * 1.731f + Seed, bBoulder ? 41.0f : (bCliff ? 47.0f : (bCanopyTree ? 49.0f : 53.0f)));
-        const float DistanceT = FMath::Pow(DistanceHash, KindConfig.DistancePower);
+        const float CliffBand = bCliff ? (static_cast<float>((Index / 2) % 5) + 0.20f + 0.42f * DistanceHash) / 5.0f : 0.0f;
+        const float DistanceT = bCliff
+            ? FMath::Clamp(CliffBand, 0.0f, 1.0f)
+            : FMath::Pow(DistanceHash, KindConfig.DistancePower);
         const float LateralCm = FMath::Lerp(KindConfig.MinLateralCm, KindConfig.MaxLateralCm, DistanceT);
-        const float AlongJitterCm = FMath::Lerp(-2400.0f, 2400.0f, Hash01(Index * 2.117f + Seed, 71.0f));
+        const float AlongJitterCm = bCliff
+            ? FMath::Lerp(-1300.0f, 1300.0f, Hash01(Index * 2.117f + Seed, 71.0f))
+            : FMath::Lerp(-2400.0f, 2400.0f, Hash01(Index * 2.117f + Seed, 71.0f));
         const FVector Location2D = Center + Forward * AlongJitterCm + Right * Side * LateralCm;
         const float SignedOffsetCm = Side * LateralCm;
 
@@ -529,6 +575,76 @@ void AYarlungSceneryActor::AddCanopyBelt(
     }
 }
 
+void AYarlungSceneryActor::AddCliffBelt(
+    UHierarchicalInstancedStaticMeshComponent* Component,
+    const FYarlungCliffBeltConfig& Belt,
+    float Seed,
+    const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+    const TArray<uint16>& HeightData,
+    const FYarlungRiverField& RiverField)
+{
+    if (!Component || !Component->GetStaticMesh())
+    {
+        return;
+    }
+
+    for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Belt.SampleStride))
+    {
+        const FYarlungSceneryTrackSample& A = TrackSamples[SampleIndex];
+        const FYarlungSceneryTrackSample& B = TrackSamples[SampleIndex + 1];
+        const FVector Center = (A.Position + B.Position) * 0.5f;
+        const FVector Forward = HorizontalForward(TrackSamples, SampleIndex);
+        const FVector Right = RightFromForward(Forward);
+
+        for (float Side : { -1.0f, 1.0f })
+        {
+            for (int32 BandIndex = 0; BandIndex < Belt.LateralBandsCm.Num(); ++BandIndex)
+            {
+                const float Keep = Hash01(SampleIndex * 1.271f + BandIndex * 8.991f + Seed, Side > 0.0f ? 5.13f : 7.67f);
+                if (Keep > Belt.Occupancy)
+                {
+                    continue;
+                }
+
+                const float AlongJitterCm = FMath::Lerp(-Belt.AlongJitterCm, Belt.AlongJitterCm, Hash01(SampleIndex * 2.381f + BandIndex + Seed, 11.0f));
+                const float LateralJitterCm = FMath::Lerp(-Belt.LateralJitterCm, Belt.LateralJitterCm, Hash01(SampleIndex * 4.619f + BandIndex + Seed, 17.0f));
+                const float LateralCm = FMath::Max(0.0f, Belt.LateralBandsCm[BandIndex] + LateralJitterCm);
+                const float SignedOffsetCm = Side * LateralCm;
+                const FVector Location2D = Center + Forward * AlongJitterCm + Right * SignedOffsetCm;
+
+                float Height = 0.0f;
+                FVector Normal = FVector::UpVector;
+                if (!TryResolvePlacement(
+                    HeightData,
+                    RiverField,
+                    Center,
+                    Location2D,
+                    SignedOffsetCm,
+                    Belt.RiverClearanceCm,
+                    Belt.MinHeightCm,
+                    Belt.MaxHeightCm,
+                    Belt.MinSlope,
+                    Belt.MaxSlope,
+                    Height,
+                    Normal))
+                {
+                    continue;
+                }
+
+                const float FaceInwardYaw = FMath::RadiansToDegrees(FMath::Atan2((-Side * Right).Y, (-Side * Right).X));
+                const float Yaw = FaceInwardYaw + FMath::Lerp(-Belt.YawJitterDegrees, Belt.YawJitterDegrees, Hash01(SampleIndex * 3.017f + BandIndex + Seed, 23.0f));
+                const float ScaleBase = FMath::Lerp(Belt.ScaleMin, Belt.ScaleMax, Hash01(SampleIndex * 6.971f + BandIndex + Seed, 31.0f));
+                const FVector Scale(
+                    ScaleBase * FMath::Lerp(0.95f, 2.15f, Hash01(SampleIndex * 7.0f + BandIndex + Seed, 41.0f)),
+                    ScaleBase * FMath::Lerp(0.42f, 0.92f, Hash01(SampleIndex * 9.0f + BandIndex + Seed, 43.0f)),
+                    ScaleBase * FMath::Lerp(0.85f, 1.65f, Hash01(SampleIndex * 5.0f + BandIndex + Seed, 47.0f)));
+                const FVector Location(Location2D.X, Location2D.Y, Height + Belt.HeightOffsetCm);
+                Component->AddInstance(FTransform(SurfaceAlignedRotation(Normal, Yaw), Location, Scale));
+            }
+        }
+    }
+}
+
 void AYarlungSceneryActor::ApplyMaterials(const FYarlungAssetConfig& AssetConfig)
 {
     UMaterialInterface* TintMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
@@ -536,7 +652,7 @@ void AYarlungSceneryActor::ApplyMaterials(const FYarlungAssetConfig& AssetConfig
     {
         if (!Component || !TintMaterial)
         {
-            return;
+            UE_LOG(LogTemp, Fatal, TEXT("Yarlung tint material setup failed for scenery component."));
         }
 
         Component->SetMaterial(0, TintMaterial);

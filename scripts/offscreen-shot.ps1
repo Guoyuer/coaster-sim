@@ -28,9 +28,26 @@ $BuildBat = "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.ba
 $EditorCommonArgs = @("-DDC-ForceMemoryCache")
 $OutputDir = Join-Path $RepoRoot "Saved\OffscreenShots"
 $LogPath = Join-Path $RepoRoot "Saved\Logs\offscreen-shot.log"
+$StdoutPath = Join-Path $RepoRoot "Saved\Logs\offscreen-shot.stdout.log"
+$StderrPath = Join-Path $RepoRoot "Saved\Logs\offscreen-shot.stderr.log"
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $LogPath) | Out-Null
+
+function Assert-OffscreenRunNoAssetSubstitution {
+    param([Parameter(Mandatory = $true)][string]$Context)
+
+    $TextParts = @()
+    foreach ($Path in @($LogPath, $StdoutPath, $StderrPath)) {
+        if (Test-Path -LiteralPath $Path) {
+            $TextParts += Get-Content -LiteralPath $Path -Raw
+        }
+    }
+    if ($TextParts.Count -eq 0) {
+        throw "$Context produced no readable UE log/stdout/stderr files."
+    }
+    Assert-YarlungNoRuntimeAssetSubstitution -Text ($TextParts -join [Environment]::NewLine) -Context $Context
+}
 
 if ($Build) {
     & $BuildBat CoasterSimEditor Win64 Development "-Project=$Project" -WaitMutex -NoHotReloadFromIDE
@@ -40,6 +57,7 @@ if ($Build) {
 }
 
 $RunStartedAt = Get-Date
+Remove-Item -LiteralPath $LogPath, $StdoutPath, $StderrPath -Force -ErrorAction SilentlyContinue
 
 $BatchSeconds = Convert-YarlungToSecondList -Values $BatchJumpSeconds -ParameterName "BatchJumpSeconds" -AllowEmpty
 if ($BatchSeconds.Count -gt 0) {
@@ -89,7 +107,7 @@ if ($BatchSeconds.Count -gt 0) {
     $BatchArgs += $ExtraArgs
     $BatchArgs = Convert-YarlungToFlatArgumentList -Items $BatchArgs
 
-    $Process = Start-Process -FilePath $EditorCmd -ArgumentList $BatchArgs -WorkingDirectory $RepoRoot -PassThru -NoNewWindow
+    $Process = Start-Process -FilePath $EditorCmd -ArgumentList $BatchArgs -WorkingDirectory $RepoRoot -PassThru -RedirectStandardOutput $StdoutPath -RedirectStandardError $StderrPath
     if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
         Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
         throw "Batch offscreen screenshot timed out after $TimeoutSeconds seconds. See $LogPath"
@@ -98,6 +116,7 @@ if ($BatchSeconds.Count -gt 0) {
     if ($null -ne $Process.ExitCode -and $Process.ExitCode -ne 0) {
         throw "Batch offscreen screenshot failed with exit code $($Process.ExitCode). See $LogPath"
     }
+    Assert-OffscreenRunNoAssetSubstitution -Context "Batch offscreen screenshot"
 
     $Missing = @()
     foreach ($Expected in $ExpectedOutputs) {
@@ -174,7 +193,7 @@ if ($CaptureMode -eq "MovieFrames") {
 }
 
 $Args = Convert-YarlungToFlatArgumentList -Items $Args
-$Process = Start-Process -FilePath $EditorCmd -ArgumentList $Args -WorkingDirectory $RepoRoot -PassThru -NoNewWindow
+$Process = Start-Process -FilePath $EditorCmd -ArgumentList $Args -WorkingDirectory $RepoRoot -PassThru -RedirectStandardOutput $StdoutPath -RedirectStandardError $StderrPath
 if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
     Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
     throw "Offscreen screenshot timed out after $TimeoutSeconds seconds. See $LogPath"
@@ -183,6 +202,7 @@ $Process.Refresh()
 if ($null -ne $Process.ExitCode -and $Process.ExitCode -ne 0) {
     throw "Offscreen screenshot failed with exit code $($Process.ExitCode). See $LogPath"
 }
+Assert-OffscreenRunNoAssetSubstitution -Context "Offscreen screenshot"
 
 $NewImages = Get-ChildItem -Path $RepoRoot -Recurse -File -Include *.png -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -like "*\Saved\*" -and -not $Before.ContainsKey($_.FullName) } |

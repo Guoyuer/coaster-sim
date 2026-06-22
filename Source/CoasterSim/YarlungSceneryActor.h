@@ -7,6 +7,7 @@
 class UHierarchicalInstancedStaticMeshComponent;
 struct FYarlungAssetConfig;
 struct FYarlungCanopyBeltConfig;
+struct FYarlungCliffBeltConfig;
 struct FYarlungSceneryComponentConfig;
 struct FYarlungScatterKindConfig;
 
@@ -45,6 +46,15 @@ private:
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesB;
+
+    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
+    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesC;
+
+    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
+    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesD;
+
+    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
+    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesE;
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ForestShrubsA;
@@ -99,6 +109,13 @@ private:
     void AddCanopyBelt(
         UHierarchicalInstancedStaticMeshComponent* Component,
         const FYarlungCanopyBeltConfig& BeltConfig,
+        float Seed,
+        const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<uint16>& HeightData,
+        const class FYarlungRiverField& RiverField);
+    void AddCliffBelt(
+        UHierarchicalInstancedStaticMeshComponent* Component,
+        const FYarlungCliffBeltConfig& BeltConfig,
         float Seed,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
         const TArray<uint16>& HeightData,

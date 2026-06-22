@@ -2,6 +2,13 @@
 
 #include "CoreMinimal.h"
 
+enum class EYarlungSceneryPlacement : uint8
+{
+    Scatter,
+    CanopyBelt,
+    CliffBelt
+};
+
 struct FYarlungScatterKindConfig
 {
     float SideBias = 0.0f;
@@ -24,10 +31,9 @@ struct FYarlungSceneryComponentConfig
     FString Name;
     FString MeshPath;
     FString Kind;
+    EYarlungSceneryPlacement Placement = EYarlungSceneryPlacement::Scatter;
     int32 Count = 0;
     float Seed = 0.0f;
-    bool bUseCanopyBelt = false;
-    float CanopyBeltSeed = 0.0f;
     bool bUseTint = false;
     FLinearColor Tint = FLinearColor::White;
 };
@@ -46,6 +52,24 @@ struct FYarlungCanopyBeltConfig
     float ScaleMin = 1.0f;
     float ScaleMax = 1.0f;
     float HeightOffsetCm = 0.0f;
+};
+
+struct FYarlungCliffBeltConfig
+{
+    int32 SampleStride = 2;
+    TArray<float> LateralBandsCm;
+    float Occupancy = 0.0f;
+    float RiverClearanceCm = 0.0f;
+    float MinHeightCm = 0.0f;
+    float MaxHeightCm = 0.0f;
+    float MinSlope = 0.0f;
+    float MaxSlope = 1.0f;
+    float ScaleMin = 1.0f;
+    float ScaleMax = 1.0f;
+    float HeightOffsetCm = 0.0f;
+    float AlongJitterCm = 0.0f;
+    float LateralJitterCm = 0.0f;
+    float YawJitterDegrees = 0.0f;
 };
 
 struct FYarlungWaterConfig
@@ -69,6 +93,7 @@ struct FYarlungAssetConfig
     TArray<FYarlungSceneryComponentConfig> SceneryComponents;
     TMap<FString, FYarlungScatterKindConfig> ScatterKinds;
     FYarlungCanopyBeltConfig CanopyBelt;
+    FYarlungCliffBeltConfig CliffBelt;
     FYarlungWaterConfig Water;
 };
 
