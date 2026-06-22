@@ -266,7 +266,7 @@
         "scale_min": 2.1,
         "scale_max": 5.8,
         "height_offset_cm": 28.0,
-        "align_to_surface": false
+        "align_to_surface": true
       },
       "slope_forest_patch": {
         "side_bias": 0.5,

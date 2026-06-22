@@ -800,11 +800,14 @@ void AYarlungSceneryActor::AddSlopePatchBelt(
                     FMath::Max(Belt.ScaleMin, KindConfig.ScaleMin),
                     FMath::Min(Belt.ScaleMax, KindConfig.ScaleMax),
                     Hash01(SampleIndex * 5.771f + BandIndex + Seed, 149.0f));
+                // Strata-block proportions (~3:1 max), not the old ~9:1 plank that
+                // read as fallen timber. Width/height stay chunky so the surface-
+                // aligned slab beds into the slope instead of floating end-up.
                 const FVector Scale = bRockWall
                     ? FVector(
-                        ScaleBase * FMath::Lerp(1.35f, 2.80f, Hash01(SampleIndex * 7.0f + BandIndex + Seed, 151.0f)),
-                        ScaleBase * FMath::Lerp(0.30f, 0.62f, Hash01(SampleIndex * 9.0f + BandIndex + Seed, 157.0f)),
-                        ScaleBase * FMath::Lerp(0.55f, 1.10f, Hash01(SampleIndex * 11.0f + BandIndex + Seed, 163.0f)))
+                        ScaleBase * FMath::Lerp(1.15f, 1.95f, Hash01(SampleIndex * 7.0f + BandIndex + Seed, 151.0f)),
+                        ScaleBase * FMath::Lerp(0.62f, 0.98f, Hash01(SampleIndex * 9.0f + BandIndex + Seed, 157.0f)),
+                        ScaleBase * FMath::Lerp(0.72f, 1.25f, Hash01(SampleIndex * 11.0f + BandIndex + Seed, 163.0f)))
                     : (bForest
                         ? FVector(
                             ScaleBase * FMath::Lerp(0.72f, 1.18f, Hash01(SampleIndex * 7.0f + BandIndex + Seed, 151.0f)),
