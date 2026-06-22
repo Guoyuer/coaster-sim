@@ -129,80 +129,14 @@ def main():
         raise RuntimeError(f"Legacy procedural YarlungRiverActor still present: {len(legacy_river_actors)}")
 
     water_zone_actors = [actor for actor in actors if actor.get_class().get_name().startswith("WaterZone")]
-    if len(water_zone_actors) != 1:
-        raise RuntimeError(f"Expected exactly one UE WaterZone, found {len(water_zone_actors)}")
-    for actor in water_zone_actors:
-        emit(f"[YARLUNG-INSPECT] water_zone={actor.get_actor_label()} class={actor.get_class().get_name()}")
+    if water_zone_actors:
+        labels = [actor.get_actor_label() for actor in water_zone_actors]
+        raise RuntimeError(f"UE WaterZone actors are no longer allowed in Yarlung map: {labels}")
 
     ue_river_actors = [actor for actor in actors if actor.get_class().get_name().startswith("WaterBodyRiver")]
-    if len(ue_river_actors) != 1:
-        raise RuntimeError(f"Expected exactly one UE WaterBodyRiver, found {len(ue_river_actors)}")
-    for actor in ue_river_actors:
-        emit(f"[YARLUNG-INSPECT] ue_water_river={actor.get_actor_label()} class={actor.get_class().get_name()}")
-        components = actor.get_components_by_class(unreal.ActorComponent)
-        component_names = {component.get_name() for component in components}
-        if not any("WaterBody" in name for name in component_names):
-            raise RuntimeError(f"UE Water river has no WaterBody component: {sorted(component_names)}")
-        if not any("Spline" in name for name in component_names):
-            raise RuntimeError(f"UE Water river has no spline component: {sorted(component_names)}")
-        uses_static_spline_rendering = False
-        has_water_material = False
-        gate_only_water = False
-        water_body_components = [component for component in components if component.get_class().get_name().startswith("WaterBodyRiverComponent")]
-        for component in water_body_components:
-            mesh_override = component.get_water_mesh_override() if hasattr(component, "get_water_mesh_override") else None
-            water_material = component.get_water_material() if hasattr(component, "get_water_material") else None
-            static_mesh_material = component.get_water_static_mesh_material() if hasattr(component, "get_water_static_mesh_material") else None
-            component_hidden = editor_bool(component, "hidden_in_game")
-            component_visible = editor_bool(component, "visible")
-            uses_static_spline_rendering = uses_static_spline_rendering or bool(mesh_override)
-            has_water_material = has_water_material or bool(water_material)
-            gate_only_water = gate_only_water or bool(component_hidden) or component_visible is False
-            emit(
-                f"[YARLUNG-INSPECT] ue_water_component={component.get_name()} "
-                f"mesh_override={object_path(mesh_override)} water_material={object_path(water_material)} "
-                f"static_mesh_material={object_path(static_mesh_material)} "
-                f"hidden={component_hidden} visible={component_visible}"
-            )
-        if not has_water_material:
-            raise RuntimeError("UE Water river has no water material")
-        render_mode = "gate_only" if gate_only_water else ("static_spline_mesh" if uses_static_spline_rendering else "water_zone_mesh")
-        emit(f"[YARLUNG-INSPECT] ue_water_render_mode={render_mode}")
-        spline_mesh_count = 0
-        visible_spline_mesh_count = 0
-        visible_info_mesh_count = 0
-        sample_water_meshes = []
-        for component in actor.get_components_by_class(unreal.MeshComponent):
-            material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
-            hidden = component.get_editor_property("hidden_in_game")
-            editor_visible = editor_bool(component, "visible")
-            component_class = component.get_class().get_name()
-            if component_class == "WaterBodyInfoMeshComponent" and not hidden and editor_visible:
-                visible_info_mesh_count += 1
-            if component_class == "SplineMeshComponent" or component.get_name().startswith("SplineMeshComponent"):
-                spline_mesh_count += 1
-                if not hidden:
-                    visible_spline_mesh_count += 1
-                if len(sample_water_meshes) < 4:
-                    sample_water_meshes.append(
-                        f"{component.get_name()} hidden={hidden} visible={editor_visible} materials={material_names}"
-                    )
-            elif len(sample_water_meshes) < 4:
-                sample_water_meshes.append(
-                    f"{component.get_name()} class={component_class} hidden={hidden} visible={editor_visible} materials={material_names}"
-                )
-        if spline_mesh_count <= 0:
-            raise RuntimeError("UE Water river has no spline mesh renderables")
-        emit(
-            f"[YARLUNG-INSPECT] ue_water_spline_meshes={spline_mesh_count} "
-            f"visible={visible_spline_mesh_count} info_visible={visible_info_mesh_count} samples={sample_water_meshes}"
-        )
-        if gate_only_water:
-            emit("[YARLUNG-INSPECT] ue_water_gate_only=true explicit_river_surface_required=true")
-        elif uses_static_spline_rendering and visible_spline_mesh_count <= 0:
-            raise RuntimeError(f"UE Water river spline meshes are all hidden: count={spline_mesh_count}")
-        elif not uses_static_spline_rendering and visible_info_mesh_count <= 0:
-            raise RuntimeError("UE WaterZone render path has no visible water info mesh")
+    if ue_river_actors:
+        labels = [actor.get_actor_label() for actor in ue_river_actors]
+        raise RuntimeError(f"UE WaterBodyRiver actors are no longer allowed in Yarlung map: {labels}")
 
     river_surface_actors = [actor for actor in actors if actor.get_actor_label() == "YarlungRiverSurface"]
     if len(river_surface_actors) != 1:

@@ -287,26 +287,14 @@ FYarlungAssetConfig LoadConfigFromDisk()
 
     const TSharedPtr<FJsonObject> Water = RequiredObject(Root, TEXT("water"), Path);
     const FString WaterContext = FString::Printf(TEXT("%s water"), *Path);
-    Config.Water.RiverMaterialPath = RequiredStringField(Water, TEXT("river_material"), WaterContext);
     Config.Water.SurfaceMaterialPath = RequiredStringField(Water, TEXT("surface_material"), WaterContext);
-    Config.Water.ZoneRenderTargetResolution = RequiredIntegerField(Water, TEXT("zone_render_target_resolution"), WaterContext);
-    Config.Water.ZoneExtentScale = RequiredNumberField(Water, TEXT("zone_extent_scale"), WaterContext);
-    Config.Water.DefaultDepthCm = RequiredNumberField(Water, TEXT("default_depth_cm"), WaterContext);
-    Config.Water.BaseVelocityCmPerSec = RequiredNumberField(Water, TEXT("base_velocity_cm_per_sec"), WaterContext);
-    Config.Water.FlowVelocityJitterCmPerSec = RequiredNumberField(Water, TEXT("flow_velocity_jitter_cm_per_sec"), WaterContext);
     Config.Water.WidthScale = RequiredNumberField(Water, TEXT("width_scale"), WaterContext);
     Config.Water.MinWidthCm = RequiredNumberField(Water, TEXT("min_width_cm"), WaterContext);
     Config.Water.MaxWidthCm = RequiredNumberField(Water, TEXT("max_width_cm"), WaterContext);
-    Config.Water.ShapeDilation = RequiredNumberField(Water, TEXT("shape_dilation"), WaterContext);
-    Config.Water.AudioIntensity = RequiredNumberField(Water, TEXT("audio_intensity"), WaterContext);
 
     if (Config.SceneryComponents.IsEmpty())
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has no scenery.components"), *Path));
-    }
-    if (Config.Water.RiverMaterialPath.IsEmpty())
-    {
-        FatalAssetConfigError(FString::Printf(TEXT("%s is missing water.river_material"), *Path));
     }
     if (Config.Water.SurfaceMaterialPath.IsEmpty())
     {
@@ -315,10 +303,6 @@ FYarlungAssetConfig LoadConfigFromDisk()
     if (Config.Water.MinWidthCm <= 0.0f || Config.Water.MaxWidthCm < Config.Water.MinWidthCm)
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has invalid water width bounds"), *Path));
-    }
-    if (Config.Water.DefaultDepthCm <= 0.0f || Config.Water.ZoneRenderTargetResolution <= 0)
-    {
-        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid water depth or render target resolution"), *Path));
     }
     if (Config.CanopyBelt.SampleStride <= 0 || Config.CanopyBelt.LateralBandsCm.IsEmpty() ||
         Config.CanopyBelt.NearOccupancy < 0.0f || Config.CanopyBelt.NearOccupancy > 1.0f ||

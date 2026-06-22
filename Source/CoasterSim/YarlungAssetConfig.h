@@ -76,18 +76,10 @@ struct FYarlungCliffBeltConfig
 
 struct FYarlungWaterConfig
 {
-    FString RiverMaterialPath;
     FString SurfaceMaterialPath;
-    int32 ZoneRenderTargetResolution = 1024;
-    float ZoneExtentScale = 0.55f;
-    float DefaultDepthCm = 0.0f;
-    float BaseVelocityCmPerSec = 0.0f;
-    float FlowVelocityJitterCmPerSec = 0.0f;
     float WidthScale = 1.0f;
     float MinWidthCm = 0.0f;
     float MaxWidthCm = 0.0f;
-    float ShapeDilation = 0.0f;
-    float AudioIntensity = 0.0f;
 };
 
 struct FYarlungAssetConfig

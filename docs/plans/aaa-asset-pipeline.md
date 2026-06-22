@@ -6,7 +6,7 @@
 ## 现状
 
 - **引擎基线已就绪**（`Config/DefaultEngine.ini`）：Lumen GI + Lumen 反射、Virtual Shadow Maps、Nanite、Mesh Distance Fields、Virtual Textures、DX12/SM6。渲染技术不是瓶颈。
-- **程序化基线**（已停止继续投入）：旧 canyon-wall 程序化幕布和旧 procedural river actor 已从默认链路删除；它们会制造假山片/黑洞/河槽遮挡/浅色平片水面，结构上到不了 AAA。当前默认关卡保留 DEM-derived corridor StaticMesh + Megascans scatter + UE Water；项目不再依赖 `ProceduralMeshComponent`。
+- **程序化基线**（已停止继续投入）：旧 canyon-wall 程序化幕布、旧 procedural river actor、以及 gate-only UE Water actor 已从默认链路删除；它们会制造假山片/黑洞/河槽遮挡/浅色平片水面或双水体歧义，结构上到不了 AAA。当前默认关卡保留 DEM-derived corridor StaticMesh + Megascans scatter + 单一显式 `SM_YarlungRiverSurface` 水面；项目不再依赖 `ProceduralMeshComponent` 或 UE Water 插件。
 - **已清理的旧资产层**：PolyHaven 1k `rock_face_01/02`、`boulder_01`、`shrub_03/04` 与 `aerial_grass_rock` 2k 地表贴图已从 live pipeline 删除；它们被评为低保真旧层，不再作为 AAA 路线 fallback。
 - **2026-06-21 资产缺口复核**：当前已导入的 Megaplant 完整树（Norway Spruce/Aleppo Pine/Japanese Cypress 等）多为 `SkeletalMesh`，而默认森林走廊用 HISM/ISM，只能吃 `StaticMesh`。所以现有管线实际用的是 Norway Spruce branch/top/twig 静态网格，属于 branch-clump 临时近似，不是整树森林。另一次 cliff belt 实验说明：把现有大型 cliff mesh 强行沿走廊排布会形成黑色 slab、穿坡、压顶，不能作为山体主解。
 - **当前最需要的资产/路径**：①整树 conifer/fir/spruce `StaticMesh`，带 LOD/Nanite/foliage-ready，能进 HISM/ISM；或允许我把森林改到能消费现有 `SkeletalMesh` 树的 PCG/foliage actor 路径。②坡面友好的模块化 cliff/rock wall 套件：多尺寸、多断面、可旋转拼接、不是单块巨板，适合沿峡谷两侧 kitbash。③多层地表 surface（forest floor / scree / mossy rock / alpine grass）用于坡面混合，避免继续调单张 DEM-derived terrain 材质。
@@ -32,7 +32,7 @@
 1. **岩壁系统**：用 Nanite cliff mesh 沿轨道走廊两壁散布/拼接；规则和路径在 `Config/yarlung-assets.json`，不恢复旧 `YarlungCanyonWallActor` 程序化幕布。
 2. **森林系统**：`YarlungSceneryActor` 读取 `Config/yarlung-assets.json` 做 instanced foliage / canopy belt；乔木、下层植被、数量、seed、clearance 都应走配置，不在 C++ 里手改。
 3. **多层地形材质**：用 Megascans 地表做 height/slope 混合（rock/scree/grass/forest-floor），替换当前单张 `M_YarlungMeshTerrain`。
-4. **江水**：在 UE Water `WaterBodyRiver` 上升级真实河流材质（翡翠色 + 流动 + 岸边泡沫），不回到旧 procedural river actor。
+4. **江水**：在 `SM_YarlungRiverSurface` 显式河面上升级真实河流材质（翡翠色 + 流动法线 + 岸边泡沫 + 深度/反射），不回到旧 procedural river actor，也不恢复 gate-only UE Water actor。
 5. **结构去灰盒**：新增 authored cockpit/train/安全杆；后续用真实钢轨/支撑网格替换当前运行时 cylinder 管轨。
 6. **成像收尾**：复核 Lumen/TSR/曝光/雾，保住已得的峡谷纵深与 aerial perspective。
 

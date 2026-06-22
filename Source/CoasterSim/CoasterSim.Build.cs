@@ -14,8 +14,7 @@ public class CoasterSim : ModuleRules
             "InputCore",
             "Json",
             "Landscape",
-            "UMG",
-            "Water"
+            "UMG"
         });
 
         PrivateDependencyModuleNames.AddRange(new[]

@@ -247,18 +247,10 @@
     }
   },
   "water": {
-    "river_material": "/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface",
     "surface_material": "/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface",
-    "zone_render_target_resolution": 1024,
-    "zone_extent_scale": 0.55,
-    "default_depth_cm": 2200.0,
-    "base_velocity_cm_per_sec": 480.0,
-    "flow_velocity_jitter_cm_per_sec": 260.0,
     "width_scale": 1.65,
     "min_width_cm": 32000,
-    "max_width_cm": 52000,
-    "shape_dilation": 24000,
-    "audio_intensity": 0.65
+    "max_width_cm": 52000
   },
   "terrain": {
     "surface": {

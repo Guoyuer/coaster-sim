@@ -746,7 +746,7 @@ def main() -> None:
         "- `YarlungTsangpo_preview.ppm`: dependency-free color preview of the terrain.\n"
         "- `YarlungTsangpo_hillshade.png`: real-scale DEM hillshade preview for bbox/orientation checks.\n"
         "- `YarlungTsangpo_masks.ppm`: RGB mask preview where red=river, green=forest, blue=rock/snow.\n"
-        "- `YarlungRiver.csv`: DEM-thalweg river samples used by UE Water, fog anchoring, explicit river surface mesh, and spatial diagnostics.\n"
+        "- `YarlungRiver.csv`: DEM-thalweg river samples used by fog anchoring, explicit river surface mesh, and spatial diagnostics.\n"
         "- `manifest.json`: import scale and layer notes.\n",
         encoding="utf-8",
     )

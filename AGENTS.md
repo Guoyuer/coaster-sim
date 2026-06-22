@@ -37,7 +37,7 @@
 & "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" CoasterSimEditor Win64 Development "-Project=$PWD\CoasterSim.uproject" -WaitMutex -NoHotReloadFromIDE
 ```
 **重建资产+关卡管线：** `.\scripts\import-yarlung-corridor.ps1 -Build`
-（顺序：生成 DEM/r16/preview/masks/river CSV → 生成/校验 `YarlungTrack.csv` → 建当前材质 → `YarlungCorridorImport` commandlet 构建 `SM_YarlungCorridorTerrain`、UE Water、scenery 并重建 `.umap`。**.umap 是生成物，关卡 actor 改动必须改 `YarlungCorridorImportCommandlet.cpp` 再重跑，手摆会被覆盖。**）
+（顺序：生成 DEM/r16/preview/masks/river CSV → 生成/校验 `YarlungTrack.csv` → 建当前材质 → `YarlungCorridorImport` commandlet 构建 `SM_YarlungCorridorTerrain`、显式 `SM_YarlungRiverSurface`、scenery 并重建 `.umap`。**.umap 是生成物，关卡 actor 改动必须改 `YarlungCorridorImportCommandlet.cpp` 再重跑，手摆会被覆盖。**）
 **默认迭代入口（优先用这个，不要手拼慢命令）：**
 ```powershell
 .\scripts\yarlung-agent-status.ps1

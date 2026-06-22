@@ -43,33 +43,29 @@ def inspect_scenery_assets(config):
 
 def inspect_water_materials(config):
     water = config["water"]
-    for label, key in (
-        ("river", "river_material"),
-        ("surface", "surface_material"),
-    ):
-        material_path = water.get(key, "")
-        if not unreal.EditorAssetLibrary.does_asset_exist(material_path):
-            print(f"[WATER-PARAMS] {label}=MISSING {material_path}")
-            continue
-        material = unreal.EditorAssetLibrary.load_asset(material_path)
-        if material is None:
-            print(f"[WATER-PARAMS] {label}=MISSING {material_path}")
-            continue
+    material_path = water.get("surface_material", "")
+    if not unreal.EditorAssetLibrary.does_asset_exist(material_path):
+        print(f"[WATER-PARAMS] surface=MISSING {material_path}")
+        return
+    material = unreal.EditorAssetLibrary.load_asset(material_path)
+    if material is None:
+        print(f"[WATER-PARAMS] surface=MISSING {material_path}")
+        return
 
-        print(f"[WATER-PARAMS] {label}={material.get_path_name()} class={material.get_class().get_name()}")
-        for getter, param_label in (
-            (unreal.MaterialEditingLibrary.get_scalar_parameter_names, "scalar"),
-            (unreal.MaterialEditingLibrary.get_vector_parameter_names, "vector"),
-            (unreal.MaterialEditingLibrary.get_texture_parameter_names, "texture"),
-        ):
-            try:
-                names = getter(material)
-            except Exception as exc:
-                print(f"[WATER-PARAMS] {label}.{param_label}_error={exc}")
-                continue
-            print(f"[WATER-PARAMS] {label}.{param_label}_count={len(names)}")
-            for name in names:
-                print(f"[WATER-PARAMS] {label}.{param_label}={name}")
+    print(f"[WATER-PARAMS] surface={material.get_path_name()} class={material.get_class().get_name()}")
+    for getter, param_label in (
+        (unreal.MaterialEditingLibrary.get_scalar_parameter_names, "scalar"),
+        (unreal.MaterialEditingLibrary.get_vector_parameter_names, "vector"),
+        (unreal.MaterialEditingLibrary.get_texture_parameter_names, "texture"),
+    ):
+        try:
+            names = getter(material)
+        except Exception as exc:
+            print(f"[WATER-PARAMS] surface.{param_label}_error={exc}")
+            continue
+        print(f"[WATER-PARAMS] surface.{param_label}_count={len(names)}")
+        for name in names:
+            print(f"[WATER-PARAMS] surface.{param_label}={name}")
 
 
 def inspect_terrain_surface_assets(config):

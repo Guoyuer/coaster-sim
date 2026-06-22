@@ -189,7 +189,7 @@ if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOut
         throw "Missing required mesh terrain material asset: $MeshTerrainMaterialAsset"
     }
     if (-not (Test-Path -LiteralPath $WaterSurfaceMaterialAsset)) {
-        throw "Missing required UE Water surface material: $WaterSurfaceMaterialAsset"
+        throw "Missing required Yarlung river surface material: $WaterSurfaceMaterialAsset"
     }
 }
 

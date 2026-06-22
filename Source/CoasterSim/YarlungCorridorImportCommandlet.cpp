@@ -13,7 +13,6 @@
 #include "YarlungTerrainRelief.h"
 #include "YarlungTrackCsv.h"
 #include "YarlungViewCorridor.h"
-#include "YarlungWaterBuilder.h"
 #include "Components/StaticMeshComponent.h"
 #include "Editor.h"
 #include "Engine/StaticMesh.h"
@@ -666,11 +665,9 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& Encoded
     return StaticMesh;
 }
 
-// Explicit sloped river-surface ribbon. UE Water's WaterZone renders the river
-// surface as a flat plane at the zone Z, which the descending valley floor buries
-// for most of the route. This mesh follows the riverbed spline at a shallow
-// authored surface height and stays inside the carved thalweg instead of reading
-// as a raised floodplain slab.
+// Explicit sloped river-surface ribbon. The water surface follows the riverbed
+// spline at a shallow authored surface height and stays inside the carved
+// thalweg instead of reading as a raised floodplain slab.
 const TCHAR* YarlungRiverSurfaceMeshPackagePath = YarlungGeneratedPaths::RiverSurfaceMeshPackagePath;
 const TCHAR* YarlungRiverSurfaceMeshAssetName = YarlungGeneratedPaths::RiverSurfaceMeshAssetName;
 
@@ -991,16 +988,8 @@ bool SpawnYarlungWorldActors(UWorld* World, UStaticMesh* CorridorTerrainAsset)
         UE_LOG(LogTemp, Error, TEXT("Unable to spawn Yarlung coaster ride actor"));
         return false;
     }
-    if (!YarlungWaterBuilder::SpawnYarlungWater(World))
-    {
-        UE_LOG(LogTemp, Error, TEXT("Unable to spawn required Yarlung UE Water actors"));
-        return false;
-    }
-
     // Visible hero water: an explicit sloped river surface that follows the bed,
-    // so the water is never buried by the descending valley floor. UE Water's
-    // dynamic GPU water collapses flat for this river (113 m drop, 363 m wide in a
-    // single zone), so this mesh is the actual rendered water surface.
+    // so the water is never buried by the descending valley floor.
     {
         FYarlungRiverField RiverSurfaceField;
         FString RiverSurfaceError;
