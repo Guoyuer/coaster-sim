@@ -271,6 +271,7 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.CliffBelt.SampleStride = RequiredIntegerField(CliffBelt, TEXT("sample_stride"), CliffBeltContext);
     Config.CliffBelt.LateralBandsCm = RequiredNumberArrayField(CliffBelt, TEXT("lateral_bands_cm"), CliffBeltContext);
     Config.CliffBelt.Occupancy = RequiredNumberField(CliffBelt, TEXT("occupancy"), CliffBeltContext);
+    Config.CliffBelt.TrackClearanceCm = RequiredNumberField(CliffBelt, TEXT("track_clearance_cm"), CliffBeltContext);
     Config.CliffBelt.RiverClearanceCm = RequiredNumberField(CliffBelt, TEXT("river_clearance_cm"), CliffBeltContext);
     Config.CliffBelt.MinHeightCm = RequiredNumberField(CliffBelt, TEXT("min_height_cm"), CliffBeltContext);
     Config.CliffBelt.MaxHeightCm = RequiredNumberField(CliffBelt, TEXT("max_height_cm"), CliffBeltContext);
@@ -326,6 +327,7 @@ FYarlungAssetConfig LoadConfigFromDisk()
     }
     if (Config.CliffBelt.SampleStride <= 0 || Config.CliffBelt.LateralBandsCm.IsEmpty() ||
         Config.CliffBelt.Occupancy < 0.0f || Config.CliffBelt.Occupancy > 1.0f ||
+        Config.CliffBelt.TrackClearanceCm < 0.0f ||
         Config.CliffBelt.ScaleMin <= 0.0f || Config.CliffBelt.ScaleMax < Config.CliffBelt.ScaleMin)
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.cliff_belt settings"), *Path));

@@ -59,6 +59,7 @@ struct FYarlungCliffBeltConfig
     int32 SampleStride = 2;
     TArray<float> LateralBandsCm;
     float Occupancy = 0.0f;
+    float TrackClearanceCm = 0.0f;
     float RiverClearanceCm = 0.0f;
     float MinHeightCm = 0.0f;
     float MaxHeightCm = 0.0f;

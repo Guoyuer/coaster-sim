@@ -133,6 +133,14 @@ float YarlungRavineMask(float X, float Y, const FYarlungRiverField& RiverField)
     return FMath::Pow(FMath::Clamp(Signal, 0.0f, 1.0f), 5.0f);
 }
 
+float YarlungTerrainBreakup(float X, float Y, float Height)
+{
+    const float Broad = 0.5f + 0.5f * FMath::Sin(X * 0.00042f - Y * 0.00058f + Height * 0.00072f);
+    const float Mid = 0.5f + 0.5f * FMath::Sin(X * 0.00115f + Y * 0.00173f - Height * 0.0011f);
+    const float Fine = YarlungValueNoise(X * 2.9f + Height * 0.17f, Y * 2.1f - Height * 0.13f);
+    return FMath::Clamp(Broad * 0.45f + Mid * 0.35f + Fine * 0.20f, 0.0f, 1.0f);
+}
+
 FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVector& Normal, float RockMask, const FYarlungRiverField& RiverField)
 {
     const float Height01 = YarlungTerrain::NormalizeEncodedHeightCm(Height);
@@ -150,8 +158,9 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
     const float BroadCanopyPatch = 0.5f + 0.5f * FMath::Sin(X * 0.00088f - Y * 0.00116f + Height * 0.0011f);
     const float FineCanopyPatch = YarlungValueNoise(X * 1.7f, Y * 1.7f);
     const float CanopyMask = YarlungTerrain::Smooth01((BroadCanopyPatch * 0.72f + FineCanopyPatch * 0.28f - 0.22f) / 0.48f);
+    const float Breakup = YarlungTerrainBreakup(X, Y, Height);
     const float Forest = FMath::Clamp(
-        ForestDistance * ForestElevation * FMath::Lerp(1.02f, 1.30f, MidSlope) * FMath::Lerp(0.82f, 1.0f, CanopyMask),
+        ForestDistance * ForestElevation * FMath::Lerp(1.08f, 1.46f, MidSlope) * FMath::Lerp(0.90f, 1.0f, CanopyMask),
         0.0f,
         1.0f);
     const float Ravine = MidSlope * YarlungRavineMask(X, Y, RiverField);
@@ -160,13 +169,13 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
         4.0f);
     const float Noise = YarlungValueNoise(X, Y);
 
-    const FLinearColor DeepForest(0.012f + Noise * 0.010f, 0.082f + Noise * 0.052f, 0.030f + Noise * 0.030f, 1.0f);
-    const FLinearColor SunForest(0.028f + Noise * 0.020f, 0.176f + Noise * 0.086f, 0.058f + Noise * 0.046f, 1.0f);
-    const FLinearColor WeatheredRock(0.070f + Height01 * 0.028f, 0.078f + Height01 * 0.030f, 0.074f + Height01 * 0.026f, 1.0f);
-    const FLinearColor WetRock(0.034f + Noise * 0.022f, 0.048f + Noise * 0.030f, 0.046f + Noise * 0.026f, 1.0f);
-    const FLinearColor MossRock(0.020f + Noise * 0.018f, 0.112f + Noise * 0.052f, 0.044f + Noise * 0.034f, 1.0f);
-    const FLinearColor Scree(0.088f + Noise * 0.032f, 0.088f + Noise * 0.032f, 0.078f + Noise * 0.028f, 1.0f);
-    const FLinearColor RavineColor(0.010f, 0.022f, 0.020f, 1.0f);
+    const FLinearColor DeepForest(0.008f + Noise * 0.010f, 0.060f + Noise * 0.050f, 0.026f + Noise * 0.030f, 1.0f);
+    const FLinearColor SunForest(0.020f + Noise * 0.020f, 0.135f + Noise * 0.090f, 0.050f + Noise * 0.046f, 1.0f);
+    const FLinearColor WeatheredRock(0.050f + Height01 * 0.024f, 0.056f + Height01 * 0.026f, 0.052f + Height01 * 0.022f, 1.0f);
+    const FLinearColor WetRock(0.024f + Noise * 0.020f, 0.034f + Noise * 0.028f, 0.034f + Noise * 0.024f, 1.0f);
+    const FLinearColor MossRock(0.014f + Noise * 0.018f, 0.086f + Noise * 0.056f, 0.038f + Noise * 0.034f, 1.0f);
+    const FLinearColor Scree(0.060f + Noise * 0.034f, 0.062f + Noise * 0.034f, 0.056f + Noise * 0.030f, 1.0f);
+    const FLinearColor RavineColor(0.006f, 0.014f, 0.014f, 1.0f);
     const FLinearColor Snow(0.66f, 0.70f, 0.69f, 1.0f);
 
     FLinearColor Base = FMath::Lerp(DeepForest, SunForest, CanopyMask * (1.0f - SteepSlope * 0.45f));
@@ -178,6 +187,10 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
     Base = FMath::Lerp(Base, Scree, FMath::Clamp(SteepSlope * (1.0f - Forest) * (0.12f + RavineStreak * 0.16f), 0.0f, 0.26f));
     Base = FMath::Lerp(Base, RavineColor, FMath::Clamp(Ravine * 0.58f, 0.0f, 0.68f));
     Base = FMath::Lerp(Base, Snow, 0.08f * YarlungTerrain::Smooth01((Height01 - 0.997f) / 0.012f));
+    const float ContrastGain = FMath::Lerp(0.78f, 1.18f, Breakup);
+    Base.R *= ContrastGain;
+    Base.G *= FMath::Lerp(0.84f, 1.14f, Breakup);
+    Base.B *= FMath::Lerp(0.80f, 1.08f, Breakup);
     return Base;
 }
 

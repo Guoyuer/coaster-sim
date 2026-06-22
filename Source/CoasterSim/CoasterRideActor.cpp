@@ -62,11 +62,19 @@ ACoasterRideActor::ACoasterRideActor()
     LeftRail->SetupAttachment(SceneRoot);
     RightRail = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("RightRail"));
     RightRail->SetupAttachment(SceneRoot);
+    CenterSpine = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("CenterSpine"));
+    CenterSpine->SetupAttachment(SceneRoot);
+    LeftGuardRail = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("LeftGuardRail"));
+    LeftGuardRail->SetupAttachment(SceneRoot);
+    RightGuardRail = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("RightGuardRail"));
+    RightGuardRail->SetupAttachment(SceneRoot);
     Ties = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Ties"));
     Ties->SetupAttachment(SceneRoot);
+    TrackBraces = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("TrackBraces"));
+    TrackBraces->SetupAttachment(SceneRoot);
     Supports = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Supports"));
     Supports->SetupAttachment(SceneRoot);
-    CoasterTrackVisuals::ConfigureMeshes(LeftRail, RightRail, Ties, Supports);
+    CoasterTrackVisuals::ConfigureMeshes(LeftRail, RightRail, CenterSpine, LeftGuardRail, RightGuardRail, Ties, TrackBraces, Supports);
 
     CurrentSpeedCms = 450.0f;
 }
@@ -89,7 +97,7 @@ void ACoasterRideActor::BeginPlay()
     const TCHAR* CommandLine = FCommandLine::Get();
     if (FParse::Param(CommandLine, TEXT("YarlungHideRide")))
     {
-        CoasterTrackVisuals::SetVisible(LeftRail, RightRail, Ties, Supports, false);
+        CoasterTrackVisuals::SetVisible(LeftRail, RightRail, CenterSpine, LeftGuardRail, RightGuardRail, Ties, TrackBraces, Supports, false);
     }
 
     YarlungAtmosphere::ApplyCommandLineOverrides(RideCamera, SkyLight, SunLight, ValleyFog, VolumetricClouds);
@@ -194,11 +202,15 @@ void ACoasterRideActor::RebuildSpline()
 
 void ACoasterRideActor::RebuildVisuals()
 {
-    CoasterTrackVisuals::ApplyMaterials(LeftRail, RightRail, Ties, Supports);
+    CoasterTrackVisuals::ApplyMaterials(LeftRail, RightRail, CenterSpine, LeftGuardRail, RightGuardRail, Ties, TrackBraces, Supports);
     CoasterTrackVisuals::Rebuild(
         LeftRail,
         RightRail,
+        CenterSpine,
+        LeftGuardRail,
+        RightGuardRail,
         Ties,
+        TrackBraces,
         Supports,
         TrackSpline,
         TrackLengthCm,

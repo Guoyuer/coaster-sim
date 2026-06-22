@@ -222,7 +222,7 @@ def create_mesh_terrain_material():
         -940,
         -180,
     )
-    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 0.92, -640, 40)
+    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 0.78, -640, 40)
     base_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
         unreal.MaterialExpressionMultiply,

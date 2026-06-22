@@ -92,7 +92,19 @@ protected:
     TObjectPtr<UInstancedStaticMeshComponent> RightRail;
 
     UPROPERTY(VisibleAnywhere, Category = "Track Visuals")
+    TObjectPtr<UInstancedStaticMeshComponent> CenterSpine;
+
+    UPROPERTY(VisibleAnywhere, Category = "Track Visuals")
+    TObjectPtr<UInstancedStaticMeshComponent> LeftGuardRail;
+
+    UPROPERTY(VisibleAnywhere, Category = "Track Visuals")
+    TObjectPtr<UInstancedStaticMeshComponent> RightGuardRail;
+
+    UPROPERTY(VisibleAnywhere, Category = "Track Visuals")
     TObjectPtr<UInstancedStaticMeshComponent> Ties;
+
+    UPROPERTY(VisibleAnywhere, Category = "Track Visuals")
+    TObjectPtr<UInstancedStaticMeshComponent> TrackBraces;
 
     UPROPERTY(VisibleAnywhere, Category = "Track Visuals")
     TObjectPtr<UInstancedStaticMeshComponent> Supports;

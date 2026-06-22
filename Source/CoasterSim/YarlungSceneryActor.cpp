@@ -587,6 +587,7 @@ void AYarlungSceneryActor::AddCliffBelt(
     {
         return;
     }
+    const float MeshRadiusCm = Component->GetStaticMesh()->GetBounds().SphereRadius;
 
     for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Belt.SampleStride))
     {
@@ -639,6 +640,11 @@ void AYarlungSceneryActor::AddCliffBelt(
                     ScaleBase * FMath::Lerp(0.42f, 0.92f, Hash01(SampleIndex * 9.0f + BandIndex + Seed, 43.0f)),
                     ScaleBase * FMath::Lerp(0.85f, 1.65f, Hash01(SampleIndex * 5.0f + BandIndex + Seed, 47.0f)));
                 const FVector Location(Location2D.X, Location2D.Y, Height + Belt.HeightOffsetCm);
+                const float ScaledRadiusCm = MeshRadiusCm * Scale.GetMax();
+                if (FVector::Dist(Location, Center) - ScaledRadiusCm < Belt.TrackClearanceCm)
+                {
+                    continue;
+                }
                 Component->AddInstance(FTransform(SurfaceAlignedRotation(Normal, Yaw), Location, Scale));
             }
         }

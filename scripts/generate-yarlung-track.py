@@ -196,29 +196,31 @@ def build_scenic_freeform(
     river_path = resample_polyline(thalweg, 70.0 * 100.0)
     river_distances = cumulative_distances(river_path)
     total_river_cm = river_distances[-1]
-    scenic_span_cm = min(total_river_cm * 0.74, target_length_m * 100.0 * 0.45)
-    start_cm = max(0.0, (total_river_cm - scenic_span_cm) * 0.52)
+    scenic_span_cm = min(total_river_cm * 0.78, target_length_m * 100.0 * 0.54)
+    start_cm = max(0.0, (total_river_cm - scenic_span_cm) * 0.50)
 
-    # Fractions intentionally alternate river sides. This gives the first-person
-    # camera repeated cross-river and high-overlook beats instead of a parallel
-    # thalweg offset that keeps the water out of frame.
+    # Reference-inspired authored beats: a long cliffside approach, a high
+    # cross-river S, an opposite-bank overlook turn, then a return bridge back
+    # toward the station. The route is still solved against the DEM and comfort
+    # gates below, but the macro silhouette is intentionally art-directed.
     anchor_specs = [
-        (0.00, -0.42, "Station"),
-        (0.07, -0.62, "Lift"),
-        (0.16, 0.18, "Outbound"),
-        (0.27, 0.78, "Outbound"),
-        (0.39, -0.24, "Outbound"),
-        (0.51, -0.86, "Outbound"),
-        (0.63, 0.30, "Turnaround"),
-        (0.76, 0.82, "Return"),
-        (0.88, 0.08, "Return"),
-        (1.00, -0.46, "Return"),
-        (0.87, -0.82, "Launch"),
-        (0.70, 0.54, "Launch"),
-        (0.53, 0.88, "Brake"),
-        (0.35, -0.58, "Brake"),
-        (0.18, -0.82, "Station"),
-        (0.06, 0.26, "Station"),
+        (0.00, -0.30, "Station"),
+        (0.05, -0.52, "Lift"),
+        (0.12, -0.78, "Lift"),
+        (0.21, -0.86, "Outbound"),
+        (0.34, -0.42, "Outbound"),
+        (0.46, 0.38, "Outbound"),
+        (0.58, 0.76, "Outbound"),
+        (0.69, 0.44, "Turnaround"),
+        (0.79, -0.28, "Return"),
+        (0.89, -0.76, "Return"),
+        (0.99, -0.42, "Return"),
+        (0.91, 0.50, "Launch"),
+        (0.76, 0.78, "Launch"),
+        (0.59, 0.08, "Brake"),
+        (0.40, -0.78, "Brake"),
+        (0.23, -0.58, "Station"),
+        (0.08, 0.18, "Station"),
     ]
 
     margin_cm = 180.0 * 100.0
@@ -259,9 +261,11 @@ def build_scenic_freeform(
         z = max(terrain_z + clearance_m * 100.0, design_z)
         points.append(TrackPoint(index, x, y, z, 0.0, scenic_section_for(ratio), terrain_z))
 
-    smooth_z(points, radius=3, passes=3, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
-    smooth_closed_xy(points, radius=2, passes=2, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
-    smooth_z(points, radius=5, passes=2, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
+    smooth_z(points, radius=5, passes=4, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
+    smooth_closed_xy(points, radius=3, passes=3, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
+    smooth_z(points, radius=7, passes=3, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
+    add_airtime_crests(points, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
+    smooth_z(points, radius=1, passes=1, heightfield=heightfield, clearance_cm=clearance_m * 100.0)
     apply_curvature_banking(points, design_speed_mps=design_speed_mps, max_bank_deg=max_bank_deg)
     smooth_roll(points, radius=3, passes=3)
     for idx, point in enumerate(points):
@@ -399,6 +403,25 @@ def smooth_closed_xy(
             point.z = max(point.terrain_z + clearance_cm, point.z)
 
 
+def add_airtime_crests(points: list[TrackPoint], heightfield: Heightfield, clearance_cm: float) -> None:
+    distances_cm = cumulative_distances([(point.x, point.y, point.z) for point in points])
+    total_cm = max(distances_cm[-1], 1.0)
+    crest_specs = [
+        (0.24, 80.0, 900.0),
+        (0.34, 75.0, 820.0),
+        (0.48, 82.0, 900.0),
+    ]
+    for index, point in enumerate(points):
+        distance_m = distances_cm[index] / 100.0
+        lift_cm = 0.0
+        for center_ratio, half_width_m, amplitude_cm in crest_specs:
+            lift_cm += raised_cosine_bump(distance_m, center_ratio * total_cm / 100.0, half_width_m, amplitude_cm)
+        if lift_cm <= 0.0:
+            continue
+        point.terrain_z = heightfield.sample_cm(point.x, point.y)
+        point.z = max(point.terrain_z + clearance_cm, point.z + lift_cm)
+
+
 def signed_curvature_xy(points: list[TrackPoint], index: int) -> float:
     count = len(points)
     previous = points[(index - 1) % count]
@@ -514,9 +537,9 @@ def main() -> None:
     parser.add_argument("--outbound-offset-m", type=float, default=35.0)
     parser.add_argument("--return-offset-m", type=float, default=90.0)
     parser.add_argument("--return-extra-height-m", type=float, default=12.0)
-    parser.add_argument("--outbound-descent-m", type=float, default=210.0)
-    parser.add_argument("--scenic-lateral-scale-m", type=float, default=210.0)
-    parser.add_argument("--scenic-height-m", type=float, default=80.0)
+    parser.add_argument("--outbound-descent-m", type=float, default=190.0)
+    parser.add_argument("--scenic-lateral-scale-m", type=float, default=245.0)
+    parser.add_argument("--scenic-height-m", type=float, default=125.0)
     parser.add_argument("--design-speed-mps", type=float, default=34.0)
     parser.add_argument("--max-bank-deg", type=float, default=70.0)
     parser.add_argument("--out", default="Content/Generated/YarlungLandscape/YarlungTrack.csv")

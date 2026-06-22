@@ -53,7 +53,11 @@ namespace CoasterTrackVisuals
 void ConfigureMeshes(
     UInstancedStaticMeshComponent* LeftRail,
     UInstancedStaticMeshComponent* RightRail,
+    UInstancedStaticMeshComponent* CenterSpine,
+    UInstancedStaticMeshComponent* LeftGuardRail,
+    UInstancedStaticMeshComponent* RightGuardRail,
     UInstancedStaticMeshComponent* Ties,
+    UInstancedStaticMeshComponent* TrackBraces,
     UInstancedStaticMeshComponent* Supports)
 {
     UStaticMesh* CylinderMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
@@ -62,7 +66,7 @@ void ConfigureMeshes(
         UE_LOG(LogTemp, Fatal, TEXT("Required tube track mesh is missing: /Engine/BasicShapes/Cylinder.Cylinder"));
     }
 
-    for (UInstancedStaticMeshComponent* Component : { LeftRail, RightRail, Ties, Supports })
+    for (UInstancedStaticMeshComponent* Component : { LeftRail, RightRail, CenterSpine, LeftGuardRail, RightGuardRail, Ties, TrackBraces, Supports })
     {
         if (Component)
         {
@@ -74,23 +78,38 @@ void ConfigureMeshes(
 void ApplyMaterials(
     UInstancedStaticMeshComponent* LeftRail,
     UInstancedStaticMeshComponent* RightRail,
+    UInstancedStaticMeshComponent* CenterSpine,
+    UInstancedStaticMeshComponent* LeftGuardRail,
+    UInstancedStaticMeshComponent* RightGuardRail,
     UInstancedStaticMeshComponent* Ties,
+    UInstancedStaticMeshComponent* TrackBraces,
     UInstancedStaticMeshComponent* Supports)
 {
-    ApplyTint(LeftRail, FLinearColor(0.52f, 0.54f, 0.57f), 1.0f, 0.24f);
-    ApplyTint(RightRail, FLinearColor(0.52f, 0.54f, 0.57f), 1.0f, 0.24f);
-    ApplyTint(Ties, FLinearColor(0.20f, 0.21f, 0.23f), 0.85f, 0.55f);
-    ApplyTint(Supports, FLinearColor(0.26f, 0.30f, 0.34f), 0.9f, 0.45f);
+    const FLinearColor TrackRed(0.76f, 0.12f, 0.08f);
+    const FLinearColor DarkRed(0.45f, 0.06f, 0.04f);
+    const FLinearColor SupportTeal(0.10f, 0.34f, 0.38f);
+    ApplyTint(LeftRail, TrackRed, 0.9f, 0.30f);
+    ApplyTint(RightRail, TrackRed, 0.9f, 0.30f);
+    ApplyTint(CenterSpine, DarkRed, 0.9f, 0.34f);
+    ApplyTint(LeftGuardRail, TrackRed, 0.85f, 0.36f);
+    ApplyTint(RightGuardRail, TrackRed, 0.85f, 0.36f);
+    ApplyTint(Ties, DarkRed, 0.85f, 0.42f);
+    ApplyTint(TrackBraces, TrackRed, 0.85f, 0.40f);
+    ApplyTint(Supports, SupportTeal, 0.85f, 0.46f);
 }
 
 void SetVisible(
     UInstancedStaticMeshComponent* LeftRail,
     UInstancedStaticMeshComponent* RightRail,
+    UInstancedStaticMeshComponent* CenterSpine,
+    UInstancedStaticMeshComponent* LeftGuardRail,
+    UInstancedStaticMeshComponent* RightGuardRail,
     UInstancedStaticMeshComponent* Ties,
+    UInstancedStaticMeshComponent* TrackBraces,
     UInstancedStaticMeshComponent* Supports,
     bool bVisible)
 {
-    for (UInstancedStaticMeshComponent* Component : { LeftRail, RightRail, Ties, Supports })
+    for (UInstancedStaticMeshComponent* Component : { LeftRail, RightRail, CenterSpine, LeftGuardRail, RightGuardRail, Ties, TrackBraces, Supports })
     {
         if (Component)
         {
@@ -102,27 +121,36 @@ void SetVisible(
 void Rebuild(
     UInstancedStaticMeshComponent* LeftRail,
     UInstancedStaticMeshComponent* RightRail,
+    UInstancedStaticMeshComponent* CenterSpine,
+    UInstancedStaticMeshComponent* LeftGuardRail,
+    UInstancedStaticMeshComponent* RightGuardRail,
     UInstancedStaticMeshComponent* Ties,
+    UInstancedStaticMeshComponent* TrackBraces,
     UInstancedStaticMeshComponent* Supports,
     const UCoasterTrackComponent* TrackSpline,
     float TrackLengthCm,
     float RailGaugeCm,
     FSampleFrameFn SampleFrame)
 {
-    if (!LeftRail || !RightRail || !Ties || !Supports || !TrackSpline || TrackLengthCm <= 1.0f)
+    if (!LeftRail || !RightRail || !CenterSpine || !LeftGuardRail || !RightGuardRail || !Ties || !TrackBraces || !Supports || !TrackSpline || TrackLengthCm <= 1.0f)
     {
         return;
     }
 
     LeftRail->ClearInstances();
     RightRail->ClearInstances();
+    CenterSpine->ClearInstances();
+    LeftGuardRail->ClearInstances();
+    RightGuardRail->ClearInstances();
     Ties->ClearInstances();
+    TrackBraces->ClearInstances();
     Supports->ClearInstances();
 
     const float RailHalfGauge = RailGaugeCm * 0.5f;
-    constexpr float SegmentStep = 180.0f;
-    constexpr float TieStep = 360.0f;
-    constexpr float SupportStep = 14400.0f;
+    constexpr float SegmentStep = 160.0f;
+    constexpr float TieStep = 260.0f;
+    constexpr float BraceStep = 520.0f;
+    constexpr float SupportStep = 9600.0f;
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += SegmentStep)
     {
@@ -142,8 +170,17 @@ void Rebuild(
 
         const FVector RailDropA = UpA * 18.0f;
         const FVector RailDropB = UpB * 18.0f;
-        LeftRail->AddInstance(MakeTubeTransform(LocationA - RightA * RailHalfGauge - RailDropA, LocationB - RightB * RailHalfGauge - RailDropB, 12.0f));
-        RightRail->AddInstance(MakeTubeTransform(LocationA + RightA * RailHalfGauge - RailDropA, LocationB + RightB * RailHalfGauge - RailDropB, 12.0f));
+        LeftRail->AddInstance(MakeTubeTransform(LocationA - RightA * RailHalfGauge - RailDropA, LocationB - RightB * RailHalfGauge - RailDropB, 16.0f));
+        RightRail->AddInstance(MakeTubeTransform(LocationA + RightA * RailHalfGauge - RailDropA, LocationB + RightB * RailHalfGauge - RailDropB, 16.0f));
+
+        const FVector SpineDropA = UpA * 52.0f;
+        const FVector SpineDropB = UpB * 52.0f;
+        CenterSpine->AddInstance(MakeTubeTransform(LocationA - SpineDropA, LocationB - SpineDropB, 22.0f));
+
+        const FVector GuardLiftA = UpA * 16.0f;
+        const FVector GuardLiftB = UpB * 16.0f;
+        LeftGuardRail->AddInstance(MakeTubeTransform(LocationA - RightA * (RailHalfGauge + 34.0f) + GuardLiftA, LocationB - RightB * (RailHalfGauge + 34.0f) + GuardLiftB, 4.0f));
+        RightGuardRail->AddInstance(MakeTubeTransform(LocationA + RightA * (RailHalfGauge + 34.0f) + GuardLiftA, LocationB + RightB * (RailHalfGauge + 34.0f) + GuardLiftB, 4.0f));
     }
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += TieStep)
@@ -155,10 +192,26 @@ void Rebuild(
         FRotator Rotation;
         SampleFrame(Distance, Location, Rotation, Forward, Right, Up);
 
-        const FVector TieCenter = Location - Up * 42.0f;
-        const FVector TieStart = TieCenter - Right * (RailHalfGauge - 8.0f);
-        const FVector TieEnd = TieCenter + Right * (RailHalfGauge - 8.0f);
-        Ties->AddInstance(MakeTubeTransform(TieStart, TieEnd, 6.0f));
+        const FVector TieCenter = Location - Up * 38.0f;
+        const FVector TieStart = TieCenter - Right * (RailHalfGauge + 34.0f);
+        const FVector TieEnd = TieCenter + Right * (RailHalfGauge + 34.0f);
+        Ties->AddInstance(MakeTubeTransform(TieStart, TieEnd, 7.0f));
+    }
+
+    for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += BraceStep)
+    {
+        FVector Location;
+        FVector Forward;
+        FVector Right;
+        FVector Up;
+        FRotator Rotation;
+        SampleFrame(Distance, Location, Rotation, Forward, Right, Up);
+
+        const FVector Spine = Location - Up * 58.0f;
+        const FVector LeftRailPoint = Location - Right * RailHalfGauge - Up * 20.0f;
+        const FVector RightRailPoint = Location + Right * RailHalfGauge - Up * 20.0f;
+        TrackBraces->AddInstance(MakeTubeTransform(Spine, LeftRailPoint, 5.0f));
+        TrackBraces->AddInstance(MakeTubeTransform(Spine, RightRailPoint, 5.0f));
     }
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += SupportStep)

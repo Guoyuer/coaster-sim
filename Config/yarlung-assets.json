@@ -194,24 +194,25 @@
     "cliff_belt": {
       "sample_stride": 2,
       "lateral_bands_cm": [
-        24000.0,
-        38000.0,
-        56000.0,
-        76000.0,
-        98000.0
+        85000.0,
+        120000.0,
+        160000.0,
+        210000.0,
+        270000.0
       ],
-      "occupancy": 0.28,
-      "river_clearance_cm": 20000.0,
+      "occupancy": 0.22,
+      "track_clearance_cm": 65000.0,
+      "river_clearance_cm": 26000.0,
       "min_height_cm": 262000.0,
       "max_height_cm": 540000.0,
       "min_slope": 0.02,
       "max_slope": 1.0,
-      "scale_min": 3.6,
-      "scale_max": 8.8,
+      "scale_min": 1.4,
+      "scale_max": 4.6,
       "height_offset_cm": 20.0,
-      "along_jitter_cm": 3200.0,
-      "lateral_jitter_cm": 5200.0,
-      "yaw_jitter_degrees": 31.0
+      "along_jitter_cm": 6200.0,
+      "lateral_jitter_cm": 9000.0,
+      "yaw_jitter_degrees": 26.0
     }
   },
   "water": {

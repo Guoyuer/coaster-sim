@@ -92,19 +92,19 @@
     "water_z_offset_cm": 180.0
   },
   "track": {
-    "path": "Content/Generated/YarlungLandscape/YarlungTrack.csv",
-    "length_m": 4942.72,
-    "control_point_count": 203,
-    "out_back_split_m": 2471.36,
+    "path": "C:/Users/guoyu/Projects/coaster-sim/Content/Generated/YarlungLandscape/YarlungTrack.csv",
+    "length_m": 5447.83,
+    "control_point_count": 226,
+    "out_back_split_m": 2723.92,
     "min_clearance_m": 72.0,
     "section_distances_m": {
-      "Station": 346.38,
-      "Lift": 486.95,
-      "Outbound": 1887.0,
-      "Turnaround": 349.18,
-      "Return": 1056.96,
-      "Launch": 499.19,
-      "Brake": 317.07
+      "Station": 304.2,
+      "Lift": 566.34,
+      "Outbound": 2074.24,
+      "Turnaround": 392.0,
+      "Return": 1169.48,
+      "Launch": 573.42,
+      "Brake": 368.15
     },
     "banking": {
       "roll_source": "curvature-derived",
