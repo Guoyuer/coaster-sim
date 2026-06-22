@@ -781,14 +781,15 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
                 * (0.35f + 0.65f * PatchGate);
             const float CrossWake = FMath::Pow(1.0f - FMath::Abs(AcrossSigned), 2.2f);
             const float Foam = FMath::Clamp(
-                EdgeFoam * (0.035f + 0.18f * BrokenStripe)
-                    + CenterRapid * (BrokenStripe * 0.20f + FastStreak * 0.24f),
+                EdgeFoam * (0.025f + 0.15f * BrokenStripe)
+                    + CenterRapid * (BrokenStripe * 0.16f + FastStreak * 0.26f),
                 0.0f,
-                0.56f);
-            const float RippleZ = (30.0f + 48.0f * CrossWake) * FMath::Sin(Flow * 210.0f + AcrossSigned * 8.0f + PatchNoise * 2.0f)
-                + 18.0f * FMath::Sin(Flow * 390.0f - AcrossSigned * 17.0f)
+                0.50f);
+            const float RawRippleZ = (38.0f + 46.0f * CrossWake) * FMath::Sin(Flow * 210.0f + AcrossSigned * 8.0f + PatchNoise * 2.0f)
+                + 20.0f * FMath::Sin(Flow * 390.0f - AcrossSigned * 17.0f)
                 + 18.0f * YarlungSignedValueNoise(Flow * 360000.0f, AcrossSigned * 64000.0f)
                 + 12.0f * FastStreak;
+            const float RippleZ = FMath::Clamp(RawRippleZ, -24.0f, 88.0f);
             const float SurfaceZ = Center.Z + FYarlungRiverField::DefaultWaterSurfaceLiftCm + RippleZ;
             MinSurfaceZ = FMath::Min(MinSurfaceZ, SurfaceZ);
             MaxSurfaceZ = FMath::Max(MaxSurfaceZ, SurfaceZ);
@@ -802,10 +803,10 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
             VertexIds[Id] = Builder.AppendVertex(Position);
             VertexUvs[Id] = FVector2D(Across01, Flow * 18.0f);
 
-            const FLinearColor DeepWater(0.004f, 0.045f, 0.052f, 1.0f);
-            const FLinearColor GlacialGreen(0.018f, 0.140f, 0.120f, 1.0f);
-            const FLinearColor AeratedFoam(0.58f, 0.72f, 0.66f, 1.0f);
-            const float ChannelTint = 0.12f + 0.18f * PatchNoise + 0.12f * BrokenStripe + 0.12f * (1.0f - CrossWake);
+            const FLinearColor DeepWater(0.002f, 0.028f, 0.034f, 1.0f);
+            const FLinearColor GlacialGreen(0.008f, 0.078f, 0.072f, 1.0f);
+            const FLinearColor AeratedFoam(0.44f, 0.58f, 0.54f, 1.0f);
+            const float ChannelTint = 0.08f + 0.14f * PatchNoise + 0.10f * BrokenStripe + 0.08f * (1.0f - CrossWake);
             const FLinearColor WaterColor = FMath::Lerp(DeepWater, GlacialGreen, FMath::Clamp(ChannelTint, 0.0f, 0.52f));
             const FLinearColor FinalColor = FMath::Lerp(WaterColor, AeratedFoam, Foam);
             VertexColors[Id] = FVector4f(FinalColor.R, FinalColor.G, FinalColor.B, 1.0f);

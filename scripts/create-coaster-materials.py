@@ -191,6 +191,20 @@ def create_lerp(material, a_expression, a_output, b_expression, b_output, alpha_
     return expression
 
 
+def create_add(material, a_expression, a_output, b_expression, b_output, x, y, label):
+    expression = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionAdd,
+        x,
+        y,
+    )
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(a_expression, a_output, expression, "A"):
+        raise RuntimeError(f"Unable to connect {label} A")
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(b_expression, b_output, expression, "B"):
+        raise RuntimeError(f"Unable to connect {label} B")
+    return expression
+
+
 def finalize_material(material):
     unreal.MaterialEditingLibrary.layout_material_expressions(material)
     unreal.MaterialEditingLibrary.recompile_material(material)
@@ -248,6 +262,7 @@ def create_yarlung_water_surface_material():
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
     material.set_editor_property("two_sided", True)
+    material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
 
     vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
@@ -255,11 +270,11 @@ def create_yarlung_water_surface_material():
         -860,
         -180,
     )
-    vertex_color_gain = create_scalar_parameter(material, "VertexColorBlend", 0.72, -620, -20)
+    vertex_color_gain = create_scalar_parameter(material, "VertexColorBlend", 0.90, -620, -20)
     base_color_param = create_vector_parameter(
         material,
         "BaseColor",
-        unreal.LinearColor(0.008, 0.105, 0.125, 1.0),
+        unreal.LinearColor(0.002, 0.038, 0.046, 1.0),
         -640,
         -300,
     )
@@ -283,21 +298,66 @@ def create_yarlung_water_surface_material():
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Roughness", 0.24, -500, -40),
+        create_scalar_parameter(material, "Roughness", 0.11, -500, -40),
         unreal.MaterialProperty.MP_ROUGHNESS,
         "yarlung water surface Roughness",
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Specular", 0.78, -500, 120),
+        create_scalar_parameter(material, "Specular", 0.92, -500, 120),
         unreal.MaterialProperty.MP_SPECULAR,
         "yarlung water surface Specular",
     )
     connect_material_property(
         material,
-        create_vector_parameter(material, "EmissiveTint", unreal.LinearColor(0.001, 0.004, 0.004, 1.0), -500, 280),
+        create_scalar_parameter(material, "Opacity", 0.62, -500, 280),
+        unreal.MaterialProperty.MP_OPACITY,
+        "yarlung water surface Opacity",
+    )
+    fresnel = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionFresnel,
+        -500,
+        460,
+    )
+    fresnel_tint = create_vector_parameter(
+        material,
+        "GrazingHighlight",
+        unreal.LinearColor(0.012, 0.034, 0.042, 1.0),
+        -500,
+        640,
+    )
+    fresnel_highlight = create_multiply(
+        material,
+        fresnel,
+        "",
+        fresnel_tint,
+        "",
+        -120,
+        540,
+        "yarlung water grazing highlight",
+    )
+    subtle_emissive = create_vector_parameter(
+        material,
+        "SubtleWaterLift",
+        unreal.LinearColor(0.0002, 0.0008, 0.0009, 1.0),
+        -500,
+        820,
+    )
+    connect_material_property(
+        material,
+        create_add(
+            material,
+            fresnel_highlight,
+            "",
+            subtle_emissive,
+            "",
+            120,
+            660,
+            "yarlung water emissive highlight",
+        ),
         unreal.MaterialProperty.MP_EMISSIVE_COLOR,
-        "yarlung water surface EmissiveTint",
+        "yarlung water surface EmissiveColor",
     )
     set_optional_material_usage(material, "MATUSAGE_STATIC_MESH")
     set_optional_material_usage(material, "MATUSAGE_SPLINE_MESHES")
