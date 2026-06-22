@@ -19,7 +19,7 @@ $Project = Join-Path $RepoRoot "CoasterSim.uproject"
 $EditorCmd = "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
 $BuildBat = "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat"
 $EditorCommonArgs = @("-DDC-ForceMemoryCache")
-$LandscapeAssetScript = Join-Path $PSScriptRoot "generate-yarlung-landscape-assets.py"
+$CorridorSourceAssetScript = Join-Path $PSScriptRoot "generate-yarlung-corridor-source-assets.py"
 $TrackScript = Join-Path $PSScriptRoot "generate-yarlung-track.py"
 $TrackLibScript = Join-Path $PSScriptRoot "yarlung_track_lib.py"
 $TrackVerifyScript = Join-Path $PSScriptRoot "verify-track-clearance.py"
@@ -28,7 +28,7 @@ $InspectScript = Join-Path $PSScriptRoot "inspect-yarlung-map.py"
 $MaterialSuccessMarker = Join-Path $RepoRoot "Saved\material-generation-ok.txt"
 $MeshTerrainMaterialAsset = Join-Path $RepoRoot "Content\Generated\Materials\M_YarlungMeshTerrain.uasset"
 $WaterSurfaceMaterialAsset = Join-Path $RepoRoot "Content\Generated\Materials\M_YarlungWaterSurface.uasset"
-$HeightmapAsset = Join-Path $RepoRoot "Content\Generated\YarlungLandscape\YarlungTsangpo_1009.r16"
+$CorridorSourceHeightAsset = Join-Path $RepoRoot "Content\Generated\YarlungLandscape\YarlungTsangpo_1009.r16"
 $TrackAsset = Join-Path $RepoRoot "Content\Generated\YarlungLandscape\YarlungTrack.csv"
 $TrackOverlayAsset = Join-Path $RepoRoot "Saved\Diagnostics\yarlung-track-overlay.png"
 $TrackClearanceCsv = Join-Path $RepoRoot "Saved\Diagnostics\track-clearance.csv"
@@ -130,18 +130,18 @@ if ($Build) {
     }
 }
 
-if (-not $SkipAssetGeneration -and ($ForceAssetGeneration -or (Test-AnySourceNewerThanAnyOutput @($LandscapeAssetScript) (@($HeightmapAsset) + $MacroTextureSources)))) {
-    Invoke-TimedStep "generate landscape source assets" {
-        python $LandscapeAssetScript
+if (-not $SkipAssetGeneration -and ($ForceAssetGeneration -or (Test-AnySourceNewerThanAnyOutput @($CorridorSourceAssetScript) (@($CorridorSourceHeightAsset) + $MacroTextureSources)))) {
+    Invoke-TimedStep "generate corridor source assets" {
+        python $CorridorSourceAssetScript
         if ($LASTEXITCODE -ne 0) {
-            throw "Yarlung landscape asset generation failed with exit code $LASTEXITCODE"
+            throw "Yarlung corridor source asset generation failed with exit code $LASTEXITCODE"
         }
     }
 } elseif (-not $SkipAssetGeneration) {
-    Write-Host "[YARLUNG-TIME] skip generate landscape source assets: outputs are fresh"
+    Write-Host "[YARLUNG-TIME] skip generate corridor source assets: outputs are fresh"
 }
 
-if (-not $SkipTrackGeneration -and ($ForceTrackGeneration -or $ForceAssetGeneration -or (Test-AnySourceNewerThanAnyOutput @($TrackScript, $TrackLibScript, $HeightmapAsset, (Join-Path $RepoRoot "Content\Generated\YarlungLandscape\manifest.json")) @($TrackAsset)))) {
+if (-not $SkipTrackGeneration -and ($ForceTrackGeneration -or $ForceAssetGeneration -or (Test-AnySourceNewerThanAnyOutput @($TrackScript, $TrackLibScript, $CorridorSourceHeightAsset, (Join-Path $RepoRoot "Content\Generated\YarlungLandscape\manifest.json")) @($TrackAsset)))) {
     Invoke-TimedStep "generate track" {
         python $TrackScript --out $TrackAsset --overlay $TrackOverlayAsset
         if ($LASTEXITCODE -ne 0) {
@@ -193,15 +193,15 @@ if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOut
 }
 
 if (-not $SkipMapImport) {
-    Invoke-TimedStep "import landscape map" {
-        $MapImportArgs = @($Project, "-run=YarlungLandscapeImport", "-unattended", "-nop4", "-NullRHI", "-NoSplash") + $EditorCommonArgs
+    Invoke-TimedStep "import corridor map" {
+        $MapImportArgs = @($Project, "-run=YarlungCorridorImport", "-unattended", "-nop4", "-NullRHI", "-NoSplash") + $EditorCommonArgs
         if ($SkipTerrainMeshBuild) {
             $MapImportArgs += "-SkipTerrainMeshBuild"
         }
-        Invoke-UnrealChecked -Args $MapImportArgs -FailureLabel "Yarlung landscape import" -TargetLabel "YarlungLandscapeImport" -RequireSuccessSummary
+        Invoke-UnrealChecked -Args $MapImportArgs -FailureLabel "Yarlung corridor import" -TargetLabel "YarlungCorridorImport" -RequireSuccessSummary
     }
 } else {
-    Write-Host "[YARLUNG-TIME] skip import landscape map: requested"
+    Write-Host "[YARLUNG-TIME] skip import corridor map: requested"
 }
 
 if ($Verify) {

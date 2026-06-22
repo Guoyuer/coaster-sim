@@ -33,7 +33,7 @@
   - 世界网格 `SIZE=1009`，`X∈[-337778.43, 337778.43]cm`（≈6.76km），`Y∈[-416981.55, 416981.55]cm`（≈8.34km），原点居中。
   - 历史 Landscape 导入曾使用原点 `Scale=(XYScaleX≈670.2, XYScaleY≈827.3, ZScale≈917.97)`、`SectionSizeQuads=63`；当前运行时可见地形已切到 generated corridor static mesh，但高度编码和世界 bounds 仍沿用同一数据契约。
   - 高度编码：`.r16` 16-bit，`HeightCm = Lerp(260000, 730000, raw16/65535)`（即海拔 2600–7300m）。
-  - 世界→经纬：`world_to_lon_lat(x,y)`（`generate-yarlung-landscape-assets.py:184`）。
+  - 世界→经纬：`world_to_lon_lat(x,y)`（`generate-yarlung-corridor-source-assets.py`）。
   - DEM bbox：lat 29.745–29.820N × lon 94.945–95.015E（大拐弯最深段）。
   - ⚠️ `river_center_y(x)` 是**合成 fallback 的解析河**，copernicus 真 DEM 路径**没有提取真实河中心线**——河 mask 也是按到解析中心线的横距近似。**真往返线路必须从真 `.r16` 提取真河谷底线（thalweg），不能直接用 `river_center_y`。**
 - **诊断基线**：`scripts/verify-track-clearance.py` 是当前净空/G 值硬门；旧一次性 height-profile 诊断脚本已退役。
@@ -75,7 +75,7 @@
 
 ## 4. 子系统 A：轨道生成器（离线 Python）
 
-**位置**：扩展 `generate-yarlung-landscape-assets.py`，或新增 `scripts/generate-yarlung-track.py`（读已生成的 `YarlungTsangpo_1009.r16` + manifest）。推荐后者（关注点分离）。
+**位置**：扩展 `generate-yarlung-corridor-source-assets.py`，或新增 `scripts/generate-yarlung-track.py`（读已生成的 `YarlungTsangpo_1009.r16` + manifest）。推荐后者（关注点分离）。
 
 **输入**：naturalized `.r16`（高度场）、世界坐标系常量、可调参数（见下）。
 **输出**：`Content/Generated/YarlungLandscape/YarlungTrack.csv` + manifest `track` 块。

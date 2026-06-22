@@ -2,15 +2,15 @@
 
 #include "Commandlets/Commandlet.h"
 #include "CoreMinimal.h"
-#include "YarlungLandscapeImportCommandlet.generated.h"
+#include "YarlungCorridorImportCommandlet.generated.h"
 
 UCLASS()
-class COASTERSIM_API UYarlungLandscapeImportCommandlet : public UCommandlet
+class COASTERSIM_API UYarlungCorridorImportCommandlet : public UCommandlet
 {
     GENERATED_BODY()
 
 public:
-    UYarlungLandscapeImportCommandlet();
+    UYarlungCorridorImportCommandlet();
 
     virtual int32 Main(const FString& Params) override;
 };

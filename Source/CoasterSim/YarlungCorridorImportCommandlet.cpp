@@ -1,4 +1,4 @@
-#include "YarlungLandscapeImportCommandlet.h"
+#include "YarlungCorridorImportCommandlet.h"
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -968,7 +968,7 @@ bool SpawnYarlungWorldActors(UWorld* World, UStaticMesh* CorridorTerrainAsset)
 }
 #endif
 
-UYarlungLandscapeImportCommandlet::UYarlungLandscapeImportCommandlet()
+UYarlungCorridorImportCommandlet::UYarlungCorridorImportCommandlet()
 {
     IsClient = false;
     IsEditor = true;
@@ -976,10 +976,10 @@ UYarlungLandscapeImportCommandlet::UYarlungLandscapeImportCommandlet()
     LogToConsole = true;
 }
 
-int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
+int32 UYarlungCorridorImportCommandlet::Main(const FString& Params)
 {
 #if WITH_EDITOR
-    const FString MapPackagePath = YarlungGeneratedPaths::LandscapeMapPackagePath;
+    const FString MapPackagePath = YarlungGeneratedPaths::CorridorMapPackagePath;
     const bool bSkipTerrainMeshBuild = Params.Contains(TEXT("SkipTerrainMeshBuild"), ESearchCase::IgnoreCase);
 
     UStaticMesh* CorridorTerrainAsset = nullptr;
@@ -1015,15 +1015,15 @@ int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
 
     if (!UEditorLoadingAndSavingUtils::SaveMap(World, MapPackagePath))
     {
-        UE_LOG(LogTemp, Error, TEXT("Unable to save imported landscape map: %s"), *MapPackagePath);
+        UE_LOG(LogTemp, Error, TEXT("Unable to save imported corridor map: %s"), *MapPackagePath);
         return 1;
     }
 
     FAssetRegistryModule::AssetCreated(World);
-    UE_LOG(LogTemp, Display, TEXT("Imported Yarlung landscape map: %s"), *MapPackagePath);
+    UE_LOG(LogTemp, Display, TEXT("Imported Yarlung corridor map: %s"), *MapPackagePath);
     return 0;
 #else
-    UE_LOG(LogTemp, Error, TEXT("YarlungLandscapeImport commandlet requires an editor build."));
+    UE_LOG(LogTemp, Error, TEXT("YarlungCorridorImport commandlet requires an editor build."));
     return 1;
 #endif
 }

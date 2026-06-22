@@ -5,7 +5,7 @@
 
 namespace YarlungGeneratedPaths
 {
-inline constexpr const TCHAR* LandscapeDirRelative = TEXT("Generated/YarlungLandscape");
+inline constexpr const TCHAR* CorridorDirRelative = TEXT("Generated/YarlungLandscape");
 inline constexpr const TCHAR* TrackCsvRelative = TEXT("Generated/YarlungLandscape/YarlungTrack.csv");
 inline constexpr const TCHAR* RiverCsvRelative = TEXT("Generated/YarlungLandscape/YarlungRiver.csv");
 inline constexpr const TCHAR* HeightmapRelative = TEXT("Generated/YarlungLandscape/YarlungTsangpo_1009.r16");
@@ -20,7 +20,7 @@ inline constexpr const TCHAR* CorridorTerrainMeshObjectPath = TEXT("/Game/Genera
 inline constexpr const TCHAR* RiverSurfaceMeshPackagePath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungRiverSurface");
 inline constexpr const TCHAR* RiverSurfaceMeshAssetName = TEXT("SM_YarlungRiverSurface");
 
-inline constexpr const TCHAR* LandscapeMapPackagePath = TEXT("/Game/Generated/YarlungLandscape/YarlungLandscape_Level");
+inline constexpr const TCHAR* CorridorMapPackagePath = TEXT("/Game/Generated/YarlungLandscape/YarlungLandscape_Level");
 
 inline FString ProjectContentFile(const TCHAR* RelativePath)
 {

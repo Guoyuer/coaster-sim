@@ -127,7 +127,7 @@ if ($Mode -ne "ScreenshotOnly") {
 
     $Steps += Invoke-Step -Name "import-$Mode" -StepArgs @($PSScriptRoot, $ImportParams) -Script {
         param([string]$ScriptRoot, [hashtable]$Params)
-        & (Join-Path $ScriptRoot "import-yarlung-landscape.ps1") @Params
+        & (Join-Path $ScriptRoot "import-yarlung-corridor.ps1") @Params
     }
 } elseif ($Build) {
     throw "-Build is only valid when Mode is not ScreenshotOnly; build with Mode Actor/Material/Terrain/Full."

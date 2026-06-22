@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Generate landscape-ready Yarlung Tsangpo canyon assets.
+"""Generate Yarlung Tsangpo corridor source data.
 
-The raw heightmap is little-endian uint16 `.r16`, which Unreal Landscape can
-import directly. TGA macro textures are imported by Unreal and drive the
-landscape's broad color/roughness zones; PPM previews are dependency-free
+The raw DEM is encoded as little-endian uint16 `.r16` source data for the
+generated corridor StaticMesh. PPM previews and masks are dependency-free
 sanity checks for shape, river width, forest massing, snow, and rock zones.
 """
 
@@ -709,7 +708,7 @@ def main() -> None:
     ])
 
     manifest = {
-        "name": "Yarlung Tsangpo cinematic canyon landscape",
+        "name": "Yarlung Tsangpo cinematic canyon corridor",
         "heightmap": "YarlungTsangpo_1009.r16",
         "river_csv": "YarlungRiver.csv",
         "preview": "YarlungTsangpo_preview.ppm",
@@ -720,10 +719,10 @@ def main() -> None:
         "dem": source_metadata,
         "world_bounds_cm": {"min_x": MIN_X, "max_x": MAX_X, "min_y": MIN_Y, "max_y": MAX_Y},
         "height_range_cm": {"encoded_min": HEIGHT_MIN, "encoded_max": HEIGHT_MAX, **stats},
-        "unreal_import": {
-            "landscape_section_size": 63,
+        "corridor_static_mesh": {
+            "source_grid_quads_per_axis": SIZE - 1,
             "sections_per_component": 1,
-            "component_count": "16 x 16",
+            "source_component_count": "16 x 16",
             "xy_scale_x_cm": round((MAX_X - MIN_X) / (SIZE - 1), 3),
             "xy_scale_y_cm": round((MAX_Y - MIN_Y) / (SIZE - 1), 3),
             "z_scale": round((HEIGHT_MAX - HEIGHT_MIN) / 512.0, 3),
