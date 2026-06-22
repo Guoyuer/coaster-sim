@@ -18,10 +18,12 @@ param(
     [int]$BatchPostFrames = 8,
     [string[]]$ExtraArgs = @(),
     [ValidateSet("MovieFrames", "ImmediateHighResShot")]
-    [string]$Mode = "MovieFrames"
+    [Alias("Mode")]
+    [string]$CaptureMode = "MovieFrames"
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "yarlung-shot-lib.ps1")
 
 $TargetSeconds = if ($null -ne $JumpSeconds) { [int]$JumpSeconds } else { $WaitSeconds }
 
@@ -45,58 +47,7 @@ if ($Build) {
 
 $RunStartedAt = Get-Date
 
-function Convert-ToFlatArgumentList {
-    param([object[]]$Items)
-
-    $Flat = @()
-    foreach ($Item in $Items) {
-        if ($Item -is [System.Array]) {
-            foreach ($Nested in $Item) {
-                $Flat += [string]$Nested
-            }
-        } else {
-            $Flat += [string]$Item
-        }
-    }
-    return $Flat
-}
-
-function Convert-ToSecondList {
-    param(
-        [string[]]$Values,
-        [Parameter(Mandatory = $true)][string]$ParameterName
-    )
-
-    $Seconds = @()
-    foreach ($Value in $Values) {
-        foreach ($Token in ([string]$Value -split "[,+;\s]+")) {
-            if ([string]::IsNullOrWhiteSpace($Token)) {
-                continue
-            }
-            $Parsed = 0
-            if (-not [int]::TryParse($Token, [System.Globalization.NumberStyles]::Integer, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$Parsed)) {
-                throw "$ParameterName contains a non-integer time value: $Token"
-            }
-            $Seconds += $Parsed
-        }
-    }
-    return [int[]]$Seconds
-}
-
-function Test-FreshNonEmptyFile {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][datetime]$StartedAt
-    )
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        return $false
-    }
-    $Item = Get-Item -LiteralPath $Path
-    return $Item.Length -gt 0 -and $Item.LastWriteTime -ge $StartedAt.AddSeconds(-1)
-}
-
-$BatchSeconds = Convert-ToSecondList -Values $BatchJumpSeconds -ParameterName "BatchJumpSeconds"
+$BatchSeconds = Convert-YarlungToSecondList -Values $BatchJumpSeconds -ParameterName "BatchJumpSeconds" -AllowEmpty
 if ($BatchSeconds.Count -gt 0) {
     if ([string]::IsNullOrWhiteSpace($BatchNamePrefix)) {
         throw "BatchNamePrefix is required when BatchJumpSeconds is provided."
@@ -142,7 +93,7 @@ if ($BatchSeconds.Count -gt 0) {
     )
     $BatchArgs += $EditorCommonArgs
     $BatchArgs += $ExtraArgs
-    $BatchArgs = Convert-ToFlatArgumentList -Items $BatchArgs
+    $BatchArgs = Convert-YarlungToFlatArgumentList -Items $BatchArgs
 
     $Process = Start-Process -FilePath $EditorCmd -ArgumentList $BatchArgs -WorkingDirectory $RepoRoot -PassThru -NoNewWindow
     if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
@@ -156,7 +107,7 @@ if ($BatchSeconds.Count -gt 0) {
 
     $Missing = @()
     foreach ($Expected in $ExpectedOutputs) {
-        if (-not (Test-FreshNonEmptyFile -Path $Expected -StartedAt $RunStartedAt)) {
+        if (-not (Test-YarlungFreshNonEmptyFile -Path $Expected -StartedAt $RunStartedAt)) {
             $Missing += "$Expected (missing, stale, or empty)"
         }
     }
@@ -210,7 +161,7 @@ if (-not $SimulateWait) {
     )
 }
 
-if ($Mode -eq "MovieFrames") {
+if ($CaptureMode -eq "MovieFrames") {
     $BenchmarkSeconds = if ($SimulateWait) { $TargetSeconds } else { $CaptureSeconds }
     $Args = $CommonArgs + @(
         "-BENCHMARK",
@@ -226,7 +177,7 @@ if ($Mode -eq "MovieFrames") {
     )
 }
 
-$Args = Convert-ToFlatArgumentList -Items $Args
+$Args = Convert-YarlungToFlatArgumentList -Items $Args
 $Process = Start-Process -FilePath $EditorCmd -ArgumentList $Args -WorkingDirectory $RepoRoot -PassThru -NoNewWindow
 if (-not $Process.WaitForExit($TimeoutSeconds * 1000)) {
     Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
@@ -247,7 +198,7 @@ if (-not $NewImages) {
 
 $Chosen = $NewImages | Select-Object -Last 1
 Copy-Item -LiteralPath $Chosen.FullName -Destination $Output -Force
-if (-not (Test-FreshNonEmptyFile -Path $Output -StartedAt $RunStartedAt)) {
+if (-not (Test-YarlungFreshNonEmptyFile -Path $Output -StartedAt $RunStartedAt)) {
     throw "UE exited but final screenshot is missing, stale, or empty: $Output. See $LogPath"
 }
 if (-not $KeepSourceFrames) {

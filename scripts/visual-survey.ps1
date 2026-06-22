@@ -11,51 +11,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "yarlung-shot-lib.ps1")
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Images = @()
 
-function Convert-ToSecondList {
-    param(
-        [string[]]$Values,
-        [Parameter(Mandatory = $true)][string]$ParameterName
-    )
-
-    $Seconds = @()
-    foreach ($Value in $Values) {
-        foreach ($Token in ([string]$Value -split "[,+;\s]+")) {
-            if ([string]::IsNullOrWhiteSpace($Token)) {
-                continue
-            }
-            $Parsed = 0
-            if (-not [int]::TryParse($Token, [System.Globalization.NumberStyles]::Integer, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$Parsed)) {
-                throw "$ParameterName contains a non-integer time value: $Token"
-            }
-            $Seconds += $Parsed
-        }
-    }
-    if ($Seconds.Count -eq 0) {
-        throw "$ParameterName must contain at least one time value."
-    }
-    return [int[]]$Seconds
-}
-
-function Assert-FreshNonEmptyFile {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][datetime]$StartedAt
-    )
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        throw "Missing expected output: $Path"
-    }
-    $Item = Get-Item -LiteralPath $Path
-    if ($Item.Length -le 0 -or $Item.LastWriteTime -lt $StartedAt.AddSeconds(-1)) {
-        throw "Expected output is stale or empty: $Path"
-    }
-}
-
-$Times = Convert-ToSecondList -Values $Times -ParameterName "Times"
+$Times = Convert-YarlungToSecondList -Values $Times -ParameterName "Times"
+$CaptureStartedAt = Get-Date
 
 if (-not $SkipCapture -and -not $LegacyPerShot) {
     $ShotParams = @{
@@ -93,6 +55,9 @@ foreach ($Time in $Times) {
     if (-not (Test-Path -LiteralPath $Path)) {
         throw "Missing expected screenshot: $Path"
     }
+    if (-not $SkipCapture) {
+        Assert-YarlungFreshNonEmptyFile -Path $Path -StartedAt $CaptureStartedAt
+    }
     $Images += $Path
 }
 
@@ -105,9 +70,9 @@ $AnalysisStartedAt = Get-Date
 if ($LASTEXITCODE -ne 0) {
     throw "visual survey analysis failed"
 }
-Assert-FreshNonEmptyFile -Path $Csv -StartedAt $AnalysisStartedAt
-Assert-FreshNonEmptyFile -Path $Json -StartedAt $AnalysisStartedAt
-Assert-FreshNonEmptyFile -Path $Sheet -StartedAt $AnalysisStartedAt
+Assert-YarlungFreshNonEmptyFile -Path $Csv -StartedAt $AnalysisStartedAt
+Assert-YarlungFreshNonEmptyFile -Path $Json -StartedAt $AnalysisStartedAt
+Assert-YarlungFreshNonEmptyFile -Path $Sheet -StartedAt $AnalysisStartedAt
 $Metrics = Get-Content -LiteralPath $Json -Raw | ConvertFrom-Json
 $MetricCount = @($Metrics).Count
 if ($MetricCount -ne $Images.Count) {
