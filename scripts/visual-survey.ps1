@@ -6,7 +6,6 @@ param(
     [int]$TimeoutSeconds = 240,
     [switch]$Build,
     [switch]$SkipCapture,
-    [switch]$LegacyPerShot,
     [string[]]$ExtraArgs = @()
 )
 
@@ -19,7 +18,7 @@ $Images = @()
 $Times = Convert-YarlungToSecondList -Values $Times -ParameterName "Times"
 $CaptureStartedAt = Get-Date
 
-if (-not $SkipCapture -and -not $LegacyPerShot) {
+if (-not $SkipCapture) {
     $ShotParams = @{
         BatchJumpSeconds = $Times
         BatchNamePrefix = $NamePrefix
@@ -37,21 +36,6 @@ if (-not $SkipCapture -and -not $LegacyPerShot) {
 foreach ($Time in $Times) {
     $Name = "$NamePrefix-t$Time"
     $Path = Join-Path $RepoRoot "Saved\OffscreenShots\$Name.png"
-    if (-not $SkipCapture -and $LegacyPerShot) {
-        $ShotParams = @{
-            Name = $Name
-            JumpSeconds = $Time
-            ResX = $ResX
-            ResY = $ResY
-            TimeoutSeconds = $TimeoutSeconds
-            ExtraArgs = $ExtraArgs
-        }
-        if ($Build) {
-            $ShotParams["Build"] = $true
-            $Build = $false
-        }
-        & (Join-Path $PSScriptRoot "offscreen-shot.ps1") @ShotParams
-    }
     if (-not (Test-Path -LiteralPath $Path)) {
         throw "Missing expected screenshot: $Path"
     }

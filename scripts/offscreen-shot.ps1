@@ -1,6 +1,5 @@
 param(
     [switch]$Build,
-    [int]$WaitSeconds = 12,
     [Nullable[int]]$JumpSeconds = $null,
     [int]$ResX = 2560,
     [int]$ResY = 1440,
@@ -10,22 +9,17 @@ param(
     [int]$CaptureSeconds = 1,
     [double]$StartRatio = 0.34,
     [double]$StartSpeedMps = 18.0,
-    [switch]$KeepSourceFrames,
-    [switch]$SimulateWait,
     [string[]]$BatchJumpSeconds = @(),
     [string]$BatchNamePrefix = "",
     [int]$BatchSettleFrames = 4,
     [int]$BatchPostFrames = 8,
     [string[]]$ExtraArgs = @(),
     [ValidateSet("MovieFrames", "ImmediateHighResShot")]
-    [Alias("Mode")]
     [string]$CaptureMode = "MovieFrames"
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "yarlung-shot-lib.ps1")
-
-$TargetSeconds = if ($null -ne $JumpSeconds) { [int]$JumpSeconds } else { $WaitSeconds }
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Project = Join-Path $RepoRoot "CoasterSim.uproject"
@@ -123,6 +117,11 @@ if ($BatchSeconds.Count -gt 0) {
     return
 }
 
+if ($null -eq $JumpSeconds) {
+    throw "JumpSeconds is required for single-shot capture. Use BatchJumpSeconds for multi-shot capture."
+}
+$TargetSeconds = [int]$JumpSeconds
+
 $Before = @{}
 $Output = Join-Path $OutputDir "$Name.png"
 Remove-Item -LiteralPath $Output -Force -ErrorAction SilentlyContinue
@@ -153,20 +152,17 @@ $CommonArgs = @(
 $CommonArgs += $EditorCommonArgs
 $CommonArgs += $ExtraArgs
 
-if (-not $SimulateWait) {
-    $CommonArgs += @(
-        "-CoasterStartRatio=$StartRatio",
-        "-CoasterStartSpeed=$StartSpeedMps",
-        "-CoasterStartSeconds=$TargetSeconds"
-    )
-}
+$CommonArgs += @(
+    "-CoasterStartRatio=$StartRatio",
+    "-CoasterStartSpeed=$StartSpeedMps",
+    "-CoasterStartSeconds=$TargetSeconds"
+)
 
 if ($CaptureMode -eq "MovieFrames") {
-    $BenchmarkSeconds = if ($SimulateWait) { $TargetSeconds } else { $CaptureSeconds }
     $Args = $CommonArgs + @(
         "-BENCHMARK",
         "-FPS=$CaptureFps",
-        "-BENCHMARKSECONDS=$BenchmarkSeconds",
+        "-BENCHMARKSECONDS=$CaptureSeconds",
         "-DUMPMOVIE",
         "-ExecCmds=DisableAllScreenMessages"
     )
@@ -201,14 +197,12 @@ Copy-Item -LiteralPath $Chosen.FullName -Destination $Output -Force
 if (-not (Test-YarlungFreshNonEmptyFile -Path $Output -StartedAt $RunStartedAt)) {
     throw "UE exited but final screenshot is missing, stale, or empty: $Output. See $LogPath"
 }
-if (-not $KeepSourceFrames) {
-    foreach ($Image in $NewImages) {
-        if ($Image.FullName -ne $Output) {
-            Remove-Item -LiteralPath $Image.FullName -Force -ErrorAction SilentlyContinue
-        }
+foreach ($Image in $NewImages) {
+    if ($Image.FullName -ne $Output) {
+        Remove-Item -LiteralPath $Image.FullName -Force -ErrorAction SilentlyContinue
     }
 }
 Write-Host "Screenshot=$Output"
 Write-Host "SourceFrame=$($Chosen.FullName)"
-Write-Host "CaptureMode=$(if ($SimulateWait) { 'SimulateWait' } else { 'JumpToSeconds' })"
+Write-Host "CaptureMode=JumpToSeconds"
 Write-Host "TargetSeconds=$TargetSeconds"

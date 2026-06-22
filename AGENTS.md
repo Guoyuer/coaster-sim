@@ -46,7 +46,7 @@
 模式选择见 `docs/plans/codex-iteration-scaffold.md`。只改 actor/灯光/水/相机/后处理用 `Actor`（复用 terrain）；只改材质用 `Material`；只有 terrain 几何/顶点色/位移变化才用 `Terrain` 或 `Full`。
 **画面验收（高分辨率第一人称截图）：**
 ```powershell
-.\scripts\offscreen-shot.ps1 -Build -Name "iterN" -ResX 2560 -ResY 1440 -WaitSeconds <英雄段时间点>
+.\scripts\offscreen-shot.ps1 -Build -Name "iterN" -ResX 2560 -ResY 1440 -JumpSeconds <英雄段时间点>
 ```
 
 ## 3. 迭代循环（每一轮严格照做）

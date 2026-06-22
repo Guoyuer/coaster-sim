@@ -38,7 +38,7 @@
 - **阶段 F（沿轨道铺开）**：整圈多个时间点截图均值 ≥4、无单维 <3、60 FPS。
 
 ## 4. 验证流程（每轮）
-1. `.\scripts\offscreen-shot.ps1 -Build -Name iterN -ResX 2560 -ResY 1440 -WaitSeconds <英雄段时间点>`。低于 1440p 的截图只能做 smoke test，不能写成验收通过。
+1. `.\scripts\offscreen-shot.ps1 -Build -Name iterN -ResX 2560 -ResY 1440 -JumpSeconds <英雄段时间点>`。低于 1440p 的截图只能做 smoke test，不能写成验收通过。
 2. 用 Read 打开 `Saved\OffscreenShots\iterN.png`，按 §2 量规逐维打分。
 3. 与 `docs/refs/` 参照照片并排比对 D1/D2/D3。
 4. 需要性能验收时，用 UE `stat unit`/CSV 单独确认帧率；offscreen 截图本身只负责画面帧。
