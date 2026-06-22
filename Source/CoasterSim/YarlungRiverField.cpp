@@ -1,5 +1,6 @@
 #include "YarlungRiverField.h"
 
+#include "YarlungGeneratedPaths.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 
@@ -51,7 +52,7 @@ bool LoadRiverCsv(const FString& CsvPath, TArray<FYarlungRiverRow>& OutRows, FSt
 
 FString FYarlungRiverField::ProjectContentRiverPath()
 {
-    return FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungRiver.csv");
+    return YarlungGeneratedPaths::ProjectContentFile(YarlungGeneratedPaths::RiverCsvRelative);
 }
 
 bool FYarlungRiverField::LoadFromProjectContent(FString* OutError)

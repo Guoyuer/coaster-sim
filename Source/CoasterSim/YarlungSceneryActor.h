@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "YarlungGeneratedPaths.h"
 #include "YarlungSceneryActor.generated.h"
 
 class UHierarchicalInstancedStaticMeshComponent;
@@ -75,10 +76,10 @@ private:
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CanopyTreesC;
 
     UPROPERTY(EditAnywhere, Category = "Yarlung Scenery")
-    FString TrackCsvRelativePath = TEXT("Generated/YarlungLandscape/YarlungTrack.csv");
+    FString TrackCsvRelativePath = YarlungGeneratedPaths::TrackCsvRelative;
 
     UPROPERTY(EditAnywhere, Category = "Yarlung Scenery")
-    FString HeightmapRelativePath = TEXT("Generated/YarlungLandscape/YarlungTsangpo_1009.r16");
+    FString HeightmapRelativePath = YarlungGeneratedPaths::HeightmapRelative;
 
     void RebuildScenery();
     bool LoadSceneryTrack(TArray<FYarlungSceneryTrackSample>& OutSamples) const;

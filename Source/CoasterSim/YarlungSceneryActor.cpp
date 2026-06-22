@@ -2,6 +2,7 @@
 
 #include "YarlungAssetConfig.h"
 #include "YarlungCorridorProfile.h"
+#include "YarlungGeneratedPaths.h"
 #include "YarlungRiverField.h"
 #include "YarlungTerrainProfile.h"
 #include "YarlungTrackCsv.h"
@@ -651,7 +652,7 @@ void AYarlungSceneryActor::AddCliffBelt(
 
 void AYarlungSceneryActor::ApplyMaterials(const FYarlungAssetConfig& AssetConfig)
 {
-    UMaterialInterface* TintMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
+    UMaterialInterface* TintMaterial = LoadObject<UMaterialInterface>(nullptr, YarlungGeneratedPaths::CoasterTintMaterialObjectPath);
     const auto ApplyTint = [TintMaterial](UHierarchicalInstancedStaticMeshComponent* Component, const FLinearColor& Color)
     {
         if (!Component || !TintMaterial)

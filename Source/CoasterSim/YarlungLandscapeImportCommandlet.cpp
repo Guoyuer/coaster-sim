@@ -8,6 +8,7 @@
 #include "YarlungSceneryActor.h"
 #include "YarlungMeshTerrainActor.h"
 #include "YarlungCorridorProfile.h"
+#include "YarlungGeneratedPaths.h"
 #include "YarlungTerrainProfile.h"
 #include "YarlungTerrainRelief.h"
 #include "YarlungTrackCsv.h"
@@ -32,9 +33,9 @@ namespace
 {
 // Heightmap dimensions + world bounds come from YarlungTerrain::Config()
 // (Config/yarlung-terrain.json), shared with the Python pipeline and scenery.
-const TCHAR* YarlungCorridorTerrainMeshPackagePath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungCorridorTerrain");
-const TCHAR* YarlungCorridorTerrainMeshAssetName = TEXT("SM_YarlungCorridorTerrain");
-const TCHAR* YarlungCorridorTerrainMeshObjectPath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungCorridorTerrain.SM_YarlungCorridorTerrain");
+const TCHAR* YarlungCorridorTerrainMeshPackagePath = YarlungGeneratedPaths::CorridorTerrainMeshPackagePath;
+const TCHAR* YarlungCorridorTerrainMeshAssetName = YarlungGeneratedPaths::CorridorTerrainMeshAssetName;
+const TCHAR* YarlungCorridorTerrainMeshObjectPath = YarlungGeneratedPaths::CorridorTerrainMeshObjectPath;
 
 float YarlungCubicBsplineInterp(float P0, float P1, float P2, float P3, float T)
 {
@@ -196,7 +197,7 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
 
 bool LoadYarlungTerrainTrackPoints(TArray<YarlungViewCorridor::FTrackPoint>& OutTrackPoints)
 {
-    const FString Path = FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungTrack.csv");
+    const FString Path = YarlungGeneratedPaths::ProjectContentFile(YarlungGeneratedPaths::TrackCsvRelative);
     TArray<FYarlungTrackRow> Rows;
     FString Error;
     if (!YarlungTrackCsv::Load(Path, Rows, &Error))
@@ -436,12 +437,10 @@ void ComputeBaseTerrainNormalsAndColors(
 
 UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightData)
 {
-    UMaterialInterface* Material = LoadObject<UMaterialInterface>(
-        nullptr,
-        TEXT("/Game/Generated/Materials/M_YarlungMeshTerrain.M_YarlungMeshTerrain"));
+    UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, YarlungGeneratedPaths::MeshTerrainMaterialObjectPath);
     if (!Material)
     {
-        UE_LOG(LogTemp, Fatal, TEXT("Missing required mesh terrain material: /Game/Generated/Materials/M_YarlungMeshTerrain.M_YarlungMeshTerrain"));
+        UE_LOG(LogTemp, Fatal, TEXT("Missing required mesh terrain material: %s"), YarlungGeneratedPaths::MeshTerrainMaterialObjectPath);
     }
 
     TArray<YarlungViewCorridor::FTrackPoint> TrackPoints;
@@ -660,8 +659,8 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
 // for most of the route. This mesh follows the riverbed spline at a shallow
 // authored surface height and stays inside the carved thalweg instead of reading
 // as a raised floodplain slab.
-const TCHAR* YarlungRiverSurfaceMeshPackagePath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungRiverSurface");
-const TCHAR* YarlungRiverSurfaceMeshAssetName = TEXT("SM_YarlungRiverSurface");
+const TCHAR* YarlungRiverSurfaceMeshPackagePath = YarlungGeneratedPaths::RiverSurfaceMeshPackagePath;
+const TCHAR* YarlungRiverSurfaceMeshAssetName = YarlungGeneratedPaths::RiverSurfaceMeshAssetName;
 
 UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverField)
 {
@@ -865,9 +864,8 @@ UStaticMesh* LoadExistingYarlungCorridorTerrainStaticMesh()
 bool LoadYarlungHeightmap(TArray<uint16>& OutHeightData)
 {
     const int32 Size = YarlungTerrain::Config().GridSize;
-    const FString HeightmapPath = FPaths::ConvertRelativePathToFull(FPaths::Combine(
-        FPaths::ProjectContentDir(),
-        TEXT("Generated/YarlungLandscape/YarlungTsangpo_1009.r16")));
+    const FString HeightmapPath = FPaths::ConvertRelativePathToFull(
+        YarlungGeneratedPaths::ProjectContentFile(YarlungGeneratedPaths::HeightmapRelative));
 
     TArray<uint8> RawBytes;
     if (!FFileHelper::LoadFileToArray(RawBytes, *HeightmapPath))
@@ -981,7 +979,7 @@ UYarlungLandscapeImportCommandlet::UYarlungLandscapeImportCommandlet()
 int32 UYarlungLandscapeImportCommandlet::Main(const FString& Params)
 {
 #if WITH_EDITOR
-    const FString MapPackagePath = TEXT("/Game/Generated/YarlungLandscape/YarlungLandscape_Level");
+    const FString MapPackagePath = YarlungGeneratedPaths::LandscapeMapPackagePath;
     const bool bSkipTerrainMeshBuild = Params.Contains(TEXT("SkipTerrainMeshBuild"), ESearchCase::IgnoreCase);
 
     UStaticMesh* CorridorTerrainAsset = nullptr;

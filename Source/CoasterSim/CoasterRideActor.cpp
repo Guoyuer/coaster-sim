@@ -5,6 +5,7 @@
 #include "CoasterTrackVisuals.h"
 #include "CoasterTrackComponent.h"
 #include "YarlungAtmosphere.h"
+#include "YarlungGeneratedPaths.h"
 
 #include "Camera/CameraComponent.h"
 #include "Components/DirectionalLightComponent.h"
@@ -188,7 +189,7 @@ void ACoasterRideActor::PositionRideForCommandLineSeconds(float StartSeconds)
 
 void ACoasterRideActor::RebuildSpline()
 {
-    const FString GeneratedTrackPath = FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungTrack.csv");
+    const FString GeneratedTrackPath = YarlungGeneratedPaths::ProjectContentFile(YarlungGeneratedPaths::TrackCsvRelative);
     if (!TrackSpline->LoadGeneratedTrack(GeneratedTrackPath))
     {
         UE_LOG(LogTemp, Fatal, TEXT("Unable to rebuild coaster spline because generated long-track CSV failed to load: %s"), *GeneratedTrackPath);

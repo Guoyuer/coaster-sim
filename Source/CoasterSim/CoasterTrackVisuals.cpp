@@ -1,6 +1,7 @@
 #include "CoasterTrackVisuals.h"
 
 #include "CoasterTrackComponent.h"
+#include "YarlungGeneratedPaths.h"
 
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/MeshComponent.h"
@@ -27,10 +28,10 @@ void ApplyTint(UMeshComponent* Component, const FLinearColor& Color, float Metal
         return;
     }
 
-    UMaterialInterface* TintMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
+    UMaterialInterface* TintMaterial = LoadObject<UMaterialInterface>(nullptr, YarlungGeneratedPaths::CoasterTintMaterialObjectPath);
     if (!TintMaterial)
     {
-        UE_LOG(LogTemp, Fatal, TEXT("Required track tint material is missing: /Game/Generated/Materials/M_CoasterTint.M_CoasterTint"));
+        UE_LOG(LogTemp, Fatal, TEXT("Required track tint material is missing: %s"), YarlungGeneratedPaths::CoasterTintMaterialObjectPath);
     }
     Component->SetMaterial(0, TintMaterial);
 
