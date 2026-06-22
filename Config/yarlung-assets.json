@@ -10,6 +10,14 @@
         "seed": 0.0
       },
       {
+        "name": "RiverbankBoulders",
+        "mesh": "/Game/Fab/Megascans/3D/Beach_Boulder_uisjbbis/Medium/uisjbbis_tier_2/StaticMeshes/uisjbbis_tier_2.uisjbbis_tier_2",
+        "kind": "riverbank_boulder",
+        "placement": "scatter",
+        "count": 900,
+        "seed": 71.0
+      },
+      {
         "name": "UnderstoryClumps",
         "mesh": "/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_05.spruce_small_05",
         "kind": "shrub",
@@ -121,6 +129,21 @@
         "height_offset_cm": 24.0,
         "align_to_surface": true
       },
+      "riverbank_boulder": {
+        "side_bias": 0.54,
+        "distance_power": 0.58,
+        "min_lateral_cm": 5000.0,
+        "max_lateral_cm": 105000.0,
+        "river_clearance_cm": 6000.0,
+        "min_height_cm": 250000.0,
+        "max_height_cm": 430000.0,
+        "min_slope": 0.0,
+        "max_slope": 0.9,
+        "scale_min": 1.1,
+        "scale_max": 4.4,
+        "height_offset_cm": 36.0,
+        "align_to_surface": true
+      },
       "cliff": {
         "side_bias": 0.7,
         "distance_power": 1.05,
@@ -170,49 +193,56 @@
     "canopy_belt": {
       "sample_stride": 1,
       "lateral_bands_cm": [
+        4500.0,
+        6000.0,
+        7000.0,
         9000.0,
-        14000.0,
-        20000.0,
-        28000.0,
-        38000.0,
-        52000.0,
-        70000.0,
-        92000.0,
-        118000.0
+        13000.0,
+        18000.0,
+        25000.0,
+        34000.0,
+        46000.0,
+        62000.0,
+        82000.0,
+        108000.0,
+        138000.0,
+        176000.0,
+        222000.0
       ],
-      "near_band_count": 5,
-      "near_occupancy": 0.96,
-      "far_occupancy": 0.78,
-      "river_clearance_cm": 18000.0,
-      "min_height_cm": 262000.0,
-      "max_height_cm": 476000.0,
-      "max_slope": 0.9,
-      "scale_min": 1.30,
-      "scale_max": 3.20,
+      "near_band_count": 9,
+      "near_occupancy": 1.0,
+      "far_occupancy": 0.96,
+      "river_clearance_cm": 6000.0,
+      "min_height_cm": 250000.0,
+      "max_height_cm": 500000.0,
+      "max_slope": 1.0,
+      "scale_min": 1.85,
+      "scale_max": 5.35,
       "height_offset_cm": 50.0
     },
     "cliff_belt": {
       "sample_stride": 2,
       "lateral_bands_cm": [
+        45000.0,
+        65000.0,
         85000.0,
         120000.0,
         160000.0,
-        210000.0,
-        270000.0
+        220000.0
       ],
-      "occupancy": 0.22,
-      "track_clearance_cm": 65000.0,
-      "river_clearance_cm": 26000.0,
-      "min_height_cm": 262000.0,
+      "occupancy": 0.46,
+      "track_clearance_cm": 42000.0,
+      "river_clearance_cm": 15000.0,
+      "min_height_cm": 250000.0,
       "max_height_cm": 540000.0,
       "min_slope": 0.02,
       "max_slope": 1.0,
-      "scale_min": 1.4,
-      "scale_max": 4.6,
+      "scale_min": 1.9,
+      "scale_max": 6.2,
       "height_offset_cm": 20.0,
-      "along_jitter_cm": 6200.0,
-      "lateral_jitter_cm": 9000.0,
-      "yaw_jitter_degrees": 26.0
+      "along_jitter_cm": 7200.0,
+      "lateral_jitter_cm": 11000.0,
+      "yaw_jitter_degrees": 34.0
     }
   },
   "water": {

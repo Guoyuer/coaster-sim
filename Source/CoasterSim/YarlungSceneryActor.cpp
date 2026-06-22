@@ -61,6 +61,11 @@ AYarlungSceneryActor::AYarlungSceneryActor()
     RockOutcrops->SetCastShadow(true);
     RockOutcrops->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+    RiverbankBoulders = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("RiverbankBoulders"));
+    RiverbankBoulders->SetupAttachment(SceneRoot);
+    RiverbankBoulders->SetCastShadow(true);
+    RiverbankBoulders->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
     UnderstoryClumps = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("UnderstoryClumps"));
     UnderstoryClumps->SetupAttachment(SceneRoot);
     UnderstoryClumps->SetCastShadow(false);
@@ -133,6 +138,7 @@ void AYarlungSceneryActor::BeginPlay()
     {
         SetActorHiddenInGame(true);
         RockOutcrops->SetVisibility(false, true);
+        RiverbankBoulders->SetVisibility(false, true);
         UnderstoryClumps->SetVisibility(false, true);
         CliffRockFacesA->SetVisibility(false, true);
         CliffRockFacesB->SetVisibility(false, true);
@@ -192,6 +198,7 @@ void AYarlungSceneryActor::ConfigureMeshesFromAssets(const FYarlungAssetConfig& 
 UHierarchicalInstancedStaticMeshComponent* AYarlungSceneryActor::ComponentByName(const FString& Name) const
 {
     if (Name == TEXT("RockOutcrops")) { return RockOutcrops; }
+    if (Name == TEXT("RiverbankBoulders")) { return RiverbankBoulders; }
     if (Name == TEXT("UnderstoryClumps")) { return UnderstoryClumps; }
     if (Name == TEXT("CliffRockFacesA")) { return CliffRockFacesA; }
     if (Name == TEXT("CliffRockFacesB")) { return CliffRockFacesB; }
@@ -209,6 +216,7 @@ UHierarchicalInstancedStaticMeshComponent* AYarlungSceneryActor::ComponentByName
 void AYarlungSceneryActor::ClearAllInstances()
 {
     RockOutcrops->ClearInstances();
+    RiverbankBoulders->ClearInstances();
     UnderstoryClumps->ClearInstances();
     CliffRockFacesA->ClearInstances();
     CliffRockFacesB->ClearInstances();
@@ -361,8 +369,9 @@ void AYarlungSceneryActor::BuildScatter(
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Yarlung scatter instances: rocks=%d understory=%d cliff_a=%d cliff_b=%d cliff_c=%d cliff_d=%d cliff_e=%d shrubs_a=%d shrubs_b=%d canopy_a=%d canopy_b=%d canopy_c=%d"),
+        TEXT("Yarlung scatter instances: rocks=%d riverbank=%d understory=%d cliff_a=%d cliff_b=%d cliff_c=%d cliff_d=%d cliff_e=%d shrubs_a=%d shrubs_b=%d canopy_a=%d canopy_b=%d canopy_c=%d"),
         RockOutcrops->GetInstanceCount(),
+        RiverbankBoulders->GetInstanceCount(),
         UnderstoryClumps->GetInstanceCount(),
         CliffRockFacesA->GetInstanceCount(),
         CliffRockFacesB->GetInstanceCount(),
@@ -431,7 +440,7 @@ void AYarlungSceneryActor::AddScatterRule(
         return;
     }
 
-    const bool bBoulder = ComponentConfig.Kind == TEXT("boulder");
+    const bool bBoulder = ComponentConfig.Kind.Contains(TEXT("boulder"), ESearchCase::IgnoreCase);
     const bool bCliff = ComponentConfig.Kind == TEXT("cliff");
     const bool bCanopyTree = ComponentConfig.Kind == TEXT("canopy_tree");
     const float Seed = ComponentConfig.Seed;

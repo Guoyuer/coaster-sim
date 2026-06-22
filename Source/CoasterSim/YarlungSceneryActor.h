@@ -39,6 +39,9 @@ private:
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> RockOutcrops;
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
+    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> RiverbankBoulders;
+
+    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> UnderstoryClumps;
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
