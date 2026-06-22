@@ -19,6 +19,7 @@
 | `docs/specs/photoreal-acceptance.md` | 验收 spec：到位定义 + 打分量规 + 每阶段出口标准 |
 | `docs/plans/photoreal-progress.md` | 进度状态（**你每轮都要更新它**，断点续跑靠它） |
 | `docs/plans/codex-iteration-scaffold.md` | Codex 迭代脚手架：按改动类型选 Actor/Material/Terrain/Full/ScreenshotOnly 快循环 |
+| `docs/plans/visual-false-negative-audit.md` | 视觉路线假阴性复审：否定方向前必须先排除 pipeline/资产/遮挡/截图 bug |
 | `docs/reviews/README.md` / `docs/reviews/*.md` | 独立外审入口、模板与原文归档；reviewer 意见不混进打分记录 |
 | `docs/refs/README.md` | 参照照片收集说明 + 评分锚点 |
 | `CONTEXT.md` / `docs/specs/visual.md` | 视觉锚点与规范 |
@@ -60,6 +61,7 @@
 8. **判定**：
    - 达到该任务/阶段出口标准 → 标记完成。
    - 出现回归或不达标 → 用 systematic-debugging 找**根因**（材质图错误、光照量级、时序、moire 等），**不许用临时覆盖几何/调色掩盖**。
+   - 若准备否定某条视觉方向或路线，先按 `docs/plans/visual-false-negative-audit.md` 做假阴性复审，并把结论标成 `BUG` / `CONTENT-LIMIT` / `DIRECTION-LIMIT`。没有隔离证据时，禁止把方向写成失败，只能写 WIP / 需复审。
 9. **提交**：一个任务一个 commit，message 末尾加 `Co-Authored-By: Claude <noreply@anthropic.com>` 行（按仓库约定）。
 10. **写状态**：更新 `photoreal-progress.md`（当前阶段、分数、截图名、根因/决策、下一步；若外审项被处理，也更新外审索引/待办）。
 11. **回到 1**，直到 §5 的"到位"全部满足。
@@ -79,6 +81,7 @@
 - ❌ headless 脚本只信 exit code——保留 success-marker / 资产存在性校验。
 - ❌ 把预算花在相机看不到的走廊外、或高速近景上（违反优先级 2）。
 - ❌ 接 corridor terrain / DEM-derived surface 近景法线不做宏观/微观尺度分离（会重现 moire）。
+- ❌ 视觉效果不符合预期就直接否定路线——必须先排除 pipeline bug、资产接线、遮挡、曝光、截图时点和验收 gate 问题。
 
 ## 5. 到位 = 停止条件
 全部满足才算到位（细则见 `photoreal-acceptance.md`）：
