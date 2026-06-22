@@ -191,9 +191,7 @@ void ACoasterRideActor::RebuildSpline()
     const FString GeneratedTrackPath = FPaths::ProjectContentDir() / TEXT("Generated/YarlungLandscape/YarlungTrack.csv");
     if (!TrackSpline->LoadGeneratedTrack(GeneratedTrackPath))
     {
-        UE_LOG(LogTemp, Error, TEXT("Unable to rebuild coaster spline because generated long-track CSV failed to load."));
-        TrackLengthCm = 1.0f;
-        return;
+        UE_LOG(LogTemp, Fatal, TEXT("Unable to rebuild coaster spline because generated long-track CSV failed to load: %s"), *GeneratedTrackPath);
     }
 
     TrackLengthCm = TrackSpline->GetTrackLengthCm();

@@ -402,7 +402,7 @@ def naturalize_height_grid(heights: list[float]) -> list[float]:
     return relax_height_slopes(conditioned, max_slope=0.78, passes=8)
 
 
-def read_outbound_softening_polyline(path: Path) -> list[tuple[float, float]]:
+def read_track_softening_polyline(path: Path) -> list[tuple[float, float]]:
     if not path.exists():
         return []
 
@@ -410,8 +410,7 @@ def read_outbound_softening_polyline(path: Path) -> list[tuple[float, float]]:
     with path.open("r", newline="", encoding="ascii") as handle:
         reader = csv.DictReader(handle)
         for row in reader:
-            if row.get("section") == "Outbound":
-                points.append((float(row["x"]), float(row["y"])))
+            points.append((float(row["x"]), float(row["y"])))
     return points
 
 
@@ -471,20 +470,17 @@ def nearest_softening_frame(x: float, y: float, segments, search_radius_cm: floa
     return best
 
 
-def soften_outbound_cliff_slope(
+def soften_ride_corridor_cliff_slope(
     heights: list[float],
     track_path: Path,
 ) -> tuple[list[float], dict[str, object]]:
-    points = read_outbound_softening_polyline(track_path)
+    points = read_track_softening_polyline(track_path)
     if len(points) < 3:
-        return heights, {
-            "enabled": False,
-            "reason": f"missing or insufficient Outbound track guide: {track_path}",
-        }
+        raise RuntimeError(f"missing or insufficient track guide for ride-corridor terrain softening: {track_path}")
 
     segments = build_softening_segments(points)
     if not segments:
-        return heights, {"enabled": False, "reason": "no valid Outbound softening segments"}
+        raise RuntimeError(f"no valid track softening segments in track guide: {track_path}")
 
     inner_cm = 5000.0
     outer_cm = 112000.0
@@ -549,7 +545,7 @@ def soften_outbound_cliff_slope(
     return smoothed, {
         "enabled": True,
         "track_guide": str(track_path),
-        "source": "previous generated Outbound track guide; track CSV is regenerated after terrain generation",
+        "source": "previous generated full-track guide; track CSV is regenerated after terrain generation",
         "inner_cm": inner_cm,
         "outer_cm": outer_cm,
         "max_slope_rise_per_run": max_slope,
@@ -662,13 +658,13 @@ def main() -> None:
 
     source_heights, source_metadata = build_copernicus_height_grid(Path(args.dem_cache))
     source_heights = naturalize_height_grid(source_heights)
-    source_heights, outbound_softening = soften_outbound_cliff_slope(source_heights, Path(args.track_guide))
+    source_heights, ride_corridor_softening = soften_ride_corridor_cliff_slope(source_heights, Path(args.track_guide))
     source_metadata["naturalization"] = {
         "enabled": NATURALIZE_STEEP_TERRAIN,
         "purpose": "Preserve broad Yarlung canyon shapes while reshaping near-vertical 30m DEM cliffs into ride-scale natural slopes for first-person photorealism.",
         "broad_blur": "box blur radius=18, passes=3, steep-relief weighted blend",
         "slope_relaxation": "max_slope=0.78, passes=8",
-        "outbound_cliff_softening": outbound_softening,
+        "ride_corridor_cliff_softening": ride_corridor_softening,
     }
 
     river_guide = build_dem_river_guide(source_heights)
@@ -746,12 +742,12 @@ def main() -> None:
         manifest["track"] = previous_manifest["track"]
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     (out_dir / "README.md").write_text(
-        "# Yarlung Tsangpo Landscape Assets\n\n"
-        "- `YarlungTsangpo_1009.r16`: Unreal Landscape heightmap import source.\n"
+        "# Yarlung Tsangpo Generated Assets\n\n"
+        "- `YarlungTsangpo_1009.r16`: DEM/r16 source data for the generated corridor terrain StaticMesh. The current visible terrain is `SM_YarlungCorridorTerrain`, not UE `ALandscape`.\n"
         "- `YarlungTsangpo_preview.ppm`: dependency-free color preview of the terrain.\n"
         "- `YarlungTsangpo_hillshade.png`: real-scale DEM hillshade preview for bbox/orientation checks.\n"
         "- `YarlungTsangpo_masks.ppm`: RGB mask preview where red=river, green=forest, blue=rock/snow.\n"
-        "- `YarlungRiver.csv`: DEM-thalweg river ribbon samples for the scenery river actor.\n"
+        "- `YarlungRiver.csv`: DEM-thalweg river samples used by UE Water, fog anchoring, explicit river surface mesh, and spatial diagnostics.\n"
         "- `manifest.json`: import scale and layer notes.\n",
         encoding="utf-8",
     )

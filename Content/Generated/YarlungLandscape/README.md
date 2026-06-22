@@ -4,5 +4,5 @@
 - `YarlungTsangpo_preview.ppm`: dependency-free color preview of the terrain.
 - `YarlungTsangpo_hillshade.png`: real-scale DEM hillshade preview for bbox/orientation checks.
 - `YarlungTsangpo_masks.ppm`: RGB mask preview where red=river, green=forest, blue=rock/snow.
-- `YarlungRiver.csv`: DEM-thalweg river samples used by UE Water, fog anchoring, and spatial diagnostics.
+- `YarlungRiver.csv`: DEM-thalweg river samples used by UE Water, fog anchoring, explicit river surface mesh, and spatial diagnostics.
 - `manifest.json`: import scale and layer notes.

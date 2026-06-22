@@ -120,7 +120,7 @@ ECoasterSection UCoasterTrackComponent::GetSectionAtDistance(float DistanceCm) c
 {
     if (SectionRanges.IsEmpty())
     {
-        UE_LOG(LogTemp, Error, TEXT("Generated coaster section ranges are unavailable; using Coast sentinel."));
+        UE_LOG(LogTemp, Fatal, TEXT("Generated coaster section ranges are unavailable."));
         return ECoasterSection::Coast;
     }
 
@@ -151,7 +151,7 @@ float UCoasterTrackComponent::GetGeneratedBankRadiansAtDistance(float DistanceCm
 {
     if (GeneratedRollDegrees.Num() < 2 || GeneratedRollSampleDistancesCm.Num() != GeneratedRollDegrees.Num() + 1)
     {
-        UE_LOG(LogTemp, Error, TEXT("Generated coaster roll samples are unavailable; using zero bank."));
+        UE_LOG(LogTemp, Fatal, TEXT("Generated coaster roll samples are unavailable."));
         return 0.0f;
     }
 
@@ -184,7 +184,7 @@ float UCoasterTrackComponent::GetGeneratedTerrainZAtDistance(float DistanceCm) c
 {
     if (GeneratedTerrainZCm.Num() < 2 || GeneratedRollSampleDistancesCm.Num() != GeneratedTerrainZCm.Num() + 1)
     {
-        UE_LOG(LogTemp, Error, TEXT("Generated coaster terrain samples are unavailable; using zero terrain height."));
+        UE_LOG(LogTemp, Fatal, TEXT("Generated coaster terrain samples are unavailable."));
         return 0.0f;
     }
 

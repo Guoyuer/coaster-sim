@@ -162,8 +162,7 @@ void AYarlungSceneryActor::RebuildScenery()
     TArray<uint16> HeightData;
     if (!LoadSceneryTrack(TrackSamples) || !LoadHeightmap(HeightData))
     {
-        ClearAllInstances();
-        return;
+        UE_LOG(LogTemp, Fatal, TEXT("Yarlung scenery requires generated track and heightmap inputs."));
     }
 
     BuildScatter(TrackSamples, HeightData, AssetConfig);
@@ -326,8 +325,7 @@ void AYarlungSceneryActor::BuildScatter(
     FString RiverLoadError;
     if (!RiverField.LoadFromProjectContent(&RiverLoadError))
     {
-        UE_LOG(LogTemp, Error, TEXT("Yarlung scenery requires generated river field: %s"), *RiverLoadError);
-        return;
+        UE_LOG(LogTemp, Fatal, TEXT("Yarlung scenery requires generated river field: %s"), *RiverLoadError);
     }
 
     for (const FYarlungSceneryComponentConfig& ComponentConfig : AssetConfig.SceneryComponents)

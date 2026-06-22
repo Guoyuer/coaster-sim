@@ -166,8 +166,7 @@ bool AnchorFogToGeneratedRiver(UExponentialHeightFogComponent* ValleyFog)
     float RiverSurfaceZCm = 0.0f;
     if (!LoadGeneratedRiverAverageZCm(RiverSurfaceZCm))
     {
-        ValleyFog->SetVisibility(false, true);
-        UE_LOG(LogTemp, Error, TEXT("Generated Yarlung river CSV is required for valley fog; fog disabled."));
+        UE_LOG(LogTemp, Fatal, TEXT("Generated Yarlung river CSV is required for valley fog."));
         return false;
     }
 

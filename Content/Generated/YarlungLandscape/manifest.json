@@ -35,17 +35,17 @@
       "purpose": "Preserve broad Yarlung canyon shapes while reshaping near-vertical 30m DEM cliffs into ride-scale natural slopes for first-person photorealism.",
       "broad_blur": "box blur radius=18, passes=3, steep-relief weighted blend",
       "slope_relaxation": "max_slope=0.78, passes=8",
-      "outbound_cliff_softening": {
+      "ride_corridor_cliff_softening": {
         "enabled": true,
         "track_guide": "Content\\Generated\\YarlungLandscape\\YarlungTrack.csv",
-        "source": "previous generated Outbound track guide; track CSV is regenerated after terrain generation",
+        "source": "previous generated full-track guide; track CSV is regenerated after terrain generation",
         "inner_cm": 5000.0,
         "outer_cm": 112000.0,
         "max_slope_rise_per_run": 0.45,
         "base_lift_cm": 2400.0,
-        "affected_samples": 48257,
-        "max_lowered_cm": 27057.425,
-        "mean_lowered_cm": 6266.932,
+        "affected_samples": 74899,
+        "max_lowered_cm": 39752.624,
+        "mean_lowered_cm": 7815.319,
         "purpose": "Replace the grazing-angle DEM-derived cliff wall with a corridor-mesh-friendly natural slope instead of a fascia mesh."
       }
     },
@@ -93,18 +93,18 @@
   },
   "track": {
     "path": "C:/Users/guoyu/Projects/coaster-sim/Content/Generated/YarlungLandscape/YarlungTrack.csv",
-    "length_m": 5447.83,
+    "length_m": 5447.91,
     "control_point_count": 226,
-    "out_back_split_m": 2723.92,
+    "out_back_split_m": 2723.95,
     "min_clearance_m": 72.0,
     "section_distances_m": {
-      "Station": 304.2,
-      "Lift": 566.34,
-      "Outbound": 2074.24,
+      "Station": 304.21,
+      "Lift": 566.35,
+      "Outbound": 2074.26,
       "Turnaround": 392.0,
-      "Return": 1169.48,
-      "Launch": 573.42,
-      "Brake": 368.15
+      "Return": 1169.51,
+      "Launch": 573.43,
+      "Brake": 368.16
     },
     "banking": {
       "roll_source": "curvature-derived",
