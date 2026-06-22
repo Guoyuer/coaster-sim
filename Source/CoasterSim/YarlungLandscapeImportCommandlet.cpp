@@ -15,6 +15,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Editor.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "FileHelpers.h"
 #include "Materials/MaterialInterface.h"
 #include "MeshDescription.h"
@@ -633,6 +634,161 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
     return StaticMesh;
 }
 
+// Explicit sloped river-surface ribbon. UE Water's WaterZone renders the river
+// surface as a flat plane at the zone Z, which the descending valley floor buries
+// for most of the route. This mesh follows the riverbed spline at the authored
+// water-surface height, so the water always sits ~5 m above the carved channel
+// floor and reads as a river winding down the gorge.
+const TCHAR* YarlungRiverSurfaceMeshPackagePath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungRiverSurface");
+const TCHAR* YarlungRiverSurfaceMeshAssetName = TEXT("SM_YarlungRiverSurface");
+
+UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverField)
+{
+    UMaterialInterface* Material = LoadObject<UMaterialInterface>(
+        nullptr,
+        TEXT("/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface"));
+    if (!Material)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Missing required river surface material: /Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface"));
+        return nullptr;
+    }
+
+    const TArray<FYarlungRiverRow>& Rows = RiverField.GetRows();
+    if (Rows.Num() < 2)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Too few river rows to build river surface: %d"), Rows.Num());
+        return nullptr;
+    }
+
+    UPackage* MeshPackage = CreatePackage(YarlungRiverSurfaceMeshPackagePath);
+    MeshPackage->FullyLoad();
+    MeshPackage->Modify();
+    if (UObject* Existing = StaticFindObject(UStaticMesh::StaticClass(), MeshPackage, YarlungRiverSurfaceMeshAssetName))
+    {
+        ResetLoaders(MeshPackage);
+        Existing->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_AllowPackageLinkerMismatch);
+    }
+
+    UStaticMesh* StaticMesh = NewObject<UStaticMesh>(
+        MeshPackage,
+        FName(YarlungRiverSurfaceMeshAssetName),
+        RF_Public | RF_Standalone);
+    StaticMesh->InitResources();
+    StaticMesh->SetLightingGuid();
+    StaticMesh->GetStaticMaterials().Add(FStaticMaterial(Material, TEXT("YarlungRiverSurface"), TEXT("YarlungRiverSurface")));
+    StaticMesh->SetImportVersion(EImportStaticMeshVersion::LastVersion);
+
+    FStaticMeshSourceModel& SourceModel = StaticMesh->AddSourceModel();
+    SourceModel.BuildSettings.bRecomputeNormals = false;
+    SourceModel.BuildSettings.bRecomputeTangents = false;
+    SourceModel.BuildSettings.bRemoveDegenerates = false;
+    SourceModel.BuildSettings.bUseFullPrecisionUVs = true;
+
+    FMeshDescription* MeshDescription = StaticMesh->CreateMeshDescription(0);
+    FStaticMeshAttributes(*MeshDescription).Register();
+    FMeshDescriptionBuilder Builder;
+    Builder.SetMeshDescription(MeshDescription);
+    Builder.SetNumUVLayers(1);
+
+    // Two vertices (left/right bank) per river row, lifted to the water surface.
+    const int32 RowCount = Rows.Num();
+    TArray<FVector> Left;
+    TArray<FVector> Right;
+    Left.SetNumUninitialized(RowCount);
+    Right.SetNumUninitialized(RowCount);
+    float MinSurfaceZ = TNumericLimits<float>::Max();
+    float MaxSurfaceZ = -TNumericLimits<float>::Max();
+    for (int32 Index = 0; Index < RowCount; ++Index)
+    {
+        const FVector Center = Rows[Index].PositionCm;
+        const FVector Next = Rows[FMath::Min(Index + 1, RowCount - 1)].PositionCm;
+        const FVector Prev = Rows[FMath::Max(Index - 1, 0)].PositionCm;
+        FVector2D Tangent = FVector2D(Next.X - Prev.X, Next.Y - Prev.Y).GetSafeNormal();
+        if (Tangent.IsNearlyZero())
+        {
+            Tangent = FVector2D(1.0f, 0.0f);
+        }
+        const FVector2D Normal(-Tangent.Y, Tangent.X);
+        // Keep the ribbon inside the flat-carved channel so its banks clear terrain.
+        const float HalfWidth = FMath::Clamp(Rows[Index].HalfWidthCm, 12000.0f, 24000.0f);
+        const float SurfaceZ = Center.Z + FYarlungRiverField::DefaultWaterSurfaceLiftCm;
+        MinSurfaceZ = FMath::Min(MinSurfaceZ, SurfaceZ);
+        MaxSurfaceZ = FMath::Max(MaxSurfaceZ, SurfaceZ);
+        Left[Index] = FVector(Center.X + Normal.X * HalfWidth, Center.Y + Normal.Y * HalfWidth, SurfaceZ);
+        Right[Index] = FVector(Center.X - Normal.X * HalfWidth, Center.Y - Normal.Y * HalfWidth, SurfaceZ);
+    }
+
+    FPolygonGroupID PolygonGroup = Builder.AppendPolygonGroup(TEXT("YarlungRiverSurface"));
+    TArray<FVertexID> LeftIds;
+    TArray<FVertexID> RightIds;
+    LeftIds.Reserve(RowCount);
+    RightIds.Reserve(RowCount);
+    for (int32 Index = 0; Index < RowCount; ++Index)
+    {
+        LeftIds.Add(Builder.AppendVertex(Left[Index]));
+        RightIds.Add(Builder.AppendVertex(Right[Index]));
+    }
+
+    const FVector SurfaceNormal = FVector::UpVector;
+    const auto AppendTri = [&](const FVertexID& A, const FVertexID& B, const FVertexID& C, const FVector2D& UvA, const FVector2D& UvB, const FVector2D& UvC)
+    {
+        const FVertexInstanceID IA = Builder.AppendInstance(A);
+        const FVertexInstanceID IB = Builder.AppendInstance(B);
+        const FVertexInstanceID IC = Builder.AppendInstance(C);
+        const FVertexInstanceID Instances[3] = { IA, IB, IC };
+        const FVector2D Uvs[3] = { UvA, UvB, UvC };
+        for (int32 Corner = 0; Corner < 3; ++Corner)
+        {
+            Builder.SetInstanceTangentSpace(Instances[Corner], SurfaceNormal, FVector::XAxisVector, 1.0f);
+            Builder.SetInstanceUV(Instances[Corner], Uvs[Corner], 0);
+            Builder.SetInstanceColor(Instances[Corner], FVector4f(1.0f, 1.0f, 1.0f, 1.0f));
+        }
+        Builder.AppendTriangle(IA, IB, IC, PolygonGroup);
+    };
+
+    for (int32 Index = 0; Index + 1 < RowCount; ++Index)
+    {
+        const float V0 = static_cast<float>(Index) / static_cast<float>(RowCount - 1);
+        const float V1 = static_cast<float>(Index + 1) / static_cast<float>(RowCount - 1);
+        const FVector2D LeftUv0(0.0f, V0);
+        const FVector2D RightUv0(1.0f, V0);
+        const FVector2D LeftUv1(0.0f, V1);
+        const FVector2D RightUv1(1.0f, V1);
+        // Wound counter-clockwise seen from above so the surface faces up.
+        AppendTri(LeftIds[Index], LeftIds[Index + 1], RightIds[Index + 1], LeftUv0, LeftUv1, RightUv1);
+        AppendTri(LeftIds[Index], RightIds[Index + 1], RightIds[Index], LeftUv0, RightUv1, RightUv0);
+    }
+
+    StaticMesh->CommitMeshDescription(0);
+
+    FMeshSectionInfo SectionInfo = StaticMesh->GetSectionInfoMap().Get(0, 0);
+    SectionInfo.MaterialIndex = 0;
+    SectionInfo.bEnableCollision = false;
+    StaticMesh->GetSectionInfoMap().Set(0, 0, SectionInfo);
+    StaticMesh->GetOriginalSectionInfoMap().Set(0, 0, SectionInfo);
+
+    StaticMesh->Build();
+    StaticMesh->PostEditChange();
+    StaticMesh->MarkPackageDirty();
+    FAssetRegistryModule::AssetCreated(StaticMesh);
+
+    if (!UEditorLoadingAndSavingUtils::SavePackages({ MeshPackage }, false))
+    {
+        UE_LOG(LogTemp, Error, TEXT("Unable to save Yarlung river surface asset: %s"), YarlungRiverSurfaceMeshPackagePath);
+        return nullptr;
+    }
+
+    UE_LOG(
+        LogTemp,
+        Display,
+        TEXT("Built Yarlung river surface ribbon: %s rows=%d surface_z_cm=%.0f..%.0f"),
+        *StaticMesh->GetPathName(),
+        RowCount,
+        MinSurfaceZ,
+        MaxSurfaceZ);
+    return StaticMesh;
+}
+
 UStaticMesh* LoadExistingYarlungCorridorTerrainStaticMesh()
 {
     UStaticMesh* StaticMesh = LoadObject<UStaticMesh>(nullptr, YarlungCorridorTerrainMeshObjectPath);
@@ -708,6 +864,40 @@ bool SpawnYarlungWorldActors(UWorld* World, UStaticMesh* CorridorTerrainAsset)
     {
         UE_LOG(LogTemp, Error, TEXT("Unable to spawn required Yarlung UE Water actors"));
         return false;
+    }
+
+    // Visible hero water: an explicit sloped river surface that follows the bed,
+    // so the water is never buried by the descending valley floor. UE Water's
+    // dynamic GPU water collapses flat for this river (113 m drop, 363 m wide in a
+    // single zone), so this mesh is the actual rendered water surface.
+    {
+        FYarlungRiverField RiverSurfaceField;
+        FString RiverSurfaceError;
+        if (!RiverSurfaceField.LoadFromProjectContent(&RiverSurfaceError))
+        {
+            UE_LOG(LogTemp, Error, TEXT("Unable to read river field for river surface mesh: %s"), *RiverSurfaceError);
+            return false;
+        }
+        UStaticMesh* RiverSurfaceMesh = BuildYarlungRiverSurfaceStaticMesh(RiverSurfaceField);
+        if (!RiverSurfaceMesh)
+        {
+            UE_LOG(LogTemp, Error, TEXT("Unable to build Yarlung river surface mesh"));
+            return false;
+        }
+        AStaticMeshActor* RiverSurface = World->SpawnActor<AStaticMeshActor>(
+            AStaticMeshActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator);
+        if (!RiverSurface)
+        {
+            UE_LOG(LogTemp, Error, TEXT("Unable to spawn Yarlung river surface actor"));
+            return false;
+        }
+        RiverSurface->SetActorLabel(TEXT("YarlungRiverSurface"));
+        RiverSurface->SetMobility(EComponentMobility::Static);
+        if (UStaticMeshComponent* RiverSurfaceComponent = RiverSurface->GetStaticMeshComponent())
+        {
+            RiverSurfaceComponent->SetStaticMesh(RiverSurfaceMesh);
+            RiverSurfaceComponent->SetMobility(EComponentMobility::Static);
+        }
     }
     if (!Spawn(AYarlungSceneryActor::StaticClass(), TEXT("YarlungForestRockScenery")))
     {

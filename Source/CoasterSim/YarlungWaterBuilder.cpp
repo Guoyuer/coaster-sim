@@ -42,6 +42,10 @@ bool SpawnYarlungWater(UWorld* World)
     const FVector2D ZoneExtent(
         (TerrainConfig.MaxXCm - TerrainConfig.MinXCm) * WaterConfig.ZoneExtentScale,
         (TerrainConfig.MaxYCm - TerrainConfig.MinYCm) * WaterConfig.ZoneExtentScale);
+    // Keep the zone at the low (downstream) river level so UE Water's flat GPU water
+    // tile stays below the explicit sloped river-surface mesh for most of the route.
+    // (Tested: centering the zone on the river midpoint does not make the GPU water
+    // follow the 113 m drop; it still collapses flat, so the mesh is the real surface.)
     WaterZone->SetActorLocation(FVector(
         (TerrainConfig.MinXCm + TerrainConfig.MaxXCm) * 0.5f,
         (TerrainConfig.MinYCm + TerrainConfig.MaxYCm) * 0.5f,
