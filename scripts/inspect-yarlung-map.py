@@ -172,7 +172,7 @@ def main():
             material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
             instance_count = component.get_instance_count()
             total_instances += instance_count
-            is_rock_or_cliff = component.get_name() == "RockOutcrops" or component.get_name().startswith("CliffRockFaces")
+            is_rock_or_cliff = component.get_name() in {"RockOutcrops", "ScreeBoulders"} or component.get_name().startswith("CliffRockFaces")
             if is_rock_or_cliff and instance_count:
                 if not any("/Game/Fab/" in material_name for material_name in material_names):
                     raise RuntimeError(

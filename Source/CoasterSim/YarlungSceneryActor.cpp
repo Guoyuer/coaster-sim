@@ -123,6 +123,11 @@ AYarlungSceneryActor::AYarlungSceneryActor()
     RiverbankBoulders->SetCastShadow(true);
     RiverbankBoulders->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+    ScreeBoulders = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ScreeBoulders"));
+    ScreeBoulders->SetupAttachment(SceneRoot);
+    ScreeBoulders->SetCastShadow(true);
+    ScreeBoulders->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
     UnderstoryClumps = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("UnderstoryClumps"));
     UnderstoryClumps->SetupAttachment(SceneRoot);
     UnderstoryClumps->SetCastShadow(false);
@@ -152,6 +157,21 @@ AYarlungSceneryActor::AYarlungSceneryActor()
     CliffRockFacesE->SetupAttachment(SceneRoot);
     CliffRockFacesE->SetCastShadow(true);
     CliffRockFacesE->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    CliffRockFacesF = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesF"));
+    CliffRockFacesF->SetupAttachment(SceneRoot);
+    CliffRockFacesF->SetCastShadow(true);
+    CliffRockFacesF->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    ForestFloorHalfA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ForestFloorHalfA"));
+    ForestFloorHalfA->SetupAttachment(SceneRoot);
+    ForestFloorHalfA->SetCastShadow(false);
+    ForestFloorHalfA->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    ForestFloorHalfB = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ForestFloorHalfB"));
+    ForestFloorHalfB->SetupAttachment(SceneRoot);
+    ForestFloorHalfB->SetCastShadow(false);
+    ForestFloorHalfB->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     ForestShrubsA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ForestShrubsA"));
     ForestShrubsA->SetupAttachment(SceneRoot);
@@ -196,12 +216,16 @@ void AYarlungSceneryActor::BeginPlay()
         SetActorHiddenInGame(true);
         RockOutcrops->SetVisibility(false, true);
         RiverbankBoulders->SetVisibility(false, true);
+        ScreeBoulders->SetVisibility(false, true);
         UnderstoryClumps->SetVisibility(false, true);
         CliffRockFacesA->SetVisibility(false, true);
         CliffRockFacesB->SetVisibility(false, true);
         CliffRockFacesC->SetVisibility(false, true);
         CliffRockFacesD->SetVisibility(false, true);
         CliffRockFacesE->SetVisibility(false, true);
+        CliffRockFacesF->SetVisibility(false, true);
+        ForestFloorHalfA->SetVisibility(false, true);
+        ForestFloorHalfB->SetVisibility(false, true);
         ForestShrubsA->SetVisibility(false, true);
         ForestShrubsB->SetVisibility(false, true);
         CanopyTreesA->SetVisibility(false, true);
@@ -255,12 +279,16 @@ UHierarchicalInstancedStaticMeshComponent* AYarlungSceneryActor::ComponentByName
 {
     if (Name == TEXT("RockOutcrops")) { return RockOutcrops; }
     if (Name == TEXT("RiverbankBoulders")) { return RiverbankBoulders; }
+    if (Name == TEXT("ScreeBoulders")) { return ScreeBoulders; }
     if (Name == TEXT("UnderstoryClumps")) { return UnderstoryClumps; }
     if (Name == TEXT("CliffRockFacesA")) { return CliffRockFacesA; }
     if (Name == TEXT("CliffRockFacesB")) { return CliffRockFacesB; }
     if (Name == TEXT("CliffRockFacesC")) { return CliffRockFacesC; }
     if (Name == TEXT("CliffRockFacesD")) { return CliffRockFacesD; }
     if (Name == TEXT("CliffRockFacesE")) { return CliffRockFacesE; }
+    if (Name == TEXT("CliffRockFacesF")) { return CliffRockFacesF; }
+    if (Name == TEXT("ForestFloorHalfA")) { return ForestFloorHalfA; }
+    if (Name == TEXT("ForestFloorHalfB")) { return ForestFloorHalfB; }
     if (Name == TEXT("ForestShrubsA")) { return ForestShrubsA; }
     if (Name == TEXT("ForestShrubsB")) { return ForestShrubsB; }
     if (Name == TEXT("CanopyTreesA")) { return CanopyTreesA; }
@@ -273,12 +301,16 @@ void AYarlungSceneryActor::ClearAllInstances()
 {
     RockOutcrops->ClearInstances();
     RiverbankBoulders->ClearInstances();
+    ScreeBoulders->ClearInstances();
     UnderstoryClumps->ClearInstances();
     CliffRockFacesA->ClearInstances();
     CliffRockFacesB->ClearInstances();
     CliffRockFacesC->ClearInstances();
     CliffRockFacesD->ClearInstances();
     CliffRockFacesE->ClearInstances();
+    CliffRockFacesF->ClearInstances();
+    ForestFloorHalfA->ClearInstances();
+    ForestFloorHalfB->ClearInstances();
     ForestShrubsA->ClearInstances();
     ForestShrubsB->ClearInstances();
     CanopyTreesA->ClearInstances();
@@ -409,21 +441,28 @@ void AYarlungSceneryActor::BuildScatter(
         case EYarlungSceneryPlacement::CliffBelt:
             AddCliffBelt(Component, AssetConfig.CliffBelt, ComponentConfig.Seed, TrackSamples, EncodedHeights, RiverField);
             break;
+        case EYarlungSceneryPlacement::GroundCoverBelt:
+            AddGroundCoverBelt(Component, ComponentConfig, *KindConfig, AssetConfig.GroundCoverBelt, TrackSamples, EncodedHeights, RiverField);
+            break;
         }
     }
 
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Yarlung scatter instances: rocks=%d riverbank=%d understory=%d cliff_a=%d cliff_b=%d cliff_c=%d cliff_d=%d cliff_e=%d shrubs_a=%d shrubs_b=%d canopy_a=%d canopy_b=%d canopy_c=%d"),
+        TEXT("Yarlung scatter instances: rocks=%d riverbank=%d scree=%d understory=%d cliff_a=%d cliff_b=%d cliff_c=%d cliff_d=%d cliff_e=%d cliff_f=%d forest_half_a=%d forest_half_b=%d shrubs_a=%d shrubs_b=%d canopy_a=%d canopy_b=%d canopy_c=%d"),
         RockOutcrops->GetInstanceCount(),
         RiverbankBoulders->GetInstanceCount(),
+        ScreeBoulders->GetInstanceCount(),
         UnderstoryClumps->GetInstanceCount(),
         CliffRockFacesA->GetInstanceCount(),
         CliffRockFacesB->GetInstanceCount(),
         CliffRockFacesC->GetInstanceCount(),
         CliffRockFacesD->GetInstanceCount(),
         CliffRockFacesE->GetInstanceCount(),
+        CliffRockFacesF->GetInstanceCount(),
+        ForestFloorHalfA->GetInstanceCount(),
+        ForestFloorHalfB->GetInstanceCount(),
         ForestShrubsA->GetInstanceCount(),
         ForestShrubsB->GetInstanceCount(),
         CanopyTreesA->GetInstanceCount(),
@@ -557,6 +596,97 @@ void AYarlungSceneryActor::AddScatterRule(
             ? SurfaceAlignedRotation(Normal, Yaw)
             : FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw));
         Component->AddInstance(FTransform(Rotation, Location, Scale));
+    }
+}
+
+void AYarlungSceneryActor::AddGroundCoverBelt(
+    UHierarchicalInstancedStaticMeshComponent* Component,
+    const FYarlungSceneryComponentConfig& ComponentConfig,
+    const FYarlungScatterKindConfig& KindConfig,
+    const FYarlungGroundCoverBeltConfig& Belt,
+    const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+    const TArray<uint16>& EncodedHeights,
+    const FYarlungRiverField& RiverField)
+{
+    if (!Component || !Component->GetStaticMesh())
+    {
+        return;
+    }
+
+    const bool bScree = ComponentConfig.Kind.Contains(TEXT("scree"), ESearchCase::IgnoreCase);
+    const float MeshRadiusCm = Component->GetStaticMesh()->GetBounds().SphereRadius;
+    const float Seed = ComponentConfig.Seed;
+
+    for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Belt.SampleStride))
+    {
+        const FYarlungSceneryTrackSample& A = TrackSamples[SampleIndex];
+        const FYarlungSceneryTrackSample& B = TrackSamples[SampleIndex + 1];
+        const FVector Center = (A.Position + B.Position) * 0.5f;
+        const FVector Forward = HorizontalForward(TrackSamples, SampleIndex);
+        const FVector Right = RightFromForward(Forward);
+
+        for (float Side : { -1.0f, 1.0f })
+        {
+            for (int32 BandIndex = 0; BandIndex < Belt.LateralBandsCm.Num(); ++BandIndex)
+            {
+                const float Keep = Hash01(SampleIndex * 1.517f + BandIndex * 5.913f + Seed, Side > 0.0f ? 29.0f : 31.0f);
+                if (Keep > Belt.Occupancy)
+                {
+                    continue;
+                }
+
+                const float AlongJitterCm = FMath::Lerp(-Belt.AlongJitterCm, Belt.AlongJitterCm, Hash01(SampleIndex * 2.317f + BandIndex + Seed, 37.0f));
+                const float LateralJitterCm = FMath::Lerp(-Belt.LateralJitterCm, Belt.LateralJitterCm, Hash01(SampleIndex * 3.719f + BandIndex + Seed, 41.0f));
+                const float LateralCm = FMath::Max(0.0f, Belt.LateralBandsCm[BandIndex] + LateralJitterCm);
+                if (LateralCm < KindConfig.MinLateralCm || LateralCm > KindConfig.MaxLateralCm)
+                {
+                    continue;
+                }
+                const float SignedOffsetCm = Side * LateralCm;
+                const FVector Location2D = Center + Forward * AlongJitterCm + Right * SignedOffsetCm;
+
+                float Height = 0.0f;
+                FVector Normal = FVector::UpVector;
+                if (!TryResolvePlacement(
+                    EncodedHeights,
+                    RiverField,
+                    Center,
+                    Location2D,
+                    SignedOffsetCm,
+                    KindConfig.RiverClearanceCm,
+                    KindConfig.MinHeightCm,
+                    KindConfig.MaxHeightCm,
+                    KindConfig.MinSlope,
+                    KindConfig.MaxSlope,
+                    Height,
+                    Normal))
+                {
+                    continue;
+                }
+
+                const float Yaw = Hash01(SampleIndex * 7.071f + BandIndex + Seed, 43.0f) * 360.0f;
+                const float ScaleBase = FMath::Lerp(KindConfig.ScaleMin, KindConfig.ScaleMax, Hash01(SampleIndex * 5.317f + BandIndex + Seed, 47.0f));
+                const FVector Scale = bScree
+                    ? FVector(
+                        ScaleBase * FMath::Lerp(0.75f, 1.75f, Hash01(SampleIndex * 4.0f + BandIndex + Seed, 53.0f)),
+                        ScaleBase * FMath::Lerp(0.65f, 1.35f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
+                        ScaleBase * FMath::Lerp(0.32f, 0.82f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f)))
+                    : FVector(
+                        ScaleBase * FMath::Lerp(0.86f, 1.30f, Hash01(SampleIndex * 4.0f + BandIndex + Seed, 53.0f)),
+                        ScaleBase * FMath::Lerp(0.82f, 1.24f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
+                        ScaleBase * FMath::Lerp(0.74f, 1.16f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f)));
+                const FVector Location(Location2D.X, Location2D.Y, Height + KindConfig.HeightOffsetCm);
+                const float ScaledRadiusCm = MeshRadiusCm * Scale.GetMax();
+                if (FVector::Dist(Location, Center) - ScaledRadiusCm < Belt.TrackClearanceCm)
+                {
+                    continue;
+                }
+                const FQuat Rotation = KindConfig.bAlignToSurface
+                    ? SurfaceAlignedRotation(Normal, Yaw)
+                    : FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw));
+                Component->AddInstance(FTransform(Rotation, Location, Scale));
+            }
+        }
     }
 }
 

@@ -18,6 +18,13 @@
         "seed": 71.0
       },
       {
+        "name": "ScreeBoulders",
+        "mesh": "/Game/Fab/Megascans/3D/Beach_Boulder_uisjbbis/Medium/uisjbbis_tier_2/StaticMeshes/uisjbbis_tier_2.uisjbbis_tier_2",
+        "kind": "talus_scree",
+        "placement": "ground_cover_belt",
+        "seed": 83.0
+      },
+      {
         "name": "UnderstoryClumps",
         "mesh": "/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_05.spruce_small_05",
         "kind": "shrub",
@@ -64,6 +71,27 @@
         "kind": "cliff",
         "placement": "cliff_belt",
         "seed": 53.0
+      },
+      {
+        "name": "CliffRockFacesF",
+        "mesh": "/Game/Fab/Megascans/3D/Nordic_Forest_Cliff_Large_xibsff1/Medium/xibsff1_tier_2/StaticMeshes/xibsff1_tier_2.xibsff1_tier_2",
+        "kind": "cliff",
+        "placement": "cliff_belt",
+        "seed": 67.0
+      },
+      {
+        "name": "ForestFloorHalfA",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01",
+        "kind": "forest_floor_half",
+        "placement": "ground_cover_belt",
+        "seed": 89.0
+      },
+      {
+        "name": "ForestFloorHalfB",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_03.spruce_half_03",
+        "kind": "forest_floor_half",
+        "placement": "ground_cover_belt",
+        "seed": 97.0
       },
       {
         "name": "ForestShrubsA",
@@ -144,6 +172,21 @@
         "height_offset_cm": 36.0,
         "align_to_surface": true
       },
+      "talus_scree": {
+        "side_bias": 0.52,
+        "distance_power": 0.74,
+        "min_lateral_cm": 7000.0,
+        "max_lateral_cm": 225000.0,
+        "river_clearance_cm": 9000.0,
+        "min_height_cm": 250000.0,
+        "max_height_cm": 505000.0,
+        "min_slope": 0.02,
+        "max_slope": 1.0,
+        "scale_min": 0.85,
+        "scale_max": 5.4,
+        "height_offset_cm": 22.0,
+        "align_to_surface": true
+      },
       "cliff": {
         "side_bias": 0.7,
         "distance_power": 1.05,
@@ -172,6 +215,21 @@
         "scale_min": 1.25,
         "scale_max": 3.05,
         "height_offset_cm": 45.0,
+        "align_to_surface": false
+      },
+      "forest_floor_half": {
+        "side_bias": 0.58,
+        "distance_power": 0.94,
+        "min_lateral_cm": 18000.0,
+        "max_lateral_cm": 210000.0,
+        "river_clearance_cm": 18000.0,
+        "min_height_cm": 250000.0,
+        "max_height_cm": 488000.0,
+        "min_slope": 0.0,
+        "max_slope": 1.0,
+        "scale_min": 1.15,
+        "scale_max": 3.45,
+        "height_offset_cm": 34.0,
         "align_to_surface": false
       },
       "shrub": {
@@ -212,7 +270,7 @@
       "near_band_count": 9,
       "near_occupancy": 1.0,
       "far_occupancy": 0.96,
-      "track_clearance_cm": 26000.0,
+      "track_clearance_cm": 32000.0,
       "river_clearance_cm": 6000.0,
       "min_height_cm": 250000.0,
       "max_height_cm": 500000.0,
@@ -224,6 +282,8 @@
     "cliff_belt": {
       "sample_stride": 2,
       "lateral_bands_cm": [
+        26000.0,
+        34000.0,
         45000.0,
         65000.0,
         85000.0,
@@ -231,33 +291,54 @@
         160000.0,
         220000.0
       ],
-      "occupancy": 0.46,
-      "track_clearance_cm": 42000.0,
+      "occupancy": 0.68,
+      "track_clearance_cm": 26000.0,
       "river_clearance_cm": 15000.0,
       "min_height_cm": 250000.0,
       "max_height_cm": 540000.0,
       "min_slope": 0.02,
       "max_slope": 1.0,
-      "scale_min": 1.9,
-      "scale_max": 6.2,
+      "scale_min": 2.4,
+      "scale_max": 7.2,
       "height_offset_cm": 20.0,
       "along_jitter_cm": 7200.0,
       "lateral_jitter_cm": 11000.0,
       "yaw_jitter_degrees": 34.0,
-      "river_wall_sample_stride": 7,
+      "river_wall_sample_stride": 5,
       "river_wall_lateral_bands_cm": [
+        30000.0,
         36000.0,
         62000.0,
         98000.0,
-        142000.0
+        142000.0,
+        190000.0
       ],
-      "river_wall_occupancy": 0.56,
+      "river_wall_occupancy": 0.74,
       "river_wall_scale_min": 2.4,
-      "river_wall_scale_max": 7.8,
+      "river_wall_scale_max": 9.2,
       "river_wall_height_offset_cm": 30.0,
       "river_wall_along_jitter_cm": 5600.0,
       "river_wall_lateral_jitter_cm": 9000.0,
       "river_wall_yaw_jitter_degrees": 24.0
+    },
+    "ground_cover_belt": {
+      "sample_stride": 1,
+      "lateral_bands_cm": [
+        12000.0,
+        20000.0,
+        30000.0,
+        42000.0,
+        58000.0,
+        78000.0,
+        104000.0,
+        136000.0,
+        172000.0,
+        214000.0
+      ],
+      "occupancy": 0.82,
+      "track_clearance_cm": 24000.0,
+      "along_jitter_cm": 3800.0,
+      "lateral_jitter_cm": 5200.0
     }
   },
   "water": {

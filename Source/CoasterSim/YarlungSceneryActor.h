@@ -9,6 +9,7 @@ class UHierarchicalInstancedStaticMeshComponent;
 struct FYarlungAssetConfig;
 struct FYarlungCanopyBeltConfig;
 struct FYarlungCliffBeltConfig;
+struct FYarlungGroundCoverBeltConfig;
 struct FYarlungSceneryComponentConfig;
 struct FYarlungScatterKindConfig;
 
@@ -43,6 +44,9 @@ private:
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> RiverbankBoulders;
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
+    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ScreeBoulders;
+
+    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> UnderstoryClumps;
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
@@ -59,6 +63,15 @@ private:
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesE;
+
+    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
+    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesF;
+
+    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
+    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ForestFloorHalfA;
+
+    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
+    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ForestFloorHalfB;
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ForestShrubsA;
@@ -128,6 +141,14 @@ private:
         UHierarchicalInstancedStaticMeshComponent* Component,
         const FYarlungCliffBeltConfig& BeltConfig,
         float Seed,
+        const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<uint16>& EncodedHeights,
+        const class FYarlungRiverField& RiverField);
+    void AddGroundCoverBelt(
+        UHierarchicalInstancedStaticMeshComponent* Component,
+        const FYarlungSceneryComponentConfig& ComponentConfig,
+        const FYarlungScatterKindConfig& KindConfig,
+        const FYarlungGroundCoverBeltConfig& BeltConfig,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);

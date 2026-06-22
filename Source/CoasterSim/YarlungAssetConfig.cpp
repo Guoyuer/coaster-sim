@@ -152,6 +152,10 @@ EYarlungSceneryPlacement ParsePlacement(const FString& Value, const FString& Con
     {
         return EYarlungSceneryPlacement::CliffBelt;
     }
+    if (Value.Equals(TEXT("ground_cover_belt"), ESearchCase::IgnoreCase))
+    {
+        return EYarlungSceneryPlacement::GroundCoverBelt;
+    }
 
     FatalAssetConfigError(FString::Printf(TEXT("%s has unknown placement '%s'"), *Context, *Value));
     return EYarlungSceneryPlacement::Scatter;
@@ -294,6 +298,15 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.CliffBelt.RiverWallLateralJitterCm = RequiredNumberField(CliffBelt, TEXT("river_wall_lateral_jitter_cm"), CliffBeltContext);
     Config.CliffBelt.RiverWallYawJitterDegrees = RequiredNumberField(CliffBelt, TEXT("river_wall_yaw_jitter_degrees"), CliffBeltContext);
 
+    const TSharedPtr<FJsonObject> GroundCoverBelt = RequiredObject(Scenery, TEXT("ground_cover_belt"), Path);
+    const FString GroundCoverBeltContext = FString::Printf(TEXT("%s scenery.ground_cover_belt"), *Path);
+    Config.GroundCoverBelt.SampleStride = RequiredIntegerField(GroundCoverBelt, TEXT("sample_stride"), GroundCoverBeltContext);
+    Config.GroundCoverBelt.LateralBandsCm = RequiredNumberArrayField(GroundCoverBelt, TEXT("lateral_bands_cm"), GroundCoverBeltContext);
+    Config.GroundCoverBelt.Occupancy = RequiredNumberField(GroundCoverBelt, TEXT("occupancy"), GroundCoverBeltContext);
+    Config.GroundCoverBelt.TrackClearanceCm = RequiredNumberField(GroundCoverBelt, TEXT("track_clearance_cm"), GroundCoverBeltContext);
+    Config.GroundCoverBelt.AlongJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("along_jitter_cm"), GroundCoverBeltContext);
+    Config.GroundCoverBelt.LateralJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("lateral_jitter_cm"), GroundCoverBeltContext);
+
     const TSharedPtr<FJsonObject> Water = RequiredObject(Root, TEXT("water"), Path);
     const FString WaterContext = FString::Printf(TEXT("%s water"), *Path);
     Config.Water.SurfaceMaterialPath = RequiredStringField(Water, TEXT("surface_material"), WaterContext);
@@ -330,6 +343,13 @@ FYarlungAssetConfig LoadConfigFromDisk()
         Config.CliffBelt.RiverWallScaleMin <= 0.0f || Config.CliffBelt.RiverWallScaleMax < Config.CliffBelt.RiverWallScaleMin)
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.cliff_belt settings"), *Path));
+    }
+    if (Config.GroundCoverBelt.SampleStride <= 0 || Config.GroundCoverBelt.LateralBandsCm.IsEmpty() ||
+        Config.GroundCoverBelt.Occupancy < 0.0f || Config.GroundCoverBelt.Occupancy > 1.0f ||
+        Config.GroundCoverBelt.TrackClearanceCm < 0.0f ||
+        Config.GroundCoverBelt.AlongJitterCm < 0.0f || Config.GroundCoverBelt.LateralJitterCm < 0.0f)
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.ground_cover_belt settings"), *Path));
     }
 
     UE_LOG(LogTemp, Display, TEXT("YarlungAssets: loaded %d scenery components, %d scatter kinds from %s"),
