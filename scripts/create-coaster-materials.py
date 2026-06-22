@@ -16,18 +16,22 @@ def yarlung_asset_config():
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def required_terrain_surface_config(terrain, key):
+    surface = terrain.get(key)
+    if not isinstance(surface, dict):
+        raise RuntimeError(f"Missing terrain.{key} config in Config/yarlung-assets.json")
+    for texture_key in ("base_color", "normal", "orm"):
+        if not surface.get(texture_key):
+            raise RuntimeError(f"Missing terrain.{key}.{texture_key} in Config/yarlung-assets.json")
+    return surface
+
+
 def terrain_surface_config():
     config = yarlung_asset_config()
     terrain = config.get("terrain")
     if not isinstance(terrain, dict):
         raise RuntimeError("Missing terrain config in Config/yarlung-assets.json")
-    surface = terrain.get("surface")
-    if not isinstance(surface, dict):
-        raise RuntimeError("Missing terrain.surface config in Config/yarlung-assets.json")
-    for key in ("base_color", "normal", "orm"):
-        if not surface.get(key):
-            raise RuntimeError(f"Missing terrain.surface.{key} in Config/yarlung-assets.json")
-    return surface
+    return required_terrain_surface_config(terrain, "surface"), required_terrain_surface_config(terrain, "rock_surface")
 
 
 def ensure_folder(path):
@@ -303,7 +307,7 @@ def create_yarlung_water_surface_material():
 
 
 def create_mesh_terrain_material():
-    surface = terrain_surface_config()
+    surface, rock_surface = terrain_surface_config()
     surface_base_color = load_required_texture(surface["base_color"], "terrain base color")
     surface_normal = load_required_texture(surface["normal"], "terrain normal")
     surface_orm = load_required_texture(surface["orm"], "terrain ORM")
@@ -311,12 +315,18 @@ def create_mesh_terrain_material():
     detail_strength = float(surface.get("detail_strength", 0.36))
     roughness_strength = float(surface.get("roughness_strength", 0.42))
     ao_strength = float(surface.get("ao_strength", 0.30))
+    rock_base_color = load_required_texture(rock_surface["base_color"], "terrain rock base color")
+    rock_normal = load_required_texture(rock_surface["normal"], "terrain rock normal")
+    rock_orm = load_required_texture(rock_surface["orm"], "terrain rock ORM")
+    rock_tiling = float(rock_surface.get("tiling", 28.0))
+    rock_blend_strength = float(rock_surface.get("blend_strength", 0.86))
 
     material = create_material_asset(MESH_TERRAIN_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     material.set_editor_property("two_sided", False)
 
     terrain_uv = create_texture_coordinate(material, tiling, -1180, 160)
+    rock_uv = create_texture_coordinate(material, rock_tiling, -1180, 500)
     surface_base = create_texture_sample(material, surface_base_color, -900, 120, terrain_uv)
     surface_normals = create_texture_sample(
         material,
@@ -327,6 +337,16 @@ def create_mesh_terrain_material():
         unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL,
     )
     surface_masks = create_texture_sample(material, surface_orm, -900, 700, terrain_uv)
+    rock_base = create_texture_sample(material, rock_base_color, -900, 980, rock_uv)
+    rock_normals = create_texture_sample(
+        material,
+        rock_normal,
+        -900,
+        1240,
+        rock_uv,
+        unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL,
+    )
+    rock_masks = create_texture_sample(material, rock_orm, -900, 1560, rock_uv)
 
     vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
@@ -334,7 +354,65 @@ def create_mesh_terrain_material():
         -1180,
         -220,
     )
-    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 0.78, -900, -40)
+    rock_mask = create_multiply(
+        material,
+        vertex_color,
+        "A",
+        create_scalar_parameter(material, "TerrainRockSurfaceBlendStrength", rock_blend_strength, -620, 980),
+        "",
+        -620,
+        1180,
+        "mesh terrain rock surface mask",
+    )
+    blended_surface_base = create_lerp(
+        material,
+        surface_base,
+        "",
+        rock_base,
+        "",
+        rock_mask,
+        "",
+        -320,
+        340,
+        "mesh terrain forest/rock surface color",
+    )
+    blended_surface_normals = create_lerp(
+        material,
+        surface_normals,
+        "",
+        rock_normals,
+        "",
+        rock_mask,
+        "",
+        -320,
+        560,
+        "mesh terrain forest/rock surface normal",
+    )
+    blended_surface_roughness = create_lerp(
+        material,
+        surface_masks,
+        "G",
+        rock_masks,
+        "G",
+        rock_mask,
+        "",
+        -320,
+        780,
+        "mesh terrain forest/rock surface roughness",
+    )
+    blended_surface_ao = create_lerp(
+        material,
+        surface_masks,
+        "R",
+        rock_masks,
+        "R",
+        rock_mask,
+        "",
+        -320,
+        940,
+        "mesh terrain forest/rock surface ao",
+    )
+    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 0.94, -900, -40)
     vertex_base_color = create_multiply(
         material,
         vertex_color,
@@ -349,7 +427,7 @@ def create_mesh_terrain_material():
         material,
         vertex_base_color,
         "",
-        surface_base,
+        blended_surface_base,
         "",
         -320,
         -40,
@@ -374,7 +452,7 @@ def create_mesh_terrain_material():
     ):
         raise RuntimeError("Unable to connect mesh terrain rock BaseColor")
     if not unreal.MaterialEditingLibrary.connect_material_property(
-        surface_normals,
+        blended_surface_normals,
         "",
         unreal.MaterialProperty.MP_NORMAL,
     ):
@@ -384,8 +462,8 @@ def create_mesh_terrain_material():
         material,
         create_scalar_parameter(material, "TerrainRoughness", 0.84, -620, 280),
         "",
-        surface_masks,
-        "G",
+        blended_surface_roughness,
+        "",
         create_scalar_parameter(material, "TerrainSurfaceRoughnessStrength", roughness_strength, -620, 460),
         "",
         -80,
@@ -403,8 +481,8 @@ def create_mesh_terrain_material():
         material,
         create_scalar_parameter(material, "TerrainAmbientOcclusion", 0.92, -620, 580),
         "",
-        surface_masks,
-        "R",
+        blended_surface_ao,
+        "",
         create_scalar_parameter(material, "TerrainSurfaceAmbientOcclusionStrength", ao_strength, -620, 760),
         "",
         -80,

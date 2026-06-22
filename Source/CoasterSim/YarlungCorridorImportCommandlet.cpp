@@ -174,12 +174,12 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
         4.0f);
     const float Noise = YarlungValueNoise(X, Y);
 
-    const FLinearColor DeepForest(0.010f + Noise * 0.008f, 0.050f + Noise * 0.036f, 0.024f + Noise * 0.022f, 1.0f);
-    const FLinearColor SunForest(0.018f + Noise * 0.014f, 0.104f + Noise * 0.058f, 0.044f + Noise * 0.034f, 1.0f);
-    const FLinearColor WeatheredRock(0.044f + Height01 * 0.020f, 0.048f + Height01 * 0.020f, 0.047f + Height01 * 0.018f, 1.0f);
-    const FLinearColor WetRock(0.020f + Noise * 0.016f, 0.029f + Noise * 0.022f, 0.030f + Noise * 0.020f, 1.0f);
-    const FLinearColor MossRock(0.012f + Noise * 0.014f, 0.066f + Noise * 0.040f, 0.034f + Noise * 0.026f, 1.0f);
-    const FLinearColor Scree(0.054f + Noise * 0.030f, 0.054f + Noise * 0.028f, 0.050f + Noise * 0.026f, 1.0f);
+    const FLinearColor DeepForest(0.018f + Noise * 0.012f, 0.080f + Noise * 0.050f, 0.038f + Noise * 0.030f, 1.0f);
+    const FLinearColor SunForest(0.030f + Noise * 0.018f, 0.155f + Noise * 0.070f, 0.068f + Noise * 0.044f, 1.0f);
+    const FLinearColor WeatheredRock(0.060f + Height01 * 0.026f, 0.066f + Height01 * 0.024f, 0.063f + Height01 * 0.020f, 1.0f);
+    const FLinearColor WetRock(0.028f + Noise * 0.020f, 0.041f + Noise * 0.030f, 0.041f + Noise * 0.026f, 1.0f);
+    const FLinearColor MossRock(0.022f + Noise * 0.018f, 0.105f + Noise * 0.052f, 0.050f + Noise * 0.034f, 1.0f);
+    const FLinearColor Scree(0.074f + Noise * 0.038f, 0.074f + Noise * 0.034f, 0.068f + Noise * 0.030f, 1.0f);
     const FLinearColor RavineColor(0.006f, 0.014f, 0.014f, 1.0f);
     const FLinearColor Snow(0.66f, 0.70f, 0.69f, 1.0f);
 
@@ -192,10 +192,18 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
     Base = FMath::Lerp(Base, Scree, FMath::Clamp(SteepSlope * (1.0f - Forest) * (0.12f + RavineStreak * 0.16f), 0.0f, 0.26f));
     Base = FMath::Lerp(Base, RavineColor, FMath::Clamp(Ravine * 0.58f, 0.0f, 0.68f));
     Base = FMath::Lerp(Base, Snow, 0.08f * YarlungTerrain::Smooth01((Height01 - 0.997f) / 0.012f));
+    const float RockSurfaceMask = FMath::Clamp(
+        RockMask * 1.05f
+            + SteepSlope * (1.0f - Forest) * 0.70f
+            + WetBank * 0.34f
+            + Ravine * 0.45f,
+        0.0f,
+        1.0f);
     const float ContrastGain = FMath::Lerp(0.78f, 1.18f, Breakup);
     Base.R *= ContrastGain;
     Base.G *= FMath::Lerp(0.84f, 1.14f, Breakup);
     Base.B *= FMath::Lerp(0.80f, 1.08f, Breakup);
+    Base.A = RockSurfaceMask;
     return Base;
 }
 

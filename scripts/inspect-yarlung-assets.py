@@ -76,25 +76,27 @@ def inspect_terrain_surface_assets(config):
     terrain = config.get("terrain")
     if not isinstance(terrain, dict):
         raise RuntimeError("Missing terrain config in Config/yarlung-assets.json")
-    surface = terrain.get("surface")
-    if not isinstance(surface, dict):
-        raise RuntimeError("Missing terrain.surface config in Config/yarlung-assets.json")
 
-    print(
-        "[TERRAIN-SURFACE] "
-        f"tiling={surface.get('tiling')} detail_strength={surface.get('detail_strength')} "
-        f"roughness_strength={surface.get('roughness_strength')} ao_strength={surface.get('ao_strength')}"
-    )
-    for label in ("base_color", "normal", "orm"):
-        texture_path = surface.get(label, "")
-        if not texture_path:
-            raise RuntimeError(f"Missing terrain.surface.{label} in Config/yarlung-assets.json")
-        if not unreal.EditorAssetLibrary.does_asset_exist(texture_path):
-            raise RuntimeError(f"Missing terrain surface texture {label}: {texture_path}")
-        texture = unreal.EditorAssetLibrary.load_asset(texture_path)
-        if not isinstance(texture, unreal.Texture):
-            raise RuntimeError(f"Configured terrain surface asset is not a Texture for {label}: {texture_path}")
-        print(f"[TERRAIN-SURFACE] {label}={texture.get_path_name()} class={texture.get_class().get_name()}")
+    for surface_name in ("surface", "rock_surface"):
+        surface = terrain.get(surface_name)
+        if not isinstance(surface, dict):
+            raise RuntimeError(f"Missing terrain.{surface_name} config in Config/yarlung-assets.json")
+        print(
+            f"[TERRAIN-SURFACE] {surface_name} "
+            f"tiling={surface.get('tiling')} detail_strength={surface.get('detail_strength')} "
+            f"roughness_strength={surface.get('roughness_strength')} ao_strength={surface.get('ao_strength')} "
+            f"blend_strength={surface.get('blend_strength')}"
+        )
+        for label in ("base_color", "normal", "orm"):
+            texture_path = surface.get(label, "")
+            if not texture_path:
+                raise RuntimeError(f"Missing terrain.{surface_name}.{label} in Config/yarlung-assets.json")
+            if not unreal.EditorAssetLibrary.does_asset_exist(texture_path):
+                raise RuntimeError(f"Missing terrain {surface_name} texture {label}: {texture_path}")
+            texture = unreal.EditorAssetLibrary.load_asset(texture_path)
+            if not isinstance(texture, unreal.Texture):
+                raise RuntimeError(f"Configured terrain {surface_name} asset is not a Texture for {label}: {texture_path}")
+            print(f"[TERRAIN-SURFACE] {surface_name}.{label}={texture.get_path_name()} class={texture.get_class().get_name()}")
 
 
 def list_local_tree_meshes():
