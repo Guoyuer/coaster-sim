@@ -48,6 +48,12 @@ FQuat SurfaceAlignedRotation(const FVector& Normal, float YawDegrees)
     return Yaw * SurfaceTilt;
 }
 
+float ScaledHorizontalRadiusCm(const UStaticMesh& Mesh, const FVector& Scale)
+{
+    const FVector Extent = Mesh.GetBounds().BoxExtent;
+    return FMath::Max(Extent.X * FMath::Abs(Scale.X), Extent.Y * FMath::Abs(Scale.Y));
+}
+
 float YawFacingDirection(const FVector2D& Direction)
 {
     const FVector2D SafeDirection = Direction.IsNearlyZero() ? FVector2D(1.0f, 0.0f) : Direction.GetSafeNormal();
@@ -614,7 +620,7 @@ void AYarlungSceneryActor::AddGroundCoverBelt(
     }
 
     const bool bScree = ComponentConfig.Kind.Contains(TEXT("scree"), ESearchCase::IgnoreCase);
-    const float MeshRadiusCm = Component->GetStaticMesh()->GetBounds().SphereRadius;
+    const UStaticMesh& Mesh = *Component->GetStaticMesh();
     const float Seed = ComponentConfig.Seed;
 
     for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Belt.SampleStride))
@@ -676,7 +682,7 @@ void AYarlungSceneryActor::AddGroundCoverBelt(
                         ScaleBase * FMath::Lerp(0.82f, 1.24f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
                         ScaleBase * FMath::Lerp(0.74f, 1.16f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f)));
                 const FVector Location(Location2D.X, Location2D.Y, Height + KindConfig.HeightOffsetCm);
-                const float ScaledRadiusCm = MeshRadiusCm * Scale.GetMax();
+                const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
                 if (FVector::Dist(Location, Center) - ScaledRadiusCm < Belt.TrackClearanceCm)
                 {
                     continue;
@@ -702,7 +708,7 @@ void AYarlungSceneryActor::AddCanopyBelt(
     {
         return;
     }
-    const float MeshRadiusCm = Component->GetStaticMesh()->GetBounds().SphereRadius;
+    const UStaticMesh& Mesh = *Component->GetStaticMesh();
 
     for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Belt.SampleStride))
     {
@@ -754,7 +760,7 @@ void AYarlungSceneryActor::AddCanopyBelt(
                 const float ZJitter = FMath::Lerp(0.72f, 1.28f, Hash01(SampleIndex * 3.151f + BandIndex + Seed, 23.0f));
                 const FVector Scale(ScaleBase * XYJitter, ScaleBase * FMath::Lerp(0.82f, 1.22f, Keep), ScaleBase * ZJitter);
                 const FVector Location(Location2D.X, Location2D.Y, Height + Belt.HeightOffsetCm);
-                const float ScaledRadiusCm = MeshRadiusCm * Scale.GetMax();
+                const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
                 if (FVector::Dist(Location, Center) - ScaledRadiusCm < Belt.TrackClearanceCm)
                 {
                     continue;
@@ -778,7 +784,7 @@ void AYarlungSceneryActor::AddCliffBelt(
     {
         return;
     }
-    const float MeshRadiusCm = Component->GetStaticMesh()->GetBounds().SphereRadius;
+    const UStaticMesh& Mesh = *Component->GetStaticMesh();
 
     for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Belt.SampleStride))
     {
@@ -837,7 +843,7 @@ void AYarlungSceneryActor::AddCliffBelt(
                     ScaleBase * FMath::Lerp(0.42f, 0.92f, Hash01(SampleIndex * 9.0f + BandIndex + Seed, 43.0f)),
                     ScaleBase * FMath::Lerp(0.85f, 1.65f, Hash01(SampleIndex * 5.0f + BandIndex + Seed, 47.0f)));
                 const FVector Location(Location2D.X, Location2D.Y, Height + Belt.HeightOffsetCm);
-                const float ScaledRadiusCm = MeshRadiusCm * Scale.GetMax();
+                const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
                 if (FVector::Dist(Location, Center) - ScaledRadiusCm < Belt.TrackClearanceCm)
                 {
                     continue;
@@ -869,7 +875,7 @@ void AYarlungSceneryActor::AddRiverWallCliffs(
         return;
     }
 
-    const float MeshRadiusCm = Component->GetStaticMesh()->GetBounds().SphereRadius;
+    const UStaticMesh& Mesh = *Component->GetStaticMesh();
     for (int32 RiverIndex = 1; RiverIndex + 1 < RiverRows.Num(); RiverIndex += FMath::Max(1, Belt.RiverWallSampleStride))
     {
         const FYarlungRiverRow& Row = RiverRows[RiverIndex];
@@ -932,7 +938,7 @@ void AYarlungSceneryActor::AddRiverWallCliffs(
                     ScaleBase * FMath::Lerp(1.15f, 2.65f, Hash01(RiverIndex * 5.0f + BandIndex + Seed, 101.0f)),
                     ScaleBase * FMath::Lerp(0.36f, 0.78f, Hash01(RiverIndex * 7.0f + BandIndex + Seed, 103.0f)),
                     ScaleBase * FMath::Lerp(0.95f, 1.85f, Hash01(RiverIndex * 9.0f + BandIndex + Seed, 107.0f)));
-                const float ScaledRadiusCm = MeshRadiusCm * Scale.GetMax();
+                const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
                 const float HorizontalTrackDistanceCm = FVector2D::Distance(LocationXY, FVector2D(TrackCenter.X, TrackCenter.Y));
                 if (HorizontalTrackDistanceCm - ScaledRadiusCm < Belt.TrackClearanceCm)
                 {

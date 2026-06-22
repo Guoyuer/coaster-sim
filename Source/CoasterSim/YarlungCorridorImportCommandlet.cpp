@@ -159,6 +159,25 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
     const float FineCanopyPatch = YarlungValueNoise(X * 1.7f, Y * 1.7f);
     const float CanopyMask = YarlungTerrain::Smooth01((BroadCanopyPatch * 0.72f + FineCanopyPatch * 0.28f - 0.22f) / 0.48f);
     const float Breakup = YarlungTerrainBreakup(X, Y, Height);
+    const float MacroPatchNoise = FMath::Clamp(
+        YarlungValueNoise(X * 0.052f + Height * 0.018f, Y * 0.041f - Height * 0.013f) * 0.62f
+            + YarlungValueNoise(X * 0.118f - Height * 0.011f, Y * 0.093f + Height * 0.017f) * 0.38f,
+        0.0f,
+        1.0f);
+    const float CanyonSlopeBand = YarlungTerrain::Smooth01((RiverDistance - 18000.0f) / 90000.0f)
+        * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 300000.0f) / 150000.0f));
+    const float SlopePatch = FMath::Clamp(
+        CanyonSlopeBand
+            * YarlungTerrain::Smooth01((Slope - 0.025f) / 0.20f)
+            * YarlungTerrain::Smooth01((MacroPatchNoise - 0.30f) / 0.44f),
+        0.0f,
+        1.0f);
+    const float ScreePatch = FMath::Clamp(
+        CanyonSlopeBand
+            * SteepSlope
+            * YarlungTerrain::Smooth01((MacroPatchNoise - 0.58f) / 0.30f),
+        0.0f,
+        1.0f);
     const float Forest = FMath::Clamp(
         ForestDistance
             * ForestElevation
@@ -187,6 +206,9 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
     Base = FMath::Lerp(Base, MossRock, FMath::Clamp(MossBank * 0.36f, 0.0f, 0.36f));
     Base = FMath::Lerp(Base, WetRock, FMath::Clamp(WetBank * 0.44f, 0.0f, 0.44f));
     Base = FMath::Lerp(Base, Scree, FMath::Clamp(WetBank * (0.04f + Noise * 0.08f), 0.0f, 0.12f));
+    Base = FMath::Lerp(Base, MossRock, FMath::Clamp(SlopePatch * (0.20f + (1.0f - SteepSlope) * 0.16f), 0.0f, 0.34f));
+    Base = FMath::Lerp(Base, WetRock, FMath::Clamp(SlopePatch * (0.14f + SteepSlope * 0.24f), 0.0f, 0.36f));
+    Base = FMath::Lerp(Base, Scree, FMath::Clamp(ScreePatch * 0.30f, 0.0f, 0.30f));
     Base = FMath::Lerp(Base, WetRock, FMath::Clamp(RockMask * 0.94f + SteepSlope * RavineStreak * 0.30f, 0.0f, 0.94f));
     Base = FMath::Lerp(Base, Scree, FMath::Clamp(SteepSlope * (1.0f - Forest) * (0.16f + RavineStreak * 0.20f), 0.0f, 0.34f));
     Base = FMath::Lerp(Base, RavineColor, FMath::Clamp(Ravine * 0.58f, 0.0f, 0.68f));
@@ -195,7 +217,9 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
         RockMask * 1.05f
             + SteepSlope * (1.0f - Forest) * 0.70f
             + WetBank * 0.34f
-            + Ravine * 0.45f,
+            + Ravine * 0.45f
+            + SlopePatch * 0.34f
+            + ScreePatch * 0.26f,
         0.0f,
         1.0f);
     const float ContrastGain = FMath::Lerp(0.78f, 1.18f, Breakup);
