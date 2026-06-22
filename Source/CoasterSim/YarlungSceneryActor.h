@@ -124,5 +124,12 @@ private:
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
+    void AddRiverWallCliffs(
+        UHierarchicalInstancedStaticMeshComponent* Component,
+        const FYarlungCliffBeltConfig& BeltConfig,
+        float Seed,
+        const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<uint16>& EncodedHeights,
+        const class FYarlungRiverField& RiverField);
     void ApplyMaterials(const FYarlungAssetConfig& AssetConfig);
 };

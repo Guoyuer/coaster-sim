@@ -54,6 +54,56 @@ float YawFacingDirection(const FVector2D& Direction)
     return FMath::RadiansToDegrees(FMath::Atan2(SafeDirection.Y, SafeDirection.X));
 }
 
+bool ProjectOntoTrackCorridor(
+    const TArray<FYarlungSceneryTrackSample>& Samples,
+    const FVector2D& Location,
+    FVector& OutCenter,
+    float& OutSignedOffsetCm)
+{
+    if (Samples.Num() < 2)
+    {
+        return false;
+    }
+
+    float BestDistanceSquared = TNumericLimits<float>::Max();
+    FVector BestCenter = Samples[0].Position;
+    FVector2D BestRight(0.0f, 1.0f);
+
+    for (int32 Index = 0; Index + 1 < Samples.Num(); ++Index)
+    {
+        const FVector& A3 = Samples[Index].Position;
+        const FVector& B3 = Samples[Index + 1].Position;
+        const FVector2D A(A3.X, A3.Y);
+        const FVector2D B(B3.X, B3.Y);
+        const FVector2D Segment = B - A;
+        const float SegmentLengthSquared = Segment.SizeSquared();
+        if (SegmentLengthSquared <= KINDA_SMALL_NUMBER)
+        {
+            continue;
+        }
+
+        const float T = FMath::Clamp(FVector2D::DotProduct(Location - A, Segment) / SegmentLengthSquared, 0.0f, 1.0f);
+        const FVector2D Closest = A + Segment * T;
+        const float DistanceSquared = FVector2D::DistSquared(Location, Closest);
+        if (DistanceSquared < BestDistanceSquared)
+        {
+            const FVector2D Tangent = Segment.GetSafeNormal();
+            BestDistanceSquared = DistanceSquared;
+            BestCenter = FMath::Lerp(A3, B3, T);
+            BestRight = FVector2D(-Tangent.Y, Tangent.X);
+        }
+    }
+
+    if (BestDistanceSquared >= TNumericLimits<float>::Max())
+    {
+        return false;
+    }
+
+    OutCenter = BestCenter;
+    OutSignedOffsetCm = FVector2D::DotProduct(Location - FVector2D(BestCenter.X, BestCenter.Y), BestRight);
+    return true;
+}
+
 }
 
 AYarlungSceneryActor::AYarlungSceneryActor()
@@ -662,6 +712,104 @@ void AYarlungSceneryActor::AddCliffBelt(
                 {
                     continue;
                 }
+                Component->AddInstance(FTransform(FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw)), Location, Scale));
+            }
+        }
+    }
+
+    AddRiverWallCliffs(Component, Belt, Seed, TrackSamples, EncodedHeights, RiverField);
+}
+
+void AYarlungSceneryActor::AddRiverWallCliffs(
+    UHierarchicalInstancedStaticMeshComponent* Component,
+    const FYarlungCliffBeltConfig& Belt,
+    float Seed,
+    const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+    const TArray<uint16>& EncodedHeights,
+    const FYarlungRiverField& RiverField)
+{
+    if (!Component || !Component->GetStaticMesh())
+    {
+        return;
+    }
+
+    const TArray<FYarlungRiverRow>& RiverRows = RiverField.GetRows();
+    if (RiverRows.Num() < 3)
+    {
+        return;
+    }
+
+    const float MeshRadiusCm = Component->GetStaticMesh()->GetBounds().SphereRadius;
+    for (int32 RiverIndex = 1; RiverIndex + 1 < RiverRows.Num(); RiverIndex += FMath::Max(1, Belt.RiverWallSampleStride))
+    {
+        const FYarlungRiverRow& Row = RiverRows[RiverIndex];
+        const FVector2D RiverCenter(Row.PositionCm.X, Row.PositionCm.Y);
+        const FVector2D Prev(RiverRows[RiverIndex - 1].PositionCm.X, RiverRows[RiverIndex - 1].PositionCm.Y);
+        const FVector2D Next(RiverRows[RiverIndex + 1].PositionCm.X, RiverRows[RiverIndex + 1].PositionCm.Y);
+        const FVector2D Tangent = (Next - Prev).GetSafeNormal();
+        if (Tangent.IsNearlyZero())
+        {
+            continue;
+        }
+        const FVector2D Right(-Tangent.Y, Tangent.X);
+
+        for (float Side : { -1.0f, 1.0f })
+        {
+            for (int32 BandIndex = 0; BandIndex < Belt.RiverWallLateralBandsCm.Num(); ++BandIndex)
+            {
+                const float Keep = Hash01(RiverIndex * 1.119f + BandIndex * 5.771f + Seed, Side > 0.0f ? 61.0f : 73.0f);
+                if (Keep > Belt.RiverWallOccupancy)
+                {
+                    continue;
+                }
+
+                const float AlongJitterCm = FMath::Lerp(-Belt.RiverWallAlongJitterCm, Belt.RiverWallAlongJitterCm, Hash01(RiverIndex * 2.871f + BandIndex + Seed, 79.0f));
+                const float LateralJitterCm = FMath::Lerp(-Belt.RiverWallLateralJitterCm, Belt.RiverWallLateralJitterCm, Hash01(RiverIndex * 3.493f + BandIndex + Seed, 83.0f));
+                const float LateralCm = FMath::Max(Belt.RiverClearanceCm, Belt.RiverWallLateralBandsCm[BandIndex] + LateralJitterCm);
+                const FVector2D LocationXY = RiverCenter + Tangent * AlongJitterCm + Right * Side * LateralCm;
+
+                FVector TrackCenter = FVector::ZeroVector;
+                float SignedOffsetCm = 0.0f;
+                if (!ProjectOntoTrackCorridor(TrackSamples, LocationXY, TrackCenter, SignedOffsetCm))
+                {
+                    continue;
+                }
+
+                float Height = 0.0f;
+                FVector Normal = FVector::UpVector;
+                const FVector Location2D(LocationXY.X, LocationXY.Y, 0.0f);
+                if (!TryResolvePlacement(
+                    EncodedHeights,
+                    RiverField,
+                    TrackCenter,
+                    Location2D,
+                    SignedOffsetCm,
+                    Belt.RiverClearanceCm,
+                    Belt.MinHeightCm,
+                    Belt.MaxHeightCm,
+                    Belt.MinSlope,
+                    Belt.MaxSlope,
+                    Height,
+                    Normal))
+                {
+                    continue;
+                }
+
+                const float FaceRiverYaw = YawFacingDirection(RiverCenter - LocationXY);
+                const float Yaw = FaceRiverYaw + FMath::Lerp(-Belt.RiverWallYawJitterDegrees, Belt.RiverWallYawJitterDegrees, Hash01(RiverIndex * 4.113f + BandIndex + Seed, 89.0f));
+                const float ScaleBase = FMath::Lerp(Belt.RiverWallScaleMin, Belt.RiverWallScaleMax, Hash01(RiverIndex * 6.331f + BandIndex + Seed, 97.0f));
+                const FVector Scale(
+                    ScaleBase * FMath::Lerp(1.15f, 2.65f, Hash01(RiverIndex * 5.0f + BandIndex + Seed, 101.0f)),
+                    ScaleBase * FMath::Lerp(0.36f, 0.78f, Hash01(RiverIndex * 7.0f + BandIndex + Seed, 103.0f)),
+                    ScaleBase * FMath::Lerp(0.95f, 1.85f, Hash01(RiverIndex * 9.0f + BandIndex + Seed, 107.0f)));
+                const float ScaledRadiusCm = MeshRadiusCm * Scale.GetMax();
+                const float HorizontalTrackDistanceCm = FVector2D::Distance(LocationXY, FVector2D(TrackCenter.X, TrackCenter.Y));
+                if (HorizontalTrackDistanceCm - ScaledRadiusCm < Belt.TrackClearanceCm)
+                {
+                    continue;
+                }
+
+                const FVector Location(LocationXY.X, LocationXY.Y, Height + Belt.RiverWallHeightOffsetCm);
                 Component->AddInstance(FTransform(FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw)), Location, Scale));
             }
         }

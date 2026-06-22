@@ -72,6 +72,15 @@ struct FYarlungCliffBeltConfig
     float AlongJitterCm = 0.0f;
     float LateralJitterCm = 0.0f;
     float YawJitterDegrees = 0.0f;
+    int32 RiverWallSampleStride = 8;
+    TArray<float> RiverWallLateralBandsCm;
+    float RiverWallOccupancy = 0.0f;
+    float RiverWallScaleMin = 1.0f;
+    float RiverWallScaleMax = 1.0f;
+    float RiverWallHeightOffsetCm = 0.0f;
+    float RiverWallAlongJitterCm = 0.0f;
+    float RiverWallLateralJitterCm = 0.0f;
+    float RiverWallYawJitterDegrees = 0.0f;
 };
 
 struct FYarlungWaterConfig

@@ -284,6 +284,15 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.CliffBelt.AlongJitterCm = RequiredNumberField(CliffBelt, TEXT("along_jitter_cm"), CliffBeltContext);
     Config.CliffBelt.LateralJitterCm = RequiredNumberField(CliffBelt, TEXT("lateral_jitter_cm"), CliffBeltContext);
     Config.CliffBelt.YawJitterDegrees = RequiredNumberField(CliffBelt, TEXT("yaw_jitter_degrees"), CliffBeltContext);
+    Config.CliffBelt.RiverWallSampleStride = RequiredIntegerField(CliffBelt, TEXT("river_wall_sample_stride"), CliffBeltContext);
+    Config.CliffBelt.RiverWallLateralBandsCm = RequiredNumberArrayField(CliffBelt, TEXT("river_wall_lateral_bands_cm"), CliffBeltContext);
+    Config.CliffBelt.RiverWallOccupancy = RequiredNumberField(CliffBelt, TEXT("river_wall_occupancy"), CliffBeltContext);
+    Config.CliffBelt.RiverWallScaleMin = RequiredNumberField(CliffBelt, TEXT("river_wall_scale_min"), CliffBeltContext);
+    Config.CliffBelt.RiverWallScaleMax = RequiredNumberField(CliffBelt, TEXT("river_wall_scale_max"), CliffBeltContext);
+    Config.CliffBelt.RiverWallHeightOffsetCm = RequiredNumberField(CliffBelt, TEXT("river_wall_height_offset_cm"), CliffBeltContext);
+    Config.CliffBelt.RiverWallAlongJitterCm = RequiredNumberField(CliffBelt, TEXT("river_wall_along_jitter_cm"), CliffBeltContext);
+    Config.CliffBelt.RiverWallLateralJitterCm = RequiredNumberField(CliffBelt, TEXT("river_wall_lateral_jitter_cm"), CliffBeltContext);
+    Config.CliffBelt.RiverWallYawJitterDegrees = RequiredNumberField(CliffBelt, TEXT("river_wall_yaw_jitter_degrees"), CliffBeltContext);
 
     const TSharedPtr<FJsonObject> Water = RequiredObject(Root, TEXT("water"), Path);
     const FString WaterContext = FString::Printf(TEXT("%s water"), *Path);
@@ -315,7 +324,10 @@ FYarlungAssetConfig LoadConfigFromDisk()
     if (Config.CliffBelt.SampleStride <= 0 || Config.CliffBelt.LateralBandsCm.IsEmpty() ||
         Config.CliffBelt.Occupancy < 0.0f || Config.CliffBelt.Occupancy > 1.0f ||
         Config.CliffBelt.TrackClearanceCm < 0.0f ||
-        Config.CliffBelt.ScaleMin <= 0.0f || Config.CliffBelt.ScaleMax < Config.CliffBelt.ScaleMin)
+        Config.CliffBelt.ScaleMin <= 0.0f || Config.CliffBelt.ScaleMax < Config.CliffBelt.ScaleMin ||
+        Config.CliffBelt.RiverWallSampleStride <= 0 || Config.CliffBelt.RiverWallLateralBandsCm.IsEmpty() ||
+        Config.CliffBelt.RiverWallOccupancy < 0.0f || Config.CliffBelt.RiverWallOccupancy > 1.0f ||
+        Config.CliffBelt.RiverWallScaleMin <= 0.0f || Config.CliffBelt.RiverWallScaleMax < Config.CliffBelt.RiverWallScaleMin)
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.cliff_belt settings"), *Path));
     }

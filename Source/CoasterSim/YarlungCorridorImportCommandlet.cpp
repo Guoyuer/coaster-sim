@@ -113,15 +113,15 @@ FVector YarlungSmoothNormalAtWorldXY(const TArray<uint16>& EncodedHeights, float
     return FVector(Left - Right, Down - Up, SampleSpacingCm * 4.0f).GetSafeNormal();
 }
 
-float YarlungCanyonWetRockMask(float X, float Y, float Height, const FVector& BaseNormal, const FYarlungRiverField& RiverField)
+float YarlungCanyonWetRockMask(float X, float Y, float Height, const FVector& SurfaceNormal, const FYarlungRiverField& RiverField)
 {
-    const float SlopeMask = YarlungTerrain::Smooth01(((1.0f - BaseNormal.Z) - 0.13f) / 0.38f);
+    const float SlopeMask = YarlungTerrain::Smooth01(((1.0f - SurfaceNormal.Z) - 0.08f) / 0.30f);
     const float HeightMask = 1.0f - 0.55f * YarlungTerrain::Smooth01((Height - 515000.0f) / 120000.0f);
     const float RiverDistance = RiverField.DistanceCm(FVector2D(X, Y));
-    const float DistanceMask = YarlungTerrain::Smooth01((RiverDistance - 28000.0f) / 95000.0f)
-        * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 320000.0f) / 120000.0f));
+    const float DistanceMask = YarlungTerrain::Smooth01((RiverDistance - 16000.0f) / 115000.0f)
+        * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 360000.0f) / 150000.0f));
     const float Strata = 0.5f + 0.5f * FMath::Sin(X * 0.0019f - Y * 0.0023f + Height * 0.0041f);
-    return FMath::Clamp(DistanceMask * SlopeMask * HeightMask * (0.72f + Strata * 0.42f), 0.0f, 1.0f);
+    return FMath::Clamp(DistanceMask * SlopeMask * HeightMask * (0.82f + Strata * 0.50f), 0.0f, 1.0f);
 }
 
 float YarlungRavineMask(float X, float Y, const FYarlungRiverField& RiverField)
@@ -187,8 +187,8 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
     Base = FMath::Lerp(Base, MossRock, FMath::Clamp(MossBank * 0.36f, 0.0f, 0.36f));
     Base = FMath::Lerp(Base, WetRock, FMath::Clamp(WetBank * 0.44f, 0.0f, 0.44f));
     Base = FMath::Lerp(Base, Scree, FMath::Clamp(WetBank * (0.04f + Noise * 0.08f), 0.0f, 0.12f));
-    Base = FMath::Lerp(Base, WetRock, FMath::Clamp(RockMask * 0.82f + SteepSlope * RavineStreak * 0.22f, 0.0f, 0.90f));
-    Base = FMath::Lerp(Base, Scree, FMath::Clamp(SteepSlope * (1.0f - Forest) * (0.12f + RavineStreak * 0.16f), 0.0f, 0.26f));
+    Base = FMath::Lerp(Base, WetRock, FMath::Clamp(RockMask * 0.94f + SteepSlope * RavineStreak * 0.30f, 0.0f, 0.94f));
+    Base = FMath::Lerp(Base, Scree, FMath::Clamp(SteepSlope * (1.0f - Forest) * (0.16f + RavineStreak * 0.20f), 0.0f, 0.34f));
     Base = FMath::Lerp(Base, RavineColor, FMath::Clamp(Ravine * 0.58f, 0.0f, 0.68f));
     Base = FMath::Lerp(Base, Snow, 0.08f * YarlungTerrain::Smooth01((Height01 - 0.997f) / 0.012f));
     const float RockSurfaceMask = FMath::Clamp(
@@ -439,8 +439,7 @@ void ComputeBaseTerrainNormalsAndColors(
             }
             Normals[VertexIndex] = Normal.IsNearlyZero() ? FVector::UpVector : Normal;
             const FVector& Position = Positions[VertexIndex];
-            const FVector BaseNormal = YarlungSmoothNormalAtWorldXY(EncodedHeights, Position.X, Position.Y);
-            const float RockMask = YarlungCanyonWetRockMask(Position.X, Position.Y, Position.Z, BaseNormal, RiverField);
+            const float RockMask = YarlungCanyonWetRockMask(Position.X, Position.Y, Position.Z, Normals[VertexIndex], RiverField);
             Colors[VertexIndex] = YarlungColorAtPosition(Position.X, Position.Y, Position.Z, Normals[VertexIndex], RockMask, RiverField);
         }
     }

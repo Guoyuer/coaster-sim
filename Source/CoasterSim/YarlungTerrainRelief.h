@@ -19,8 +19,8 @@ struct FReliefConfig
     float HighAltitudeReduction = 0.30f;
 
     float WarpScale = 1.0f / 60000.0f;
-    float WarpAmplitudeCm = 13000.0f;
-    float NoiseScale = 1.0f / 36000.0f;
+    float WarpAmplitudeCm = 17000.0f;
+    float NoiseScale = 1.0f / 52000.0f;
     int32 Octaves = 4;
     float Lacunarity = 2.0f;
     float Gain = 0.5f;
@@ -28,25 +28,25 @@ struct FReliefConfig
     float RidgedWeight = 1.9f;
     float FbmWeight = 0.40f;
     float DetailMin = -1.25f;
-    float DetailMax = 1.25f;
+    float DetailMax = 0.95f;
 
     float CliffFoldRiverDistanceStartCm = 36000.0f;
     float CliffFoldRiverDistanceFadeCm = 120000.0f;
     float CliffFoldWarpScale = 1.0f / 140000.0f;
-    float CliffFoldWarpAmplitudeCm = 18000.0f;
-    float CliffFoldAlongRiverScale = 1.0f / 180000.0f;
-    float CliffFoldAcrossWallScale = 1.0f / 52000.0f;
+    float CliffFoldWarpAmplitudeCm = 24000.0f;
+    float CliffFoldAlongRiverScale = 1.0f / 220000.0f;
+    float CliffFoldAcrossWallScale = 1.0f / 74000.0f;
     int32 CliffFoldOctaves = 3;
-    float CliffFoldBias = 0.36f;
+    float CliffFoldBias = 0.32f;
     float CliffFoldWeight = 1.0f;
-    float CliffFoldFbmWeight = 0.20f;
+    float CliffFoldFbmWeight = 0.26f;
     float CliffFoldDetailMin = -1.25f;
-    float CliffFoldDetailMax = 0.35f;
-    float CliffFoldMinAmplitudeCm = 260.0f;
-    float CliffFoldMaxAmplitudeCm = 720.0f;
+    float CliffFoldDetailMax = 0.62f;
+    float CliffFoldMinAmplitudeCm = 720.0f;
+    float CliffFoldMaxAmplitudeCm = 2400.0f;
 
-    float MinAmplitudeCm = 280.0f;
-    float MaxAmplitudeCm = 900.0f;
+    float MinAmplitudeCm = 420.0f;
+    float MaxAmplitudeCm = 1900.0f;
     float NearTrackProtectStartCm = 4000.0f;
     float NearTrackProtectFadeCm = 12000.0f;
     float NearTrackPositiveScale = 0.15f;

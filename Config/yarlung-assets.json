@@ -243,7 +243,21 @@
       "height_offset_cm": 20.0,
       "along_jitter_cm": 7200.0,
       "lateral_jitter_cm": 11000.0,
-      "yaw_jitter_degrees": 34.0
+      "yaw_jitter_degrees": 34.0,
+      "river_wall_sample_stride": 7,
+      "river_wall_lateral_bands_cm": [
+        36000.0,
+        62000.0,
+        98000.0,
+        142000.0
+      ],
+      "river_wall_occupancy": 0.56,
+      "river_wall_scale_min": 2.4,
+      "river_wall_scale_max": 7.8,
+      "river_wall_height_offset_cm": 30.0,
+      "river_wall_along_jitter_cm": 5600.0,
+      "river_wall_lateral_jitter_cm": 9000.0,
+      "river_wall_yaw_jitter_degrees": 24.0
     }
   },
   "water": {
