@@ -11,6 +11,20 @@
 
 namespace
 {
+void ConfigureTrackProxyComponent(UInstancedStaticMeshComponent* Component, UStaticMesh* Mesh, bool bCastShadow)
+{
+    if (!Component)
+    {
+        return;
+    }
+
+    Component->SetStaticMesh(Mesh);
+    // These generated tube instances are first-person composition guides, not
+    // authored coaster assets. Their thin VSM shadows read as giant black lines
+    // across the valley/water in screenshots, so only the visible geometry remains.
+    Component->SetCastShadow(bCastShadow);
+}
+
 FTransform MakeTubeTransform(const FVector& Start, const FVector& End, float DiameterCm)
 {
     const FVector Mid = (Start + End) * 0.5f;
@@ -67,13 +81,14 @@ void ConfigureMeshes(
         UE_LOG(LogTemp, Fatal, TEXT("Required tube track mesh is missing: /Engine/BasicShapes/Cylinder.Cylinder"));
     }
 
-    for (UInstancedStaticMeshComponent* Component : { LeftRail, RightRail, CenterSpine, LeftGuardRail, RightGuardRail, Ties, TrackBraces, Supports })
-    {
-        if (Component)
-        {
-            Component->SetStaticMesh(CylinderMesh);
-        }
-    }
+    ConfigureTrackProxyComponent(LeftRail, CylinderMesh, true);
+    ConfigureTrackProxyComponent(RightRail, CylinderMesh, true);
+    ConfigureTrackProxyComponent(CenterSpine, CylinderMesh, false);
+    ConfigureTrackProxyComponent(LeftGuardRail, CylinderMesh, false);
+    ConfigureTrackProxyComponent(RightGuardRail, CylinderMesh, false);
+    ConfigureTrackProxyComponent(Ties, CylinderMesh, false);
+    ConfigureTrackProxyComponent(TrackBraces, CylinderMesh, false);
+    ConfigureTrackProxyComponent(Supports, CylinderMesh, false);
 }
 
 void ApplyMaterials(
@@ -233,7 +248,7 @@ void Rebuild(
         const FVector YokeLeft = YokeCenter - Right * (RailHalfGauge + 34.0f);
         const FVector YokeRight = YokeCenter + Right * (RailHalfGauge + 34.0f);
         const float TerrainRefZ = TrackSpline->GetGeneratedTerrainZAtDistance(Distance);
-        const float TerrainFootZ = TerrainRefZ - 6000.0f;
+        const float TerrainFootZ = TerrainRefZ + 45.0f;
         const FVector LeftFoot = FVector(YokeLeft.X, YokeLeft.Y, TerrainFootZ);
         const FVector RightFoot = FVector(YokeRight.X, YokeRight.Y, TerrainFootZ);
 
