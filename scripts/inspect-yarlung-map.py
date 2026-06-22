@@ -5,6 +5,8 @@ from pathlib import Path
 MAP_PATH = "/Game/Generated/YarlungLandscape/YarlungLandscape_Level"
 MESH_TERRAIN_MATERIAL_PATH = "/Game/Generated/Materials/M_YarlungMeshTerrain.M_YarlungMeshTerrain"
 CORRIDOR_TERRAIN_STATIC_MESH_PATH = "/Game/Generated/YarlungLandscape/SM_YarlungCorridorTerrain.SM_YarlungCorridorTerrain"
+RIVER_SURFACE_STATIC_MESH_PATH = "/Game/Generated/YarlungLandscape/SM_YarlungRiverSurface.SM_YarlungRiverSurface"
+RIVER_SURFACE_MATERIAL_PATH = "/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface"
 FORBIDDEN_RIDE_COMPONENTS = {
     "CanyonTerrainMesh",
     "SnowCaps",
@@ -47,10 +49,18 @@ def main():
 
     mesh_terrain_material = unreal.EditorAssetLibrary.load_asset(MESH_TERRAIN_MATERIAL_PATH)
     corridor_terrain_static_mesh = unreal.EditorAssetLibrary.load_asset(CORRIDOR_TERRAIN_STATIC_MESH_PATH)
+    river_surface_static_mesh = unreal.EditorAssetLibrary.load_asset(RIVER_SURFACE_STATIC_MESH_PATH)
+    river_surface_material = unreal.EditorAssetLibrary.load_asset(RIVER_SURFACE_MATERIAL_PATH)
     emit(f"[YARLUNG-INSPECT] mesh_terrain_material={object_path(mesh_terrain_material)}")
     emit(f"[YARLUNG-INSPECT] corridor_terrain_static_mesh={object_path(corridor_terrain_static_mesh)}")
+    emit(f"[YARLUNG-INSPECT] river_surface_static_mesh={object_path(river_surface_static_mesh)}")
+    emit(f"[YARLUNG-INSPECT] river_surface_material={object_path(river_surface_material)}")
     if not corridor_terrain_static_mesh:
         raise RuntimeError(f"Missing Yarlung corridor terrain StaticMesh: {CORRIDOR_TERRAIN_STATIC_MESH_PATH}")
+    if not river_surface_static_mesh:
+        raise RuntimeError(f"Missing Yarlung river surface StaticMesh: {RIVER_SURFACE_STATIC_MESH_PATH}")
+    if not river_surface_material:
+        raise RuntimeError(f"Missing Yarlung river surface material: {RIVER_SURFACE_MATERIAL_PATH}")
     corridor_nanite_status = "<unavailable>"
     if hasattr(corridor_terrain_static_mesh, "is_nanite_enabled"):
         corridor_nanite_status = corridor_terrain_static_mesh.is_nanite_enabled()
@@ -137,22 +147,26 @@ def main():
             raise RuntimeError(f"UE Water river has no spline component: {sorted(component_names)}")
         uses_static_spline_rendering = False
         has_water_material = False
+        gate_only_water = False
         water_body_components = [component for component in components if component.get_class().get_name().startswith("WaterBodyRiverComponent")]
         for component in water_body_components:
             mesh_override = component.get_water_mesh_override() if hasattr(component, "get_water_mesh_override") else None
             water_material = component.get_water_material() if hasattr(component, "get_water_material") else None
             static_mesh_material = component.get_water_static_mesh_material() if hasattr(component, "get_water_static_mesh_material") else None
+            component_hidden = editor_bool(component, "hidden_in_game")
+            component_visible = editor_bool(component, "visible")
             uses_static_spline_rendering = uses_static_spline_rendering or bool(mesh_override)
             has_water_material = has_water_material or bool(water_material)
+            gate_only_water = gate_only_water or bool(component_hidden) or component_visible is False
             emit(
                 f"[YARLUNG-INSPECT] ue_water_component={component.get_name()} "
                 f"mesh_override={object_path(mesh_override)} water_material={object_path(water_material)} "
                 f"static_mesh_material={object_path(static_mesh_material)} "
-                f"hidden={editor_bool(component, 'hidden_in_game')} visible={editor_bool(component, 'visible')}"
+                f"hidden={component_hidden} visible={component_visible}"
             )
         if not has_water_material:
             raise RuntimeError("UE Water river has no water material")
-        render_mode = "static_spline_mesh" if uses_static_spline_rendering else "water_zone_mesh"
+        render_mode = "gate_only" if gate_only_water else ("static_spline_mesh" if uses_static_spline_rendering else "water_zone_mesh")
         emit(f"[YARLUNG-INSPECT] ue_water_render_mode={render_mode}")
         spline_mesh_count = 0
         visible_spline_mesh_count = 0
@@ -183,10 +197,34 @@ def main():
             f"[YARLUNG-INSPECT] ue_water_spline_meshes={spline_mesh_count} "
             f"visible={visible_spline_mesh_count} info_visible={visible_info_mesh_count} samples={sample_water_meshes}"
         )
-        if uses_static_spline_rendering and visible_spline_mesh_count <= 0:
+        if gate_only_water:
+            emit("[YARLUNG-INSPECT] ue_water_gate_only=true explicit_river_surface_required=true")
+        elif uses_static_spline_rendering and visible_spline_mesh_count <= 0:
             raise RuntimeError(f"UE Water river spline meshes are all hidden: count={spline_mesh_count}")
-        if not uses_static_spline_rendering and visible_info_mesh_count <= 0:
+        elif not uses_static_spline_rendering and visible_info_mesh_count <= 0:
             raise RuntimeError("UE WaterZone render path has no visible water info mesh")
+
+    river_surface_actors = [actor for actor in actors if actor.get_actor_label() == "YarlungRiverSurface"]
+    if len(river_surface_actors) != 1:
+        raise RuntimeError(f"Expected exactly one explicit YarlungRiverSurface actor, found {len(river_surface_actors)}")
+    for actor in river_surface_actors:
+        mesh_components = actor.get_components_by_class(unreal.StaticMeshComponent)
+        if len(mesh_components) != 1:
+            raise RuntimeError(f"Expected one YarlungRiverSurface mesh component, found {len(mesh_components)}")
+        for component in mesh_components:
+            static_mesh = component.get_editor_property("static_mesh")
+            material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
+            if static_mesh != river_surface_static_mesh:
+                raise RuntimeError(f"YarlungRiverSurface uses wrong mesh: {object_path(static_mesh)}")
+            if object_path(river_surface_material) not in material_names:
+                raise RuntimeError(f"YarlungRiverSurface uses wrong material: {material_names}")
+            if component.get_editor_property("hidden_in_game") or editor_bool(component, "visible") is False:
+                raise RuntimeError("YarlungRiverSurface must be visible")
+            emit(
+                f"[YARLUNG-INSPECT] river_surface={actor.get_actor_label()} "
+                f"static_mesh={object_path(static_mesh)} materials={material_names} "
+                f"hidden={component.get_editor_property('hidden_in_game')} visible={editor_bool(component, 'visible')}"
+            )
 
     scenery_actors = [actor for actor in actors if actor.get_class().get_name().startswith("YarlungSceneryActor")]
     if len(scenery_actors) != 1:

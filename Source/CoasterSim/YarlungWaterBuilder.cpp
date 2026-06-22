@@ -131,10 +131,16 @@ bool SpawnYarlungWater(UWorld* World)
     RiverComponent->UpdateWaterBodyRenderData();
 #endif
     RiverComponent->UpdateWaterZones(true);
+
+    // UE Water's WaterZone renderer is only kept as a validated water-system
+    // actor. Its flat mesh cannot represent this 113 m descending gorge river;
+    // the visible first-person surface is SM_YarlungRiverSurface.
+    RiverComponent->SetVisibility(false, true);
+    RiverComponent->SetHiddenInGame(true);
     RiverComponent->UpdateVisibility();
 
     TArray<UPrimitiveComponent*> WaterRenderables = RiverComponent->GetStandardRenderableComponents();
-    int32 ForcedVisibleRenderables = 0;
+    int32 HiddenRenderables = 0;
     for (UPrimitiveComponent* Renderable : WaterRenderables)
     {
         if (!Renderable)
@@ -142,21 +148,21 @@ bool SpawnYarlungWater(UWorld* World)
             continue;
         }
 
-        Renderable->SetVisibility(true, true);
-        Renderable->SetHiddenInGame(false);
+        Renderable->SetVisibility(false, true);
+        Renderable->SetHiddenInGame(true);
         Renderable->MarkRenderStateDirty();
-        ++ForcedVisibleRenderables;
+        ++HiddenRenderables;
     }
 
     WaterZone->Update();
 
-    UE_LOG(LogTemp, Display, TEXT("Yarlung UE Water render path: mesh_override=%s material=%s static_material=%s generates_water_mesh_tile=%s renderables=%d forced_visible=%d"),
+    UE_LOG(LogTemp, Display, TEXT("Yarlung UE Water render path: mode=gate_only mesh_override=%s material=%s static_material=%s generates_water_mesh_tile=%s renderables=%d hidden=%d"),
         RiverComponent->GetWaterMeshOverride() ? *RiverComponent->GetWaterMeshOverride()->GetName() : TEXT("none"),
         RiverComponent->GetWaterMaterial() ? *RiverComponent->GetWaterMaterial()->GetName() : TEXT("none"),
         RiverComponent->GetWaterStaticMeshMaterial() ? *RiverComponent->GetWaterStaticMeshMaterial()->GetName() : TEXT("none"),
         RiverComponent->ShouldGenerateWaterMeshTile() ? TEXT("true") : TEXT("false"),
         WaterRenderables.Num(),
-        ForcedVisibleRenderables);
+        HiddenRenderables);
 
     UE_LOG(LogTemp, Display, TEXT("Spawned Yarlung UE Water river: samples=%d water_width_cm=%.0f..%.0f lift_cm=%.0f"),
         RiverRows.Num(),

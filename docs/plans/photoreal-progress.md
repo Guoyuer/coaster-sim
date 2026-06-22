@@ -13,6 +13,7 @@
 
 ## 最新记录
 
+- **2026-06-21/22 水面管线收口 + 初版流纹（OK，水不再走 UE Water 平面；总体仍 FAIL）**：继续 AAA 视觉推进时发现 `water-foam-lanes-v1/v2` 出现黑水，`v3` 又变成过亮大平板；根因是两个职责混在一起：`YarlungWaterBuilder` 仍强制 UE Water 的 212 个 renderable 可见，而真正能跟随 113.6m 河床落差的是 `SM_YarlungRiverSurface` 显式斜面水带。处理：UE Water 保留 `WaterZone + WaterBodyRiver`、材质/宽度/速度数据和 fail-close gate，但渲染组件改为 `gate_only` hidden，不再把水平 WaterZone 当主水面；`inspect-yarlung-map.py` 同步新合同，要求显式 `YarlungRiverSurface` actor 存在、可见且使用 `M_YarlungWaterSurface`。可见水面升级为 17 cross-lane ribbon，宽度收窄到河槽主流区（`HalfWidth * 0.42`，clamp 45m-105m），顶点色加入岸边/中线 broken foam 和 fast streak；水材质改为 BaseColor 与 VertexColor lerp，避免整片发光。验证：`python -m py_compile scripts/create-coaster-materials.py scripts/inspect-yarlung-map.py` PASS；C++ Build PASS；`import-yarlung-landscape.ps1 -SkipAssetGeneration -SkipTrackGeneration -ForceMaterials -SkipTerrainMeshBuild -Verify` PASS；`test-yarlung.ps1 -Build` 10/10 PASS；已 Read `Saved\Diagnostics\water-gateonly-foam-v3.png`。肉眼：水沿峡谷凹槽可见，宽度和流纹比 v1/v2 明显更可信；但仍是 opaque 顶点色水，没有真实法线、反射、透明深度或岸边湿岩，离参考图湍流江水仍远。下一步不要继续只堆顶点色，优先做河岸/山体材质与水面法线/反射方案。
 - **2026-06-21/22 UE Editor Lumen 曝光 warning + 灰天修复（OK，默认截图回到蓝天基线；总体仍 FAIL）**：针对 Editor 红字 `Cached lighting in Lumen and real-time sky capture lighting is going to be clipped... Exposure: 15.7. Safe exposure range: [-8.0, 12.0]` 做根因定位。UE 5.8 Renderer 源码显示 `r.EyeAdaptation.CachedLightingPreExposure` 默认 `4` 对应 safe range `[-8, 12]`，物理日光曝光 15.7 超出范围；按引擎注释把项目配置设为 `8`，safe range 覆盖到约 `[-4, 16]`，修 Editor 默认 red overlay 的配置根因。视觉上做 A/B：`diagnose-sky-current` / `diagnose-sky-exposure-055` 说明单纯曝光只能小幅改善；`diagnose-no-clouds` 证明 SkyAtmosphere 本身能出蓝天，灰天主要来自 UE 默认 VolumetricCloud 材质把英雄段盖成阴云。处理：默认相机曝光 bias 从 `0.20` 提到 `0.55`；SkyLight 提到 `0.58`；雾降到 density `0.000070` / max opacity `0.42`；默认关闭 VolumetricCloud 渲染，先建立稳定 Clear Sky 基线，白云后续单独做可控云层/资产，不再让默认云材质污染基础日照。验证：C++ Build PASS；`git diff --check` PASS；`.\scripts\visual-survey.ps1 -Times 60,120 -NamePrefix fix-clear-sky-v1 -ResX 960 -ResY 540 -TimeoutSeconds 240` PASS；已 Read `Saved\Diagnostics\fix-clear-sky-v1.png`，t60 出现蓝天，t120 不再有灰云污染。剩余明显短板：无白云层、山体/水面/资产密度仍非 AAA；下一步应在稳定蓝天曝光下继续做水流反射/泡沫和山体岩壁森林，而不是继续追曝光。
 - **2026-06-21/22 repo 兼容层/dead code 扫描（OK，水材质链更 fail-close；视觉不变）**：按“扫整个 repo，还有什么不需要的兼容层/dead code”裁决，重点扫 `Source/`、`scripts/`、`Config/` 的 live 链路。已清理一处真实兼容层：删除 `Config/yarlung-assets.json` 的 `water.fallback_river_material`、`FYarlungWaterConfig::FallbackRiverMaterialPath` 与 `YarlungWaterBuilder` 的 UE plugin 默认材质 fallback；`river_material` / `surface_material` 缺失现在直接失败。顺手把 `BuildYarlungRiverSurfaceStaticMesh()` 从硬编码 `/Game/Generated/Materials/M_YarlungWaterSurface` 改为读同一份 asset config。已删除死的 `MI_YarlungWaterRiver.uasset`、对应 Python 生成分支、import 脚本强制检查和未使用的 material-instance helper；当前水材质唯一 live 路径是 `M_YarlungWaterSurface`。扫描结论：脚本入口基本收敛，剩余 `normalize(..., fallback)` 属数值退化保护，不是旧兼容；历史 docs/reviews 保留旧名作为证据，不按 live 指南处理。验证：targeted `rg` 只剩本记录；JSON parse PASS；Python compile PASS；PowerShell parse PASS；C++ Build PASS；`import-yarlung-landscape.ps1 -SkipAssetGeneration -SkipTrackGeneration -ForceMaterials -SkipMapImport -Verify` PASS；`import-yarlung-landscape.ps1 -SkipAssetGeneration -SkipTrackGeneration -SkipMaterials -SkipTerrainMeshBuild -Verify` PASS，日志确认 `material=M_YarlungWaterSurface static_material=M_YarlungWaterSurface`。
 - **2026-06-21/22 截图脚本兼容层删除（OK，接口更窄；视觉不变）**：按“没必要兼容旧用法”继续精简截图 harness。`scripts/offscreen-shot.ps1` 删除旧 `-WaitSeconds`、`-Mode` alias、`-SimulateWait`、`-KeepSourceFrames`；单帧截图现在必须显式传 `-JumpSeconds`，多帧路径继续由 `-BatchJumpSeconds` 驱动。`scripts/visual-survey.ps1` 删除 `-LegacyPerShot`，统一只走 batch capture，不再保留逐帧冷启动 fallback。当前文档命令同步到 `-JumpSeconds` / `-CaptureMode`。验证：PowerShell parse PASS；`git diff --check` PASS；`.\scripts\visual-survey.ps1 -Times 60,120 -NamePrefix simplify-shot-api-batch-smoke -ResX 640 -ResY 360 -TimeoutSeconds 240` PASS，已 Read `Saved\Diagnostics\simplify-shot-api-batch-smoke.png`；`.\scripts\offscreen-shot.ps1 -Name simplify-shot-api-single-smoke -JumpSeconds 60 -ResX 640 -ResY 360 -TimeoutSeconds 240 -CaptureMode MovieFrames` PASS，已 Read `Saved\OffscreenShots\simplify-shot-api-single-smoke.png`。
@@ -70,7 +71,7 @@
 | A 真实地形/路线基础 | 🟨 | DEM/长轨道/走廊基础可运行；不再用旧短环。但 2026-06-21 用户放宽拓扑后，当前沿江/offset 生成器不再是目标形态；需要 scenic control-point route generator 让英雄帧稳定看见江水/湿岩/森林/远山。 |
 | B 光照/曝光/大气基础 | 🟨 | 物理日光/曝光有基础；2026-06-21/22 已修 UE Lumen cached pre-exposure warning，并把默认 VolumetricCloud 阴天层切到 Clear Sky 蓝天基线。剩余：白云需要单独可控层，整体仍受山体资产和成像层拖累。 |
 | C 山体/峡谷几何 | 🟦 | 旧程序化 canyon-wall 已删除；当前靠 DEM-derived corridor StaticMesh + Megascans scatter，仍缺真实连续 Nanite 岩壁和远山层次；最新 cliff belt/材质微调实验被拒绝，不能靠大 slab 或单一 terrain 材质调色解决。 |
-| D 江水/轨道/车 | 🟦 | 轨道已管轨化且支撑比例修正；隐藏 `TrainBody` placeholder 已删除；**江水第一人称全程可见已修复**（`SM_YarlungRiverSurface` 斜面水带，2026-06-22），UE Water 动态水对这条极端河不可用故改用显式 mesh。剩余：水面哑光、无反射/泡沫/奔流；author cockpit/train 仍缺。 |
+| D 江水/轨道/车 | 🟦 | 轨道已管轨化且支撑比例修正；隐藏 `TrainBody` placeholder 已删除；**江水第一人称全程可见已修复**。UE Water 保留 gate-only 系统 actor，真正可见水面是 `SM_YarlungRiverSurface` 斜面 mesh；2026-06-22 已加入 17-lane 窄水带与初版流纹/泡沫顶点色。剩余：水面仍无真实法线/反射/透明深度，author cockpit/train 仍缺。 |
 | E 密林/成像收尾 | 🟨 | HISM 树冠走廊已让 Standard 风险进 OK，但仍是 branch-clump 近似；当前完整 Megaplant 树多为 `SkeletalMesh`，不能直接进 HISM，需要整树 StaticMesh foliage 或 PCG 路径，再做 TSR/运动模糊/镜头感。 |
 | F 全程铺开/性能 | ⬜ | 需整条 on-rails 视锥验收，当前未到。 |
 
@@ -84,12 +85,11 @@
    .\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Standard -Build -NamePrefix <short-name>
    ```
    如果改变 terrain mesh/vertex color/displacement，改用 `-Mode Terrain`。
-3. **当前最高优先级：修“第一人称无水”WIP**：
-   - 先打开并肉眼对比 `Saved\Diagnostics\water-river-overhead-v5.png` 与 `Saved\Diagnostics\water-segment-river-default-v1.png`；不要用 spatial/risk 指标替代视觉判断。
-   - 已确认 `assets.local` 分叉删除，所有资产配置只读 `Config/yarlung-assets.json`；不要恢复 local override。
-   - 已确认 `FYarlungRiverField` segment projection 编译通过；默认路线重新生成后 `verify-track-clearance.py` violations=0，但水仍不进入主画面。
-   - 下个实现分支二选一：做 scenic route/hero camera solver，或在保留 UE Water 的前提下生成显式 river surface mesh / WaterMeshOverride，并给截图 gate 加“关键帧肉眼可见水”的 fail-close 检查。
-   - 当前 WIP 未提交；继续前先跑 `git status --short`，确认 generated assets 来自默认合法 route，不要提交 `route-river-overhead-v5` 那种 invalid 诊断状态。
+3. **当前最高优先级：山体/河岸真实感 + 水面成像，不再追“是否有水”**：
+   - `water-gateonly-foam-v3` 已确认水沿河槽可见，UE Water 是 gate-only；不要恢复强制可见 WaterZone，也不要恢复旧 `YarlungRiverActor`。
+   - 下一轮优先做山体/河岸：把大面积灰白裸坡压下去，用 Megascans cliff/rock wall 和地表材质形成湿岩、碎石岸、森林坡，而不是继续让水带贴在白灰平面上。
+   - 水面下一刀应做真实法线/反射/深度感：用材质法线/流向 panner 或可验证的 UE/mesh hybrid，不要再只靠 vertex color 加白纹。
+   - 截图验收继续以 `Saved\Diagnostics\<name>.png` 肉眼为准：水应沿峡谷凹槽、无遮挡/不穿石头、不是大块水平平板。
 4. **主线（AAA）= 资产导入/资产路径修正，见 `docs/plans/aaa-asset-pipeline.md`**：
    - **【当前优先】** 先补 HISM/ISM 可用的整树针叶/冷杉/云杉 StaticMesh，或明确改成可使用现有树资产的 PCG/foliage actor 路径；否则山体只能停留在 branch-clump 近似。
    - **【当前优先】** 选择坡面友好的模块化 cliff/rock wall（多尺寸、可旋转、非单块巨板），沿峡谷两侧 kitbash；不要恢复旧 `YarlungCanyonWallActor`，也不要用大 slab 硬盖坡。

@@ -692,14 +692,22 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
     Builder.SetMeshDescription(MeshDescription);
     Builder.SetNumUVLayers(1);
 
-    // Two vertices (left/right bank) per river row, lifted to the water surface.
+    // Multiple cross-river lanes let vertex color carry bank foam and rapid streaks.
     const int32 RowCount = Rows.Num();
-    TArray<FVector> Left;
-    TArray<FVector> Right;
-    Left.SetNumUninitialized(RowCount);
-    Right.SetNumUninitialized(RowCount);
+    constexpr int32 CrossSamples = 17;
+    TArray<FVertexID> VertexIds;
+    TArray<FVector2D> VertexUvs;
+    TArray<FVector4f> VertexColors;
+    VertexIds.SetNumUninitialized(RowCount * CrossSamples);
+    VertexUvs.SetNumUninitialized(RowCount * CrossSamples);
+    VertexColors.SetNumUninitialized(RowCount * CrossSamples);
     float MinSurfaceZ = TNumericLimits<float>::Max();
     float MaxSurfaceZ = -TNumericLimits<float>::Max();
+    int32 FoamVertexCount = 0;
+    const auto VertexIndex = [](int32 RowIndex, int32 CrossIndex)
+    {
+        return RowIndex * CrossSamples + CrossIndex;
+    };
     for (int32 Index = 0; Index < RowCount; ++Index)
     {
         const FVector Center = Rows[Index].PositionCm;
@@ -712,53 +720,83 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
         }
         const FVector2D Normal(-Tangent.Y, Tangent.X);
         // Keep the ribbon inside the flat-carved channel so its banks clear terrain.
-        const float HalfWidth = FMath::Clamp(Rows[Index].HalfWidthCm, 12000.0f, 24000.0f);
-        const float SurfaceZ = Center.Z + FYarlungRiverField::DefaultWaterSurfaceLiftCm;
-        MinSurfaceZ = FMath::Min(MinSurfaceZ, SurfaceZ);
-        MaxSurfaceZ = FMath::Max(MaxSurfaceZ, SurfaceZ);
-        Left[Index] = FVector(Center.X + Normal.X * HalfWidth, Center.Y + Normal.Y * HalfWidth, SurfaceZ);
-        Right[Index] = FVector(Center.X - Normal.X * HalfWidth, Center.Y - Normal.Y * HalfWidth, SurfaceZ);
+        const float HalfWidth = FMath::Clamp(Rows[Index].HalfWidthCm * 0.42f, 4500.0f, 10500.0f);
+        const float Flow = FMath::Clamp(Rows[Index].Flow, 0.0f, 1.0f);
+        const float SegmentDropCm = FMath::Abs(Next.Z - Prev.Z);
+        const float SegmentLengthCm = FMath::Max(1.0f, FVector2D(Next.X - Prev.X, Next.Y - Prev.Y).Size());
+        const float SlopeRapid = YarlungTerrain::Smooth01((SegmentDropCm / SegmentLengthCm - 0.018f) / 0.055f);
+        for (int32 CrossIndex = 0; CrossIndex < CrossSamples; ++CrossIndex)
+        {
+            const float Across01 = static_cast<float>(CrossIndex) / static_cast<float>(CrossSamples - 1);
+            const float AcrossSigned = 1.0f - Across01 * 2.0f;
+            const float EdgeFoam = YarlungTerrain::Smooth01((FMath::Abs(AcrossSigned) - 0.64f) / 0.30f);
+            const float CenterRapid = (1.0f - YarlungTerrain::Smooth01(FMath::Abs(AcrossSigned) / 0.46f))
+                * (0.45f + 0.55f * SlopeRapid);
+            const float BrokenStripe = FMath::Pow(
+                FMath::Clamp(0.5f + 0.5f * FMath::Sin(Flow * 96.0f + AcrossSigned * 9.0f), 0.0f, 1.0f),
+                3.0f);
+            const float FastStreak = FMath::Pow(
+                FMath::Clamp(0.5f + 0.5f * FMath::Sin(Flow * 520.0f + AcrossSigned * 23.0f), 0.0f, 1.0f),
+                5.0f);
+            const float Foam = FMath::Clamp(EdgeFoam * 0.18f + CenterRapid * (BrokenStripe * 0.22f + FastStreak * 0.34f), 0.0f, 0.62f);
+            const float RippleZ = 18.0f * FMath::Sin(Flow * 160.0f + AcrossSigned * 5.5f)
+                + 10.0f * FMath::Sin(Flow * 260.0f - AcrossSigned * 11.0f);
+            const float SurfaceZ = Center.Z + FYarlungRiverField::DefaultWaterSurfaceLiftCm + RippleZ;
+            MinSurfaceZ = FMath::Min(MinSurfaceZ, SurfaceZ);
+            MaxSurfaceZ = FMath::Max(MaxSurfaceZ, SurfaceZ);
+
+            const FVector Position(
+                Center.X + Normal.X * HalfWidth * AcrossSigned,
+                Center.Y + Normal.Y * HalfWidth * AcrossSigned,
+                SurfaceZ);
+            const int32 Id = VertexIndex(Index, CrossIndex);
+            VertexIds[Id] = Builder.AppendVertex(Position);
+            VertexUvs[Id] = FVector2D(Across01, Flow * 18.0f);
+
+            const FLinearColor DeepWater(0.012f, 0.18f, 0.20f, 1.0f);
+            const FLinearColor GlacialGreen(0.035f, 0.34f, 0.31f, 1.0f);
+            const FLinearColor AeratedFoam(0.76f, 0.86f, 0.78f, 1.0f);
+            const FLinearColor WaterColor = FMath::Lerp(DeepWater, GlacialGreen, 0.34f + 0.24f * BrokenStripe);
+            const FLinearColor FinalColor = FMath::Lerp(WaterColor, AeratedFoam, Foam);
+            VertexColors[Id] = FVector4f(FinalColor.R, FinalColor.G, FinalColor.B, 1.0f);
+            if (Foam > 0.12f)
+            {
+                ++FoamVertexCount;
+            }
+        }
     }
 
     FPolygonGroupID PolygonGroup = Builder.AppendPolygonGroup(TEXT("YarlungRiverSurface"));
-    TArray<FVertexID> LeftIds;
-    TArray<FVertexID> RightIds;
-    LeftIds.Reserve(RowCount);
-    RightIds.Reserve(RowCount);
-    for (int32 Index = 0; Index < RowCount; ++Index)
-    {
-        LeftIds.Add(Builder.AppendVertex(Left[Index]));
-        RightIds.Add(Builder.AppendVertex(Right[Index]));
-    }
-
     const FVector SurfaceNormal = FVector::UpVector;
-    const auto AppendTri = [&](const FVertexID& A, const FVertexID& B, const FVertexID& C, const FVector2D& UvA, const FVector2D& UvB, const FVector2D& UvC)
+    const auto AppendTri = [&](int32 A, int32 B, int32 C)
     {
-        const FVertexInstanceID IA = Builder.AppendInstance(A);
-        const FVertexInstanceID IB = Builder.AppendInstance(B);
-        const FVertexInstanceID IC = Builder.AppendInstance(C);
+        const FVertexInstanceID IA = Builder.AppendInstance(VertexIds[A]);
+        const FVertexInstanceID IB = Builder.AppendInstance(VertexIds[B]);
+        const FVertexInstanceID IC = Builder.AppendInstance(VertexIds[C]);
         const FVertexInstanceID Instances[3] = { IA, IB, IC };
-        const FVector2D Uvs[3] = { UvA, UvB, UvC };
+        const FVector2D Uvs[3] = { VertexUvs[A], VertexUvs[B], VertexUvs[C] };
+        const FVector4f Colors[3] = { VertexColors[A], VertexColors[B], VertexColors[C] };
         for (int32 Corner = 0; Corner < 3; ++Corner)
         {
             Builder.SetInstanceTangentSpace(Instances[Corner], SurfaceNormal, FVector::XAxisVector, 1.0f);
             Builder.SetInstanceUV(Instances[Corner], Uvs[Corner], 0);
-            Builder.SetInstanceColor(Instances[Corner], FVector4f(1.0f, 1.0f, 1.0f, 1.0f));
+            Builder.SetInstanceColor(Instances[Corner], Colors[Corner]);
         }
         Builder.AppendTriangle(IA, IB, IC, PolygonGroup);
     };
 
     for (int32 Index = 0; Index + 1 < RowCount; ++Index)
     {
-        const float V0 = static_cast<float>(Index) / static_cast<float>(RowCount - 1);
-        const float V1 = static_cast<float>(Index + 1) / static_cast<float>(RowCount - 1);
-        const FVector2D LeftUv0(0.0f, V0);
-        const FVector2D RightUv0(1.0f, V0);
-        const FVector2D LeftUv1(0.0f, V1);
-        const FVector2D RightUv1(1.0f, V1);
-        // Wound counter-clockwise seen from above so the surface faces up.
-        AppendTri(LeftIds[Index], LeftIds[Index + 1], RightIds[Index + 1], LeftUv0, LeftUv1, RightUv1);
-        AppendTri(LeftIds[Index], RightIds[Index + 1], RightIds[Index], LeftUv0, RightUv1, RightUv0);
+        for (int32 CrossIndex = 0; CrossIndex + 1 < CrossSamples; ++CrossIndex)
+        {
+            const int32 A = VertexIndex(Index, CrossIndex);
+            const int32 B = VertexIndex(Index + 1, CrossIndex);
+            const int32 C = VertexIndex(Index + 1, CrossIndex + 1);
+            const int32 D = VertexIndex(Index, CrossIndex + 1);
+            // Wound counter-clockwise seen from above so the surface faces up.
+            AppendTri(A, B, C);
+            AppendTri(A, C, D);
+        }
     }
 
     StaticMesh->CommitMeshDescription(0);
@@ -783,9 +821,11 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Built Yarlung river surface ribbon: %s rows=%d surface_z_cm=%.0f..%.0f"),
+        TEXT("Built Yarlung river surface ribbon: %s rows=%d cross_lanes=%d foam_vertices=%d surface_z_cm=%.0f..%.0f"),
         *StaticMesh->GetPathName(),
         RowCount,
+        CrossSamples,
+        FoamVertexCount,
         MinSurfaceZ,
         MaxSurfaceZ);
     return StaticMesh;

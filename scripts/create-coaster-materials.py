@@ -154,27 +154,53 @@ def create_yarlung_water_surface_material():
     material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
     material.set_editor_property("two_sided", True)
 
+    vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionVertexColor,
+        -860,
+        -180,
+    )
+    vertex_color_gain = create_scalar_parameter(material, "VertexColorBlend", 0.72, -620, -20)
+    base_color_param = create_vector_parameter(
+        material,
+        "BaseColor",
+        unreal.LinearColor(0.012, 0.16, 0.18, 1.0),
+        -640,
+        -300,
+    )
+    base_color = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionLinearInterpolate,
+        -120,
+        -200,
+    )
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(base_color_param, "", base_color, "A"):
+        raise RuntimeError("Unable to connect yarlung water base color")
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(vertex_color, "", base_color, "B"):
+        raise RuntimeError("Unable to connect yarlung water vertex color")
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(vertex_color_gain, "", base_color, "Alpha"):
+        raise RuntimeError("Unable to connect yarlung water vertex-color blend")
     connect_material_property(
         material,
-        create_vector_parameter(material, "BaseColor", unreal.LinearColor(0.055, 0.42, 0.36, 1.0), -500, -220),
+        base_color,
         unreal.MaterialProperty.MP_BASE_COLOR,
-        "yarlung water surface BaseColor",
+        "yarlung water surface vertex BaseColor",
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Roughness", 0.92, -500, -40),
+        create_scalar_parameter(material, "Roughness", 0.58, -500, -40),
         unreal.MaterialProperty.MP_ROUGHNESS,
         "yarlung water surface Roughness",
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Specular", 0.12, -500, 120),
+        create_scalar_parameter(material, "Specular", 0.38, -500, 120),
         unreal.MaterialProperty.MP_SPECULAR,
         "yarlung water surface Specular",
     )
     connect_material_property(
         material,
-        create_vector_parameter(material, "EmissiveTint", unreal.LinearColor(0.018, 0.055, 0.047, 1.0), -500, 280),
+        create_vector_parameter(material, "EmissiveTint", unreal.LinearColor(0.003, 0.010, 0.010, 1.0), -500, 280),
         unreal.MaterialProperty.MP_EMISSIVE_COLOR,
         "yarlung water surface EmissiveTint",
     )
