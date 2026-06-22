@@ -94,6 +94,27 @@
         "seed": 97.0
       },
       {
+        "name": "SlopeRockWallA",
+        "mesh": "/Game/Fab/Megascans/3D/Quarry_Cliff_uchwaffda/High/uchwaffda_tier_1/StaticMeshes/uchwaffda_tier_1.uchwaffda_tier_1",
+        "kind": "slope_rock_wall",
+        "placement": "slope_patch_belt",
+        "seed": 211.0
+      },
+      {
+        "name": "SlopeRockWallB",
+        "mesh": "/Game/Fab/Megascans/3D/Nordic_Forest_Cliff_Large_xibsff1/Medium/xibsff1_tier_2/StaticMeshes/xibsff1_tier_2.xibsff1_tier_2",
+        "kind": "slope_rock_wall",
+        "placement": "slope_patch_belt",
+        "seed": 223.0
+      },
+      {
+        "name": "SlopeForestPatchA",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01",
+        "kind": "slope_forest_patch",
+        "placement": "slope_patch_belt",
+        "seed": 239.0
+      },
+      {
         "name": "ForestShrubsA",
         "mesh": "/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_06.spruce_small_06",
         "kind": "shrub",
@@ -232,6 +253,36 @@
         "height_offset_cm": 34.0,
         "align_to_surface": false
       },
+      "slope_rock_wall": {
+        "side_bias": 0.5,
+        "distance_power": 1.0,
+        "min_lateral_cm": 10000.0,
+        "max_lateral_cm": 190000.0,
+        "river_clearance_cm": 12000.0,
+        "min_height_cm": 250000.0,
+        "max_height_cm": 520000.0,
+        "min_slope": 0.025,
+        "max_slope": 1.0,
+        "scale_min": 2.1,
+        "scale_max": 5.8,
+        "height_offset_cm": 28.0,
+        "align_to_surface": false
+      },
+      "slope_forest_patch": {
+        "side_bias": 0.5,
+        "distance_power": 1.0,
+        "min_lateral_cm": 34000.0,
+        "max_lateral_cm": 210000.0,
+        "river_clearance_cm": 18000.0,
+        "min_height_cm": 250000.0,
+        "max_height_cm": 492000.0,
+        "min_slope": 0.0,
+        "max_slope": 0.86,
+        "scale_min": 1.05,
+        "scale_max": 2.15,
+        "height_offset_cm": 36.0,
+        "align_to_surface": false
+      },
       "shrub": {
         "side_bias": 0.58,
         "distance_power": 1.05,
@@ -339,6 +390,43 @@
       "track_clearance_cm": 24000.0,
       "along_jitter_cm": 3800.0,
       "lateral_jitter_cm": 5200.0
+    },
+    "slope_patch_belt": {
+      "sample_stride": 1,
+      "sample_ranges": [
+        0.0,
+        8.0,
+        12.0,
+        58.0,
+        72.0,
+        128.0,
+        138.0,
+        204.0
+      ],
+      "lateral_bands_cm": [
+        12000.0,
+        18000.0,
+        26000.0,
+        34000.0,
+        46000.0,
+        62000.0,
+        85000.0,
+        116000.0,
+        152000.0
+      ],
+      "occupancy": 0.78,
+      "track_clearance_cm": 9000.0,
+      "river_clearance_cm": 12000.0,
+      "min_height_cm": 250000.0,
+      "max_height_cm": 520000.0,
+      "min_slope": 0.015,
+      "max_slope": 1.0,
+      "scale_min": 1.2,
+      "scale_max": 5.4,
+      "height_offset_cm": 28.0,
+      "along_jitter_cm": 2800.0,
+      "lateral_jitter_cm": 3600.0,
+      "yaw_jitter_degrees": 12.0
     }
   },
   "water": {

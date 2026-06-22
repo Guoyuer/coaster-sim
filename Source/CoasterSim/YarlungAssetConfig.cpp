@@ -91,6 +91,28 @@ TArray<float> RequiredNumberArrayField(const TSharedPtr<FJsonObject>& Object, co
     return Values;
 }
 
+TArray<FIntPoint> RequiredIntegerPairArrayField(const TSharedPtr<FJsonObject>& Object, const TCHAR* Name, const FString& Context)
+{
+    const TArray<float> RawValues = RequiredNumberArrayField(Object, Name, Context);
+    if (RawValues.Num() == 0 || RawValues.Num() % 2 != 0)
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s.%s must contain start/end integer pairs"), *Context, Name));
+    }
+
+    TArray<FIntPoint> Ranges;
+    for (int32 Index = 0; Index + 1 < RawValues.Num(); Index += 2)
+    {
+        const int32 Start = FMath::RoundToInt(RawValues[Index]);
+        const int32 End = FMath::RoundToInt(RawValues[Index + 1]);
+        if (Start < 0 || End <= Start)
+        {
+            FatalAssetConfigError(FString::Printf(TEXT("%s.%s has invalid range %d..%d"), *Context, Name, Start, End));
+        }
+        Ranges.Add(FIntPoint(Start, End));
+    }
+    return Ranges;
+}
+
 bool OptionalColorArrayField(const TSharedPtr<FJsonObject>& Object, const TCHAR* Name, FLinearColor& OutColor, const FString& Context)
 {
     if (!Object.IsValid() || !Object->HasField(Name))
@@ -155,6 +177,10 @@ EYarlungSceneryPlacement ParsePlacement(const FString& Value, const FString& Con
     if (Value.Equals(TEXT("ground_cover_belt"), ESearchCase::IgnoreCase))
     {
         return EYarlungSceneryPlacement::GroundCoverBelt;
+    }
+    if (Value.Equals(TEXT("slope_patch_belt"), ESearchCase::IgnoreCase))
+    {
+        return EYarlungSceneryPlacement::SlopePatchBelt;
     }
 
     FatalAssetConfigError(FString::Printf(TEXT("%s has unknown placement '%s'"), *Context, *Value));
@@ -307,6 +333,25 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.GroundCoverBelt.AlongJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("along_jitter_cm"), GroundCoverBeltContext);
     Config.GroundCoverBelt.LateralJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("lateral_jitter_cm"), GroundCoverBeltContext);
 
+    const TSharedPtr<FJsonObject> SlopePatchBelt = RequiredObject(Scenery, TEXT("slope_patch_belt"), Path);
+    const FString SlopePatchBeltContext = FString::Printf(TEXT("%s scenery.slope_patch_belt"), *Path);
+    Config.SlopePatchBelt.SampleStride = RequiredIntegerField(SlopePatchBelt, TEXT("sample_stride"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.SampleRanges = RequiredIntegerPairArrayField(SlopePatchBelt, TEXT("sample_ranges"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.LateralBandsCm = RequiredNumberArrayField(SlopePatchBelt, TEXT("lateral_bands_cm"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.Occupancy = RequiredNumberField(SlopePatchBelt, TEXT("occupancy"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.TrackClearanceCm = RequiredNumberField(SlopePatchBelt, TEXT("track_clearance_cm"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.RiverClearanceCm = RequiredNumberField(SlopePatchBelt, TEXT("river_clearance_cm"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.MinHeightCm = RequiredNumberField(SlopePatchBelt, TEXT("min_height_cm"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.MaxHeightCm = RequiredNumberField(SlopePatchBelt, TEXT("max_height_cm"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.MinSlope = RequiredNumberField(SlopePatchBelt, TEXT("min_slope"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.MaxSlope = RequiredNumberField(SlopePatchBelt, TEXT("max_slope"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.ScaleMin = RequiredNumberField(SlopePatchBelt, TEXT("scale_min"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.ScaleMax = RequiredNumberField(SlopePatchBelt, TEXT("scale_max"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.HeightOffsetCm = RequiredNumberField(SlopePatchBelt, TEXT("height_offset_cm"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.AlongJitterCm = RequiredNumberField(SlopePatchBelt, TEXT("along_jitter_cm"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.LateralJitterCm = RequiredNumberField(SlopePatchBelt, TEXT("lateral_jitter_cm"), SlopePatchBeltContext);
+    Config.SlopePatchBelt.YawJitterDegrees = RequiredNumberField(SlopePatchBelt, TEXT("yaw_jitter_degrees"), SlopePatchBeltContext);
+
     const TSharedPtr<FJsonObject> Water = RequiredObject(Root, TEXT("water"), Path);
     const FString WaterContext = FString::Printf(TEXT("%s water"), *Path);
     Config.Water.SurfaceMaterialPath = RequiredStringField(Water, TEXT("surface_material"), WaterContext);
@@ -350,6 +395,17 @@ FYarlungAssetConfig LoadConfigFromDisk()
         Config.GroundCoverBelt.AlongJitterCm < 0.0f || Config.GroundCoverBelt.LateralJitterCm < 0.0f)
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.ground_cover_belt settings"), *Path));
+    }
+    if (Config.SlopePatchBelt.SampleStride <= 0 || Config.SlopePatchBelt.SampleRanges.IsEmpty() ||
+        Config.SlopePatchBelt.LateralBandsCm.IsEmpty() ||
+        Config.SlopePatchBelt.Occupancy < 0.0f || Config.SlopePatchBelt.Occupancy > 1.0f ||
+        Config.SlopePatchBelt.TrackClearanceCm < 0.0f || Config.SlopePatchBelt.RiverClearanceCm < 0.0f ||
+        Config.SlopePatchBelt.MaxHeightCm < Config.SlopePatchBelt.MinHeightCm ||
+        Config.SlopePatchBelt.MinSlope < 0.0f || Config.SlopePatchBelt.MaxSlope < Config.SlopePatchBelt.MinSlope ||
+        Config.SlopePatchBelt.ScaleMin <= 0.0f || Config.SlopePatchBelt.ScaleMax < Config.SlopePatchBelt.ScaleMin ||
+        Config.SlopePatchBelt.AlongJitterCm < 0.0f || Config.SlopePatchBelt.LateralJitterCm < 0.0f)
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.slope_patch_belt settings"), *Path));
     }
 
     UE_LOG(LogTemp, Display, TEXT("YarlungAssets: loaded %d scenery components, %d scatter kinds from %s"),
