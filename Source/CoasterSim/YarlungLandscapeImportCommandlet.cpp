@@ -3,6 +3,7 @@
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "CoasterRideActor.h"
+#include "YarlungAssetConfig.h"
 #include "YarlungRiverField.h"
 #include "YarlungSceneryActor.h"
 #include "YarlungMeshTerrainActor.h"
@@ -644,12 +645,13 @@ const TCHAR* YarlungRiverSurfaceMeshAssetName = TEXT("SM_YarlungRiverSurface");
 
 UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverField)
 {
+    const FYarlungWaterConfig& WaterConfig = YarlungAssets::Config().Water;
     UMaterialInterface* Material = LoadObject<UMaterialInterface>(
         nullptr,
-        TEXT("/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface"));
+        *WaterConfig.SurfaceMaterialPath);
     if (!Material)
     {
-        UE_LOG(LogTemp, Error, TEXT("Missing required river surface material: /Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface"));
+        UE_LOG(LogTemp, Error, TEXT("Missing required river surface material: %s"), *WaterConfig.SurfaceMaterialPath);
         return nullptr;
     }
 

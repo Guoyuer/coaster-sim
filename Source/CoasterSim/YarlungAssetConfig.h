@@ -51,7 +51,6 @@ struct FYarlungCanopyBeltConfig
 struct FYarlungWaterConfig
 {
     FString RiverMaterialPath;
-    FString FallbackRiverMaterialPath;
     FString SurfaceMaterialPath;
     int32 ZoneRenderTargetResolution = 1024;
     float ZoneExtentScale = 0.55f;

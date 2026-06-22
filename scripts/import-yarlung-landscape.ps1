@@ -26,7 +26,6 @@ $MaterialScript = Join-Path $PSScriptRoot "create-coaster-materials.py"
 $InspectScript = Join-Path $PSScriptRoot "inspect-yarlung-map.py"
 $MaterialSuccessMarker = Join-Path $RepoRoot "Saved\material-generation-ok.txt"
 $MeshTerrainMaterialAsset = Join-Path $RepoRoot "Content\Generated\Materials\M_YarlungMeshTerrain.uasset"
-$WaterRiverMaterialAsset = Join-Path $RepoRoot "Content\Generated\Materials\MI_YarlungWaterRiver.uasset"
 $WaterSurfaceMaterialAsset = Join-Path $RepoRoot "Content\Generated\Materials\M_YarlungWaterSurface.uasset"
 $HeightmapAsset = Join-Path $RepoRoot "Content\Generated\YarlungLandscape\YarlungTsangpo_1009.r16"
 $TrackAsset = Join-Path $RepoRoot "Content\Generated\YarlungLandscape\YarlungTrack.csv"
@@ -166,7 +165,7 @@ if (-not $SkipTrackGeneration) {
     }
 }
 
-if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOutput @($MaterialScript) @($MeshTerrainMaterialAsset, $WaterRiverMaterialAsset, $WaterSurfaceMaterialAsset)))) {
+if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOutput @($MaterialScript) @($MeshTerrainMaterialAsset, $WaterSurfaceMaterialAsset)))) {
     Invoke-TimedStep "import materials" {
         Remove-Item -LiteralPath $MaterialSuccessMarker -ErrorAction SilentlyContinue
 
@@ -177,9 +176,6 @@ if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOut
         if (-not (Test-Path -LiteralPath $MeshTerrainMaterialAsset)) {
             throw "Coaster material generation did not produce $MeshTerrainMaterialAsset"
         }
-        if (-not (Test-Path -LiteralPath $WaterRiverMaterialAsset)) {
-            throw "Coaster material generation did not produce $WaterRiverMaterialAsset"
-        }
         if (-not (Test-Path -LiteralPath $WaterSurfaceMaterialAsset)) {
             throw "Coaster material generation did not produce $WaterSurfaceMaterialAsset"
         }
@@ -188,9 +184,6 @@ if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOut
     Write-Host "[YARLUNG-TIME] skip import materials: assets are fresh"
     if (-not (Test-Path -LiteralPath $MeshTerrainMaterialAsset)) {
         throw "Missing required mesh terrain material asset: $MeshTerrainMaterialAsset"
-    }
-    if (-not (Test-Path -LiteralPath $WaterRiverMaterialAsset)) {
-        throw "Missing required UE Water river material instance: $WaterRiverMaterialAsset"
     }
     if (-not (Test-Path -LiteralPath $WaterSurfaceMaterialAsset)) {
         throw "Missing required UE Water surface material: $WaterSurfaceMaterialAsset"

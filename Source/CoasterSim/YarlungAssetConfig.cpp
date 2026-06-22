@@ -246,7 +246,6 @@ FYarlungAssetConfig LoadConfigFromDisk()
     const TSharedPtr<FJsonObject> Water = RequiredObject(Root, TEXT("water"), Path);
     const FString WaterContext = FString::Printf(TEXT("%s water"), *Path);
     Config.Water.RiverMaterialPath = RequiredStringField(Water, TEXT("river_material"), WaterContext);
-    Config.Water.FallbackRiverMaterialPath = RequiredStringField(Water, TEXT("fallback_river_material"), WaterContext);
     Config.Water.SurfaceMaterialPath = RequiredStringField(Water, TEXT("surface_material"), WaterContext);
     Config.Water.ZoneRenderTargetResolution = RequiredIntegerField(Water, TEXT("zone_render_target_resolution"), WaterContext);
     Config.Water.ZoneExtentScale = RequiredNumberField(Water, TEXT("zone_extent_scale"), WaterContext);

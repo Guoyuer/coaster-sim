@@ -7,10 +7,7 @@ import unreal
 PACKAGE_PATH = "/Game/Generated/Materials"
 TINT_MATERIAL_NAME = "M_CoasterTint"
 MESH_TERRAIN_MATERIAL_NAME = "M_YarlungMeshTerrain"
-WATER_RIVER_MATERIAL_INSTANCE_NAME = "MI_YarlungWaterRiver"
 WATER_SURFACE_MATERIAL_NAME = "M_YarlungWaterSurface"
-UE_WATER_RIVER_PARENT_PATH = "/Water/Materials/WaterSurface/Water_Material_River.Water_Material_River"
-PROJECT_WATER_PARENT_PATH = f"{PACKAGE_PATH}/{WATER_SURFACE_MATERIAL_NAME}.{WATER_SURFACE_MATERIAL_NAME}"
 SUCCESS_MARKER = "material-generation-ok.txt"
 
 
@@ -41,27 +38,6 @@ def create_material_asset(name, package_path):
     if material is None:
         raise RuntimeError(f"Unable to create material: {asset_path}")
     return material
-
-
-def create_material_instance_asset(name, package_path, parent_path):
-    asset_path = f"{package_path}/{name}"
-    parent = unreal.EditorAssetLibrary.load_asset(parent_path) if unreal.EditorAssetLibrary.does_asset_exist(parent_path) else None
-    if parent is None:
-        raise RuntimeError(f"Unable to load material instance parent: {parent_path}")
-
-    instance = unreal.EditorAssetLibrary.load_asset(asset_path) if unreal.EditorAssetLibrary.does_asset_exist(asset_path) else None
-    if instance is None:
-        instance = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-            name,
-            package_path,
-            unreal.MaterialInstanceConstant,
-            unreal.MaterialInstanceConstantFactoryNew(),
-        )
-    if instance is None:
-        raise RuntimeError(f"Unable to create material instance: {asset_path}")
-
-    instance.set_editor_property("parent", parent)
-    return instance
 
 
 def connect_material_property(material, expression, material_property, label):
@@ -170,80 +146,6 @@ def set_optional_material_usage(material, usage_name):
     usage = getattr(unreal.MaterialUsage, usage_name, None)
     if usage is not None:
         unreal.MaterialEditingLibrary.set_base_material_usage(material, usage, True)
-
-
-def set_instance_scalar(instance, name, value):
-    unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(
-        instance,
-        name,
-        value,
-    )
-
-
-def set_instance_vector(instance, name, value):
-    unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(
-        instance,
-        name,
-        value,
-    )
-
-
-def create_yarlung_water_material_instance():
-    parent_path = UE_WATER_RIVER_PARENT_PATH
-    if not unreal.EditorAssetLibrary.does_asset_exist(parent_path):
-        parent_path = PROJECT_WATER_PARENT_PATH
-        if not unreal.EditorAssetLibrary.does_asset_exist(parent_path):
-            raise RuntimeError(f"Unable to load UE Water parent or project water parent: {UE_WATER_RIVER_PARENT_PATH} / {PROJECT_WATER_PARENT_PATH}")
-        print(f"[WATER-MATERIAL] UE Water plugin parent unavailable; using project parent {PROJECT_WATER_PARENT_PATH}")
-
-    instance = create_material_instance_asset(
-        WATER_RIVER_MATERIAL_INSTANCE_NAME,
-        PACKAGE_PATH,
-        parent_path,
-    )
-
-    # Keep the UE Water shader/render path, but bias it toward glacial Yarlung
-    # water: cold emerald body color, high roughness, and readable whitewater.
-    vector_values = {
-        "Water Albedo": unreal.LinearColor(0.055, 0.42, 0.36, 1.0),
-        "Scattering": unreal.LinearColor(0.76, 1.08, 0.92, 1.0),
-        "Absorption": unreal.LinearColor(0.82, 0.18, 0.08, 1.0),
-        "Foam Scattering": unreal.LinearColor(0.92, 1.00, 0.90, 1.0),
-        "Foam Emissive": unreal.LinearColor(0.22, 0.30, 0.22, 1.0),
-    }
-    scalar_values = {
-        "Opacity": 0.86,
-        "Water Opacity": 0.86,
-        "Water Roughness": 0.86,
-        "Water Specular": 0.18,
-        "Refraction": 0.035,
-        "Refraction Far": 0.015,
-        "Water Fresnel Roughness": 0.94,
-        "Water Fresnel Specular": 0.14,
-        "Default Near Normal Strength": 1.85,
-        "Default Distant Normal Strength": 1.05,
-        "Default Distant Normal StrengthB": 0.86,
-        "River Normal Flatness": 0.12,
-        "River Flowmap Speed": 2.35,
-        "River Flowmap Detection Velocity": 0.08,
-        "River Foam Scale": 3.80,
-        "Foam Opacity": 1.0,
-        "Foam Roughness": 0.96,
-        "FoamContrast": 5.40,
-        "Foam Boost": 4.80,
-        "Foam MacroScale": 0.32,
-        "Front Foam Scale": 2.10,
-        "SimFoam Contrast": 4.20,
-        "MaxFlowVelocity": 1180.0,
-    }
-    for name, value in vector_values.items():
-        set_instance_vector(instance, name, value)
-    for name, value in scalar_values.items():
-        set_instance_scalar(instance, name, value)
-
-    unreal.EditorAssetLibrary.save_loaded_asset(instance)
-    print(f"[WATER-MATERIAL] saved /Game/Generated/Materials/{WATER_RIVER_MATERIAL_INSTANCE_NAME}")
-    return instance
 
 
 def create_yarlung_water_surface_material():
@@ -365,7 +267,6 @@ def main():
     enable_imported_material_usages()
     create_tint_material()
     create_yarlung_water_surface_material()
-    create_yarlung_water_material_instance()
     create_mesh_terrain_material()
     marker_path = unreal.Paths.convert_relative_path_to_full(
         unreal.Paths.project_saved_dir() + SUCCESS_MARKER

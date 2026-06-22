@@ -107,11 +107,6 @@ bool SpawnYarlungWater(UWorld* World)
     RiverComponent->SetWaterBodyStaticMeshEnabled(true);
 #endif
 
-    UMaterialInterface* RiverMaterial = LoadObject<UMaterialInterface>(nullptr, *WaterConfig.RiverMaterialPath);
-    if (!RiverMaterial && !WaterConfig.FallbackRiverMaterialPath.IsEmpty())
-    {
-        RiverMaterial = LoadObject<UMaterialInterface>(nullptr, *WaterConfig.FallbackRiverMaterialPath);
-    }
     UMaterialInterface* RiverSurfaceMaterial = LoadObject<UMaterialInterface>(nullptr, *WaterConfig.SurfaceMaterialPath);
     if (!RiverSurfaceMaterial)
     {
@@ -119,11 +114,10 @@ bool SpawnYarlungWater(UWorld* World)
         return false;
     }
 
+    UMaterialInterface* RiverMaterial = LoadObject<UMaterialInterface>(nullptr, *WaterConfig.RiverMaterialPath);
     if (!RiverMaterial)
     {
-        UE_LOG(LogTemp, Error, TEXT("Yarlung UE Water river material not found: %s fallback=%s"),
-            *WaterConfig.RiverMaterialPath,
-            *WaterConfig.FallbackRiverMaterialPath);
+        UE_LOG(LogTemp, Error, TEXT("Yarlung UE Water river material not found: %s"), *WaterConfig.RiverMaterialPath);
         return false;
     }
 

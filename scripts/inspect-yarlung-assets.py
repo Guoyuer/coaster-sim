@@ -45,7 +45,6 @@ def inspect_water_materials(config):
     water = config["water"]
     for label, key in (
         ("river", "river_material"),
-        ("fallback_river", "fallback_river_material"),
         ("surface", "surface_material"),
     ):
         material_path = water.get(key, "")

@@ -177,7 +177,6 @@
   },
   "water": {
     "river_material": "/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface",
-    "fallback_river_material": "/Water/Materials/WaterSurface/Water_Material_River.Water_Material_River",
     "surface_material": "/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface",
     "zone_render_target_resolution": 1024,
     "zone_extent_scale": 0.55,
