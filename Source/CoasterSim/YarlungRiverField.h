@@ -29,6 +29,15 @@ class FYarlungRiverField
 {
 public:
     static constexpr float DefaultWaterSurfaceLiftCm = 20.0f;
+    static constexpr float ChannelHalfWidthScale = 0.38f;
+    static constexpr float ChannelHalfWidthMinCm = 4000.0f;
+    static constexpr float ChannelHalfWidthMaxCm = 9000.0f;
+    static constexpr float VisibleRibbonHalfWidthScale = 0.34f;
+    static constexpr float VisibleRibbonHalfWidthMinCm = 3600.0f;
+    static constexpr float VisibleRibbonHalfWidthMaxCm = 8200.0f;
+
+    static float CarvedChannelHalfWidthCm(float RiverHalfWidthCm);
+    static float VisibleRibbonHalfWidthCm(float RiverHalfWidthCm);
 
     bool LoadGeneratedCsv(FString* OutError = nullptr);
 

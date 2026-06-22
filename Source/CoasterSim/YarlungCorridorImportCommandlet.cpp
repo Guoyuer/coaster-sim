@@ -7,10 +7,9 @@
 #include "YarlungRiverField.h"
 #include "YarlungSceneryActor.h"
 #include "YarlungMeshTerrainActor.h"
-#include "YarlungCorridorProfile.h"
 #include "YarlungGeneratedPaths.h"
 #include "YarlungTerrainProfile.h"
-#include "YarlungTerrainRelief.h"
+#include "YarlungTerrainSurface.h"
 #include "YarlungTrackCsv.h"
 #include "YarlungViewCorridor.h"
 #include "Components/StaticMeshComponent.h"
@@ -36,16 +35,6 @@ const TCHAR* YarlungCorridorTerrainMeshPackagePath = YarlungGeneratedPaths::Corr
 const TCHAR* YarlungCorridorTerrainMeshAssetName = YarlungGeneratedPaths::CorridorTerrainMeshAssetName;
 const TCHAR* YarlungCorridorTerrainMeshObjectPath = YarlungGeneratedPaths::CorridorTerrainMeshObjectPath;
 
-float YarlungCubicBsplineInterp(float P0, float P1, float P2, float P3, float T)
-{
-    const float OneMinusT = 1.0f - T;
-    const float W0 = OneMinusT * OneMinusT * OneMinusT / 6.0f;
-    const float W1 = (3.0f * T * T * T - 6.0f * T * T + 4.0f) / 6.0f;
-    const float W2 = (-3.0f * T * T * T + 3.0f * T * T + 3.0f * T + 1.0f) / 6.0f;
-    const float W3 = T * T * T / 6.0f;
-    return P0 * W0 + P1 * W1 + P2 * W2 + P3 * W3;
-}
-
 float YarlungValueNoise(float X, float Y)
 {
     return FMath::Frac(FMath::Sin(X * 0.00173f + Y * 0.00291f) * 43758.5453f);
@@ -54,63 +43,6 @@ float YarlungValueNoise(float X, float Y)
 float YarlungSignedValueNoise(float X, float Y)
 {
     return YarlungValueNoise(X, Y) * 2.0f - 1.0f;
-}
-
-float YarlungHeightAtGrid(const TArray<uint16>& EncodedHeights, int32 XIndex, int32 YIndex)
-{
-    const int32 Size = YarlungTerrain::Config().GridSize;
-    const int32 ClampedX = FMath::Clamp(XIndex, 0, Size - 1);
-    const int32 ClampedY = FMath::Clamp(YIndex, 0, Size - 1);
-    return YarlungTerrain::HeightValueToCm(EncodedHeights[ClampedY * Size + ClampedX]);
-}
-
-float YarlungHeightAtSourceGrid(const TArray<uint16>& EncodedHeights, float SourceX, float SourceY)
-{
-    const int32 BaseX = FMath::FloorToInt(SourceX);
-    const int32 BaseY = FMath::FloorToInt(SourceY);
-    const float TX = SourceX - static_cast<float>(BaseX);
-    const float TY = SourceY - static_cast<float>(BaseY);
-    float Rows[4] = {};
-    float MinNeighbor = TNumericLimits<float>::Max();
-    float MaxNeighbor = -TNumericLimits<float>::Max();
-
-    for (int32 Row = 0; Row < 4; ++Row)
-    {
-        float Samples[4] = {};
-        for (int32 Column = 0; Column < 4; ++Column)
-        {
-            Samples[Column] = YarlungHeightAtGrid(EncodedHeights, BaseX + Column - 1, BaseY + Row - 1);
-            MinNeighbor = FMath::Min(MinNeighbor, Samples[Column]);
-            MaxNeighbor = FMath::Max(MaxNeighbor, Samples[Column]);
-        }
-        Rows[Row] = YarlungCubicBsplineInterp(Samples[0], Samples[1], Samples[2], Samples[3], TX);
-    }
-
-    return FMath::Clamp(
-        YarlungCubicBsplineInterp(Rows[0], Rows[1], Rows[2], Rows[3], TY),
-        MinNeighbor,
-        MaxNeighbor);
-}
-
-float YarlungHeightAtWorldXY(const TArray<uint16>& EncodedHeights, float X, float Y)
-{
-    const YarlungTerrain::FConfig& Tc = YarlungTerrain::Config();
-    const float U = FMath::Clamp((X - Tc.MinXCm) / (Tc.MaxXCm - Tc.MinXCm), 0.0f, 1.0f);
-    const float V = FMath::Clamp((Y - Tc.MinYCm) / (Tc.MaxYCm - Tc.MinYCm), 0.0f, 1.0f);
-    return YarlungHeightAtSourceGrid(
-        EncodedHeights,
-        U * static_cast<float>(Tc.GridSize - 1),
-        V * static_cast<float>(Tc.GridSize - 1));
-}
-
-FVector YarlungSmoothNormalAtWorldXY(const TArray<uint16>& EncodedHeights, float X, float Y)
-{
-    constexpr float SampleSpacingCm = 900.0f;
-    const float Left = YarlungHeightAtWorldXY(EncodedHeights, X - SampleSpacingCm, Y);
-    const float Right = YarlungHeightAtWorldXY(EncodedHeights, X + SampleSpacingCm, Y);
-    const float Down = YarlungHeightAtWorldXY(EncodedHeights, X, Y - SampleSpacingCm);
-    const float Up = YarlungHeightAtWorldXY(EncodedHeights, X, Y + SampleSpacingCm);
-    return FVector(Left - Right, Down - Up, SampleSpacingCm * 4.0f).GetSafeNormal();
 }
 
 float YarlungCanyonWetRockMask(float X, float Y, float Height, const FVector& SurfaceNormal, const FYarlungRiverField& RiverField)
@@ -259,60 +191,11 @@ bool LoadYarlungTerrainTrackPoints(TArray<YarlungViewCorridor::FTrackPoint>& Out
     return true;
 }
 
-bool FindNearestTrackProfileFrame(
-    const TArray<YarlungViewCorridor::FTrackPoint>& TrackPoints,
-    const FVector2D& Position,
-    FVector2D& OutCenter,
-    float& OutSignedOffsetCm)
-{
-    if (TrackPoints.Num() < 2)
-    {
-        return false;
-    }
-
-    float BestSquared = TNumericLimits<float>::Max();
-    FVector2D BestCenter = TrackPoints[0].Position;
-    FVector2D BestTangent = FVector2D(1.0f, 0.0f);
-
-    for (int32 Index = 0; Index < TrackPoints.Num(); ++Index)
-    {
-        const FVector2D A = TrackPoints[Index].Position;
-        const FVector2D B = TrackPoints[(Index + 1) % TrackPoints.Num()].Position;
-        const FVector2D AB = B - A;
-        const float LengthSquared = AB.SizeSquared();
-        if (LengthSquared <= KINDA_SMALL_NUMBER)
-        {
-            continue;
-        }
-
-        const float T = FMath::Clamp(FVector2D::DotProduct(Position - A, AB) / LengthSquared, 0.0f, 1.0f);
-        const FVector2D Closest = A + AB * T;
-        const float Squared = FVector2D::DistSquared(Position, Closest);
-        if (Squared < BestSquared)
-        {
-            BestSquared = Squared;
-            BestCenter = Closest;
-            BestTangent = AB.GetSafeNormal();
-        }
-    }
-
-    const FVector2D Relative = Position - BestCenter;
-    OutCenter = BestCenter;
-    OutSignedOffsetCm = BestTangent.X * Relative.Y - BestTangent.Y * Relative.X;
-    return BestSquared < TNumericLimits<float>::Max();
-}
-
 // Continuous canyon base mesh. The track-view corridor is still the visual
 // priority, but the foundation must be a non-self-intersecting world surface.
 // A track-swept strip folded over itself on loops/turns and clipped the camera.
 constexpr int32 BaseTerrainStride = 1;
-struct FBaseTerrainMeshStats
-{
-    int32 DisplacedVertexCount = 0;
-    float MaxAbsDisplacementCm = 0.0f;
-    int32 RiverCarvedVertexCount = 0;
-    float MaxRiverCarveCm = 0.0f;
-};
+using FBaseTerrainMeshStats = YarlungTerrainSurface::FSurfaceStats;
 
 int32 BaseTerrainSampleCount()
 {
@@ -339,39 +222,6 @@ int32 BaseTerrainVertexIndex(int32 XIndex, int32 YIndex, int32 SampleCount)
     return YIndex * SampleCount + XIndex;
 }
 
-float CarveRiverChannelCm(
-    float HeightCm,
-    const FVector2D& Position,
-    const FYarlungRiverField& RiverField,
-    FBaseTerrainMeshStats& Stats)
-{
-    const FYarlungRiverQuery River = RiverField.QueryNearest(Position);
-    if (!River.bIsValid)
-    {
-        return HeightCm;
-    }
-
-    const float InnerBankCm = River.WaterHalfWidthCm + 1000.0f;
-    const float OuterBankCm = River.WaterHalfWidthCm + 12000.0f;
-    if (River.DistanceCm >= OuterBankCm)
-    {
-        return HeightCm;
-    }
-
-    const float BankT = YarlungTerrain::Smooth01((River.DistanceCm - InnerBankCm) / (OuterBankCm - InnerBankCm));
-    const float CarveAlpha = 1.0f - BankT;
-    const float BankRiseCm = FMath::Max(0.0f, River.DistanceCm - River.WaterHalfWidthCm) * 0.90f;
-    const float TargetHeightCm = River.WaterSurfaceZCm - 80.0f + BankRiseCm;
-    const float CarvedHeightCm = FMath::Min(HeightCm, FMath::Lerp(HeightCm, TargetHeightCm, CarveAlpha));
-    const float CarveCm = HeightCm - CarvedHeightCm;
-    if (CarveCm > 1.0f)
-    {
-        ++Stats.RiverCarvedVertexCount;
-        Stats.MaxRiverCarveCm = FMath::Max(Stats.MaxRiverCarveCm, CarveCm);
-    }
-    return CarvedHeightCm;
-}
-
 // Phase 1: continuous DEM-led surface positions and UVs.
 void ComputeBaseTerrainPositions(
     const TArray<uint16>& EncodedHeights,
@@ -391,42 +241,13 @@ void ComputeBaseTerrainPositions(
         {
             const float X = BaseTerrainWorldX(XIndex);
             const FVector2D Position2D(X, Y);
-            const float BaseHeight = YarlungHeightAtWorldXY(EncodedHeights, Position2D.X, Position2D.Y);
-            const FVector BaseNormal = YarlungSmoothNormalAtWorldXY(EncodedHeights, Position2D.X, Position2D.Y);
-            const float TrackDistance = YarlungViewCorridor::DistanceToTrackCm(TrackPoints, Position2D);
-            const float ViewCorridorMask = YarlungViewCorridor::ComputeMask(TrackPoints, Position2D);
-            FVector2D ProfileCenter = Position2D;
-            float SignedOffsetCm = 0.0f;
-            const bool bHasProfileFrame = FindNearestTrackProfileFrame(TrackPoints, Position2D, ProfileCenter, SignedOffsetCm);
-            const float TrackBaseHeight = bHasProfileFrame
-                ? YarlungHeightAtWorldXY(EncodedHeights, ProfileCenter.X, ProfileCenter.Y)
-                : BaseHeight;
-            const float CorridorProfileHeight = bHasProfileFrame
-                ? YarlungCorridorProfile::CorridorTerrainHeightCm(ProfileCenter, SignedOffsetCm, TrackBaseHeight, BaseHeight)
-                : BaseHeight;
-            const float ProfileBlend = FMath::Clamp(ViewCorridorMask, 0.0f, 1.0f)
-                * YarlungTerrain::Smooth01((TrackDistance - 30000.0f) / 52000.0f);
-            const float RelaxedProfileHeight = BaseHeight + (CorridorProfileHeight - BaseHeight) * 0.48f;
-            const float RiverDistance = RiverField.DistanceCm(Position2D);
-            const float DisplacementCm = YarlungTerrainRelief::ComputeReliefForRiverDistanceCm(
-                Position2D,
-                RelaxedProfileHeight,
-                BaseNormal,
-                TrackDistance,
-                RiverDistance,
-                ViewCorridorMask);
-
             const int32 VertexIndex = BaseTerrainVertexIndex(XIndex, YIndex, SampleCount);
-            const float HeightBeforeRiverCarve = FMath::Lerp(BaseHeight, RelaxedProfileHeight, ProfileBlend) + DisplacementCm;
-            const float Height = CarveRiverChannelCm(HeightBeforeRiverCarve, Position2D, RiverField, Stats);
-            Positions[VertexIndex] = FVector(Position2D.X, Position2D.Y, Height + 25.0f);
+            Positions[VertexIndex] = FVector(
+                Position2D.X,
+                Position2D.Y,
+                YarlungTerrainSurface::SurfaceZCm(EncodedHeights, TrackPoints, RiverField, Position2D, &Stats));
             Us[VertexIndex] = static_cast<float>(XIndex) / static_cast<float>(SampleCount - 1);
             Vs[VertexIndex] = static_cast<float>(YIndex) / static_cast<float>(SampleCount - 1);
-            if (FMath::Abs(DisplacementCm) > 1.0f)
-            {
-                ++Stats.DisplacedVertexCount;
-                Stats.MaxAbsDisplacementCm = FMath::Max(Stats.MaxAbsDisplacementCm, FMath::Abs(DisplacementCm));
-            }
         }
     }
 }
@@ -775,8 +596,8 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
             Tangent = FVector2D(1.0f, 0.0f);
         }
         const FVector2D Normal(-Tangent.Y, Tangent.X);
-        // Keep the ribbon inside the flat-carved channel so its banks clear terrain.
-        const float HalfWidth = FMath::Clamp(Rows[Index].HalfWidthCm * 0.34f, 3600.0f, 8200.0f);
+        // Keep the visible ribbon inside FYarlungRiverField's carved channel.
+        const float HalfWidth = FYarlungRiverField::VisibleRibbonHalfWidthCm(Rows[Index].HalfWidthCm);
         const float Flow = FMath::Clamp(Rows[Index].Flow, 0.0f, 1.0f);
         const float SegmentDropCm = FMath::Abs(Next.Z - Prev.Z);
         const float SegmentLengthCm = FMath::Max(1.0f, FVector2D(Next.X - Prev.X, Next.Y - Prev.Y).Size());

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "YarlungGeneratedPaths.h"
+#include "YarlungViewCorridor.h"
 #include "YarlungSceneryActor.generated.h"
 
 class UHierarchicalInstancedStaticMeshComponent;
@@ -107,18 +108,15 @@ private:
     void RebuildScenery();
     bool LoadSceneryTrack(TArray<FYarlungSceneryTrackSample>& OutSamples) const;
     bool LoadCorridorSourceHeights(TArray<uint16>& OutEncodedHeights) const;
-    float SampleHeightCm(const TArray<uint16>& EncodedHeights, float X, float Y) const;
-    FVector SampleNormal(const TArray<uint16>& EncodedHeights, float X, float Y) const;
     void ConfigureMeshesFromAssets(const FYarlungAssetConfig& AssetConfig);
     UHierarchicalInstancedStaticMeshComponent* ComponentByName(const FString& Name) const;
     void ClearAllInstances();
     void BuildScatter(const TArray<FYarlungSceneryTrackSample>& TrackSamples, const TArray<uint16>& EncodedHeights, const FYarlungAssetConfig& AssetConfig);
     bool TryResolvePlacement(
         const TArray<uint16>& EncodedHeights,
+        const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const class FYarlungRiverField& RiverField,
-        const FVector& Center,
         const FVector& Location2D,
-        float SignedOffsetCm,
         float RiverClearanceCm,
         float MinHeightCm,
         float MaxHeightCm,
@@ -131,6 +129,7 @@ private:
         const FYarlungSceneryComponentConfig& ComponentConfig,
         const FYarlungScatterKindConfig& KindConfig,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
     void AddCanopyBelt(
@@ -138,6 +137,7 @@ private:
         const FYarlungCanopyBeltConfig& BeltConfig,
         float Seed,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
     void AddCliffBelt(
@@ -145,6 +145,7 @@ private:
         const FYarlungCliffBeltConfig& BeltConfig,
         float Seed,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
     void AddRiverWallCliffs(
@@ -152,6 +153,7 @@ private:
         const FYarlungCliffBeltConfig& BeltConfig,
         float Seed,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
     void AddGroundCoverBelt(
@@ -160,6 +162,7 @@ private:
         const FYarlungScatterKindConfig& KindConfig,
         const FYarlungGroundCoverBeltConfig& BeltConfig,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
     void AddSlopePatchBelt(
@@ -168,6 +171,7 @@ private:
         const FYarlungScatterKindConfig& KindConfig,
         const FYarlungSlopePatchBeltConfig& BeltConfig,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
     void ApplyMaterials(const FYarlungAssetConfig& AssetConfig);

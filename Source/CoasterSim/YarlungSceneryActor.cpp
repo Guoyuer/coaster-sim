@@ -1,10 +1,10 @@
 #include "YarlungSceneryActor.h"
 
 #include "YarlungAssetConfig.h"
-#include "YarlungCorridorProfile.h"
 #include "YarlungGeneratedPaths.h"
 #include "YarlungRiverField.h"
 #include "YarlungTerrainProfile.h"
+#include "YarlungTerrainSurface.h"
 #include "YarlungTrackCsv.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -412,39 +412,6 @@ bool AYarlungSceneryActor::LoadCorridorSourceHeights(TArray<uint16>& OutEncodedH
     return true;
 }
 
-float AYarlungSceneryActor::SampleHeightCm(const TArray<uint16>& EncodedHeights, float X, float Y) const
-{
-    const YarlungTerrain::FConfig& Tc = YarlungTerrain::Config();
-    const int32 HeightmapSize = Tc.GridSize;
-    const float GridX = FMath::Clamp((X - Tc.MinXCm) / (Tc.MaxXCm - Tc.MinXCm) * (HeightmapSize - 1), 0.0f, static_cast<float>(HeightmapSize - 1));
-    const float GridY = FMath::Clamp((Y - Tc.MinYCm) / (Tc.MaxYCm - Tc.MinYCm) * (HeightmapSize - 1), 0.0f, static_cast<float>(HeightmapSize - 1));
-    const int32 X0 = FMath::FloorToInt(GridX);
-    const int32 Y0 = FMath::FloorToInt(GridY);
-    const int32 X1 = FMath::Min(HeightmapSize - 1, X0 + 1);
-    const int32 Y1 = FMath::Min(HeightmapSize - 1, Y0 + 1);
-    const float Tx = GridX - X0;
-    const float Ty = GridY - Y0;
-
-    const auto At = [&EncodedHeights, HeightmapSize](int32 SampleX, int32 SampleY)
-    {
-        return YarlungTerrain::HeightValueToCm(EncodedHeights[SampleY * HeightmapSize + SampleX]);
-    };
-
-    const float A = FMath::Lerp(At(X0, Y0), At(X1, Y0), Tx);
-    const float B = FMath::Lerp(At(X0, Y1), At(X1, Y1), Tx);
-    return FMath::Lerp(A, B, Ty);
-}
-
-FVector AYarlungSceneryActor::SampleNormal(const TArray<uint16>& EncodedHeights, float X, float Y) const
-{
-    constexpr float StepCm = 1800.0f;
-    const float Left = SampleHeightCm(EncodedHeights, X - StepCm, Y);
-    const float Right = SampleHeightCm(EncodedHeights, X + StepCm, Y);
-    const float Down = SampleHeightCm(EncodedHeights, X, Y - StepCm);
-    const float Up = SampleHeightCm(EncodedHeights, X, Y + StepCm);
-    return FVector(Left - Right, Down - Up, StepCm * 2.0f).GetSafeNormal();
-}
-
 void AYarlungSceneryActor::BuildScatter(
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
     const TArray<uint16>& EncodedHeights,
@@ -457,6 +424,15 @@ void AYarlungSceneryActor::BuildScatter(
     if (!RiverField.LoadGeneratedCsv(&RiverLoadError))
     {
         UE_LOG(LogTemp, Fatal, TEXT("Yarlung scenery requires generated river field: %s"), *RiverLoadError);
+    }
+
+    TArray<YarlungViewCorridor::FTrackPoint> TerrainTrackPoints;
+    TerrainTrackPoints.Reserve(TrackSamples.Num());
+    for (const FYarlungSceneryTrackSample& Sample : TrackSamples)
+    {
+        YarlungViewCorridor::FTrackPoint Point;
+        Point.Position = FVector2D(Sample.Position.X, Sample.Position.Y);
+        TerrainTrackPoints.Add(Point);
     }
 
     for (const FYarlungSceneryComponentConfig& ComponentConfig : AssetConfig.SceneryComponents)
@@ -475,19 +451,19 @@ void AYarlungSceneryActor::BuildScatter(
         switch (ComponentConfig.Placement)
         {
         case EYarlungSceneryPlacement::Scatter:
-            AddScatterRule(Component, ComponentConfig, *KindConfig, TrackSamples, EncodedHeights, RiverField);
+            AddScatterRule(Component, ComponentConfig, *KindConfig, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
         case EYarlungSceneryPlacement::CanopyBelt:
-            AddCanopyBelt(Component, AssetConfig.CanopyBelt, ComponentConfig.Seed, TrackSamples, EncodedHeights, RiverField);
+            AddCanopyBelt(Component, AssetConfig.CanopyBelt, ComponentConfig.Seed, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
         case EYarlungSceneryPlacement::CliffBelt:
-            AddCliffBelt(Component, AssetConfig.CliffBelt, ComponentConfig.Seed, TrackSamples, EncodedHeights, RiverField);
+            AddCliffBelt(Component, AssetConfig.CliffBelt, ComponentConfig.Seed, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
         case EYarlungSceneryPlacement::GroundCoverBelt:
-            AddGroundCoverBelt(Component, ComponentConfig, *KindConfig, AssetConfig.GroundCoverBelt, TrackSamples, EncodedHeights, RiverField);
+            AddGroundCoverBelt(Component, ComponentConfig, *KindConfig, AssetConfig.GroundCoverBelt, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
         case EYarlungSceneryPlacement::SlopePatchBelt:
-            AddSlopePatchBelt(Component, ComponentConfig, *KindConfig, AssetConfig.SlopePatchBelt, TrackSamples, EncodedHeights, RiverField);
+            AddSlopePatchBelt(Component, ComponentConfig, *KindConfig, AssetConfig.SlopePatchBelt, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
         }
     }
@@ -520,10 +496,9 @@ void AYarlungSceneryActor::BuildScatter(
 
 bool AYarlungSceneryActor::TryResolvePlacement(
     const TArray<uint16>& EncodedHeights,
+    const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
     const FYarlungRiverField& RiverField,
-    const FVector& Center,
     const FVector& Location2D,
-    float SignedOffsetCm,
     float RiverClearanceCm,
     float MinHeightCm,
     float MaxHeightCm,
@@ -543,19 +518,21 @@ bool AYarlungSceneryActor::TryResolvePlacement(
         return false;
     }
 
-    const float BaseHeight = SampleHeightCm(EncodedHeights, Location2D.X, Location2D.Y);
-    const float TrackBaseHeight = SampleHeightCm(EncodedHeights, Center.X, Center.Y);
-    OutHeightCm = YarlungCorridorProfile::CorridorTerrainHeightCm(
-        FVector2D(Center.X, Center.Y),
-        SignedOffsetCm,
-        TrackBaseHeight,
-        BaseHeight);
+    OutHeightCm = YarlungTerrainSurface::SurfaceZCm(
+        EncodedHeights,
+        TerrainTrackPoints,
+        RiverField,
+        FVector2D(Location2D.X, Location2D.Y));
     if (OutHeightCm < MinHeightCm || OutHeightCm > MaxHeightCm)
     {
         return false;
     }
 
-    OutNormal = SampleNormal(EncodedHeights, Location2D.X, Location2D.Y);
+    OutNormal = YarlungTerrainSurface::SurfaceNormal(
+        EncodedHeights,
+        TerrainTrackPoints,
+        RiverField,
+        FVector2D(Location2D.X, Location2D.Y));
     const float Slope = 1.0f - OutNormal.Z;
     return Slope >= MinSlope && Slope <= MaxSlope;
 }
@@ -565,6 +542,7 @@ void AYarlungSceneryActor::AddScatterRule(
     const FYarlungSceneryComponentConfig& ComponentConfig,
     const FYarlungScatterKindConfig& KindConfig,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+    const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
     const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField)
 {
@@ -607,16 +585,14 @@ void AYarlungSceneryActor::AddScatterRule(
             ? FMath::Lerp(-1300.0f, 1300.0f, Hash01(Index * 2.117f + Seed, 71.0f))
             : FMath::Lerp(-2400.0f, 2400.0f, Hash01(Index * 2.117f + Seed, 71.0f));
         const FVector Location2D = Center + Forward * AlongJitterCm + Right * Side * LateralCm;
-        const float SignedOffsetCm = Side * LateralCm;
 
         float Height = 0.0f;
         FVector Normal = FVector::UpVector;
         if (!TryResolvePlacement(
             EncodedHeights,
+            TerrainTrackPoints,
             RiverField,
-            Center,
             Location2D,
-            SignedOffsetCm,
             KindConfig.RiverClearanceCm,
             KindConfig.MinHeightCm,
             KindConfig.MaxHeightCm,
@@ -633,7 +609,7 @@ void AYarlungSceneryActor::AddScatterRule(
             : Hash01(Index * 4.121f + Seed, 97.0f) * 360.0f;
         const float ScaleBase = FMath::Lerp(KindConfig.ScaleMin, KindConfig.ScaleMax, Hash01(Index * 6.617f + Seed, 13.0f));
         const FVector Scale = bBoulder
-            ? FVector(ScaleBase * FMath::Lerp(0.7f, 1.8f, Hash01(Index * 9.0f, 1.0f)), ScaleBase, ScaleBase * FMath::Lerp(0.45f, 1.15f, Hash01(Index * 7.0f, 2.0f)))
+            ? FVector(ScaleBase * FMath::Lerp(0.7f, 1.8f, Hash01(Index * 9.0f + Seed, 1.0f)), ScaleBase, ScaleBase * FMath::Lerp(0.45f, 1.15f, Hash01(Index * 7.0f + Seed, 2.0f)))
             : (bCliff
                 ? FVector(ScaleBase * FMath::Lerp(0.8f, 1.9f, Hash01(Index * 9.0f + Seed, 1.0f)), ScaleBase * FMath::Lerp(0.45f, 1.2f, Hash01(Index * 7.0f + Seed, 2.0f)), ScaleBase * FMath::Lerp(0.65f, 1.45f, Hash01(Index * 5.0f + Seed, 3.0f)))
                 : (bCanopyTree
@@ -653,6 +629,7 @@ void AYarlungSceneryActor::AddGroundCoverBelt(
     const FYarlungScatterKindConfig& KindConfig,
     const FYarlungGroundCoverBeltConfig& Belt,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+    const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
     const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField)
 {
@@ -697,10 +674,9 @@ void AYarlungSceneryActor::AddGroundCoverBelt(
                 FVector Normal = FVector::UpVector;
                 if (!TryResolvePlacement(
                     EncodedHeights,
+                    TerrainTrackPoints,
                     RiverField,
-                    Center,
                     Location2D,
-                    SignedOffsetCm,
                     KindConfig.RiverClearanceCm,
                     KindConfig.MinHeightCm,
                     KindConfig.MaxHeightCm,
@@ -744,6 +720,7 @@ void AYarlungSceneryActor::AddSlopePatchBelt(
     const FYarlungScatterKindConfig& KindConfig,
     const FYarlungSlopePatchBeltConfig& Belt,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+    const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
     const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField)
 {
@@ -796,10 +773,9 @@ void AYarlungSceneryActor::AddSlopePatchBelt(
                 FVector Normal = FVector::UpVector;
                 if (!TryResolvePlacement(
                     EncodedHeights,
+                    TerrainTrackPoints,
                     RiverField,
-                    Center,
                     Location2D,
-                    SignedOffsetCm,
                     FMath::Max(Belt.RiverClearanceCm, KindConfig.RiverClearanceCm),
                     FMath::Max(Belt.MinHeightCm, KindConfig.MinHeightCm),
                     FMath::Min(Belt.MaxHeightCm, KindConfig.MaxHeightCm),
@@ -860,6 +836,7 @@ void AYarlungSceneryActor::AddCanopyBelt(
     const FYarlungCanopyBeltConfig& Belt,
     float Seed,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+    const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
     const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField)
 {
@@ -898,10 +875,9 @@ void AYarlungSceneryActor::AddCanopyBelt(
                 FVector Normal = FVector::UpVector;
                 if (!TryResolvePlacement(
                     EncodedHeights,
+                    TerrainTrackPoints,
                     RiverField,
-                    Center,
                     Location2D,
-                    SignedOffsetCm,
                     Belt.RiverClearanceCm,
                     Belt.MinHeightCm,
                     Belt.MaxHeightCm,
@@ -936,6 +912,7 @@ void AYarlungSceneryActor::AddCliffBelt(
     const FYarlungCliffBeltConfig& Belt,
     float Seed,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+    const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
     const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField)
 {
@@ -973,10 +950,9 @@ void AYarlungSceneryActor::AddCliffBelt(
                 FVector Normal = FVector::UpVector;
                 if (!TryResolvePlacement(
                     EncodedHeights,
+                    TerrainTrackPoints,
                     RiverField,
-                    Center,
                     Location2D,
-                    SignedOffsetCm,
                     Belt.RiverClearanceCm,
                     Belt.MinHeightCm,
                     Belt.MaxHeightCm,
@@ -1012,7 +988,7 @@ void AYarlungSceneryActor::AddCliffBelt(
         }
     }
 
-    AddRiverWallCliffs(Component, Belt, Seed, TrackSamples, EncodedHeights, RiverField);
+    AddRiverWallCliffs(Component, Belt, Seed, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
 }
 
 void AYarlungSceneryActor::AddRiverWallCliffs(
@@ -1020,6 +996,7 @@ void AYarlungSceneryActor::AddRiverWallCliffs(
     const FYarlungCliffBeltConfig& Belt,
     float Seed,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+    const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
     const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField)
 {
@@ -1075,10 +1052,9 @@ void AYarlungSceneryActor::AddRiverWallCliffs(
                 const FVector Location2D(LocationXY.X, LocationXY.Y, 0.0f);
                 if (!TryResolvePlacement(
                     EncodedHeights,
+                    TerrainTrackPoints,
                     RiverField,
-                    TrackCenter,
                     Location2D,
-                    SignedOffsetCm,
                     Belt.RiverClearanceCm,
                     Belt.MinHeightCm,
                     Belt.MaxHeightCm,
