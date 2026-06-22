@@ -81,7 +81,7 @@ private:
     FString HeightmapRelativePath = TEXT("Generated/YarlungLandscape/YarlungTsangpo_1009.r16");
 
     void RebuildScenery();
-    bool LoadOutboundTrack(TArray<FYarlungSceneryTrackSample>& OutSamples) const;
+    bool LoadSceneryTrack(TArray<FYarlungSceneryTrackSample>& OutSamples) const;
     bool LoadHeightmap(TArray<uint16>& OutHeightData) const;
     float SampleHeightCm(const TArray<uint16>& HeightData, float X, float Y) const;
     FVector SampleNormal(const TArray<uint16>& HeightData, float X, float Y) const;

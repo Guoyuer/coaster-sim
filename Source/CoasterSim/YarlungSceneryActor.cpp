@@ -160,7 +160,7 @@ void AYarlungSceneryActor::RebuildScenery()
 
     TArray<FYarlungSceneryTrackSample> TrackSamples;
     TArray<uint16> HeightData;
-    if (!LoadOutboundTrack(TrackSamples) || !LoadHeightmap(HeightData))
+    if (!LoadSceneryTrack(TrackSamples) || !LoadHeightmap(HeightData))
     {
         ClearAllInstances();
         return;
@@ -230,7 +230,7 @@ void AYarlungSceneryActor::ClearAllInstances()
     CanopyTreesC->ClearInstances();
 }
 
-bool AYarlungSceneryActor::LoadOutboundTrack(TArray<FYarlungSceneryTrackSample>& OutSamples) const
+bool AYarlungSceneryActor::LoadSceneryTrack(TArray<FYarlungSceneryTrackSample>& OutSamples) const
 {
     const FString Path = FPaths::ProjectContentDir() / TrackCsvRelativePath;
     TArray<FYarlungTrackRow> Rows;
@@ -244,19 +244,10 @@ bool AYarlungSceneryActor::LoadOutboundTrack(TArray<FYarlungSceneryTrackSample>&
     OutSamples.Reset();
     for (const FYarlungTrackRow& Row : Rows)
     {
-        const bool bScenerySection =
-            Row.Section.Equals(TEXT("Lift"), ESearchCase::IgnoreCase) ||
-            Row.Section.Equals(TEXT("Outbound"), ESearchCase::IgnoreCase) ||
-            Row.Section.Equals(TEXT("Turnaround"), ESearchCase::IgnoreCase) ||
-            Row.Section.Equals(TEXT("Return"), ESearchCase::IgnoreCase) ||
-            Row.Section.Equals(TEXT("Launch"), ESearchCase::IgnoreCase);
-        if (bScenerySection)
-        {
-            FYarlungSceneryTrackSample Sample;
-            Sample.Position = Row.PositionCm;
-            Sample.Section = Row.Section;
-            OutSamples.Add(Sample);
-        }
+        FYarlungSceneryTrackSample Sample;
+        Sample.Position = Row.PositionCm;
+        Sample.Section = Row.Section;
+        OutSamples.Add(Sample);
     }
 
     if (OutSamples.Num() < 8)
