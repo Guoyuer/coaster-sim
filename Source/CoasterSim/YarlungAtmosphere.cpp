@@ -92,7 +92,7 @@ void ConfigureComponents(
 {
     if (SkyLight)
     {
-        SkyLight->SetIntensity(0.56f);
+        SkyLight->SetIntensity(0.66f);
         SkyLight->SetRealTimeCapture(true);
     }
 

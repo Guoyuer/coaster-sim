@@ -161,7 +161,11 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
     const float CanopyMask = YarlungTerrain::Smooth01((BroadCanopyPatch * 0.72f + FineCanopyPatch * 0.28f - 0.22f) / 0.48f);
     const float Breakup = YarlungTerrainBreakup(X, Y, Height);
     const float Forest = FMath::Clamp(
-        ForestDistance * ForestElevation * FMath::Lerp(1.08f, 1.46f, MidSlope) * FMath::Lerp(0.90f, 1.0f, CanopyMask),
+        ForestDistance
+            * ForestElevation
+            * FMath::Lerp(1.04f, 1.20f, MidSlope)
+            * FMath::Lerp(0.92f, 1.0f, CanopyMask)
+            * FMath::Lerp(1.0f, 0.46f, SteepSlope),
         0.0f,
         1.0f);
     const float Ravine = MidSlope * YarlungRavineMask(X, Y, RiverField);
@@ -170,12 +174,12 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
         4.0f);
     const float Noise = YarlungValueNoise(X, Y);
 
-    const FLinearColor DeepForest(0.008f + Noise * 0.010f, 0.060f + Noise * 0.050f, 0.026f + Noise * 0.030f, 1.0f);
-    const FLinearColor SunForest(0.020f + Noise * 0.020f, 0.135f + Noise * 0.090f, 0.050f + Noise * 0.046f, 1.0f);
-    const FLinearColor WeatheredRock(0.050f + Height01 * 0.024f, 0.056f + Height01 * 0.026f, 0.052f + Height01 * 0.022f, 1.0f);
-    const FLinearColor WetRock(0.024f + Noise * 0.020f, 0.034f + Noise * 0.028f, 0.034f + Noise * 0.024f, 1.0f);
-    const FLinearColor MossRock(0.014f + Noise * 0.018f, 0.086f + Noise * 0.056f, 0.038f + Noise * 0.034f, 1.0f);
-    const FLinearColor Scree(0.060f + Noise * 0.034f, 0.062f + Noise * 0.034f, 0.056f + Noise * 0.030f, 1.0f);
+    const FLinearColor DeepForest(0.010f + Noise * 0.008f, 0.050f + Noise * 0.036f, 0.024f + Noise * 0.022f, 1.0f);
+    const FLinearColor SunForest(0.018f + Noise * 0.014f, 0.104f + Noise * 0.058f, 0.044f + Noise * 0.034f, 1.0f);
+    const FLinearColor WeatheredRock(0.044f + Height01 * 0.020f, 0.048f + Height01 * 0.020f, 0.047f + Height01 * 0.018f, 1.0f);
+    const FLinearColor WetRock(0.020f + Noise * 0.016f, 0.029f + Noise * 0.022f, 0.030f + Noise * 0.020f, 1.0f);
+    const FLinearColor MossRock(0.012f + Noise * 0.014f, 0.066f + Noise * 0.040f, 0.034f + Noise * 0.026f, 1.0f);
+    const FLinearColor Scree(0.054f + Noise * 0.030f, 0.054f + Noise * 0.028f, 0.050f + Noise * 0.026f, 1.0f);
     const FLinearColor RavineColor(0.006f, 0.014f, 0.014f, 1.0f);
     const FLinearColor Snow(0.66f, 0.70f, 0.69f, 1.0f);
 
@@ -699,8 +703,8 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
     StaticMesh->SetImportVersion(EImportStaticMeshVersion::LastVersion);
 
     FStaticMeshSourceModel& SourceModel = StaticMesh->AddSourceModel();
-    SourceModel.BuildSettings.bRecomputeNormals = false;
-    SourceModel.BuildSettings.bRecomputeTangents = false;
+    SourceModel.BuildSettings.bRecomputeNormals = true;
+    SourceModel.BuildSettings.bRecomputeTangents = true;
     SourceModel.BuildSettings.bRemoveDegenerates = false;
     SourceModel.BuildSettings.bUseFullPrecisionUVs = true;
 
@@ -712,7 +716,7 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
 
     // Multiple cross-river lanes let vertex color carry bank foam and rapid streaks.
     const int32 RowCount = Rows.Num();
-    constexpr int32 CrossSamples = 17;
+    constexpr int32 CrossSamples = 33;
     TArray<FVertexID> VertexIds;
     TArray<FVector2D> VertexUvs;
     TArray<FVector4f> VertexColors;
@@ -738,7 +742,7 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
         }
         const FVector2D Normal(-Tangent.Y, Tangent.X);
         // Keep the ribbon inside the flat-carved channel so its banks clear terrain.
-        const float HalfWidth = FMath::Clamp(Rows[Index].HalfWidthCm * 0.38f, 4000.0f, 9000.0f);
+        const float HalfWidth = FMath::Clamp(Rows[Index].HalfWidthCm * 0.34f, 3600.0f, 8200.0f);
         const float Flow = FMath::Clamp(Rows[Index].Flow, 0.0f, 1.0f);
         const float SegmentDropCm = FMath::Abs(Next.Z - Prev.Z);
         const float SegmentLengthCm = FMath::Max(1.0f, FVector2D(Next.X - Prev.X, Next.Y - Prev.Y).Size());
@@ -747,18 +751,24 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
         {
             const float Across01 = static_cast<float>(CrossIndex) / static_cast<float>(CrossSamples - 1);
             const float AcrossSigned = 1.0f - Across01 * 2.0f;
-            const float EdgeFoam = YarlungTerrain::Smooth01((FMath::Abs(AcrossSigned) - 0.64f) / 0.30f);
-            const float CenterRapid = (1.0f - YarlungTerrain::Smooth01(FMath::Abs(AcrossSigned) / 0.46f))
+            const float EdgeFoam = YarlungTerrain::Smooth01((FMath::Abs(AcrossSigned) - 0.78f) / 0.18f);
+            const float CenterRapid = (1.0f - YarlungTerrain::Smooth01(FMath::Abs(AcrossSigned) / 0.34f))
                 * (0.45f + 0.55f * SlopeRapid);
             const float BrokenStripe = FMath::Pow(
-                FMath::Clamp(0.5f + 0.5f * FMath::Sin(Flow * 96.0f + AcrossSigned * 9.0f), 0.0f, 1.0f),
-                3.0f);
+                FMath::Clamp(0.5f + 0.5f * FMath::Sin(Flow * 140.0f + AcrossSigned * 15.0f), 0.0f, 1.0f),
+                4.0f);
             const float FastStreak = FMath::Pow(
-                FMath::Clamp(0.5f + 0.5f * FMath::Sin(Flow * 520.0f + AcrossSigned * 23.0f), 0.0f, 1.0f),
+                FMath::Clamp(0.5f + 0.5f * FMath::Sin(Flow * 760.0f + AcrossSigned * 31.0f), 0.0f, 1.0f),
                 5.0f);
-            const float Foam = FMath::Clamp(EdgeFoam * 0.18f + CenterRapid * (BrokenStripe * 0.22f + FastStreak * 0.34f), 0.0f, 0.62f);
-            const float RippleZ = 18.0f * FMath::Sin(Flow * 160.0f + AcrossSigned * 5.5f)
-                + 10.0f * FMath::Sin(Flow * 260.0f - AcrossSigned * 11.0f);
+            const float CrossWake = FMath::Pow(1.0f - FMath::Abs(AcrossSigned), 2.2f);
+            const float Foam = FMath::Clamp(
+                EdgeFoam * (0.06f + 0.08f * BrokenStripe)
+                    + CenterRapid * (BrokenStripe * 0.18f + FastStreak * 0.26f),
+                0.0f,
+                0.48f);
+            const float RippleZ = (22.0f + 34.0f * CrossWake) * FMath::Sin(Flow * 210.0f + AcrossSigned * 8.0f)
+                + 14.0f * FMath::Sin(Flow * 390.0f - AcrossSigned * 17.0f)
+                + 8.0f * FastStreak;
             const float SurfaceZ = Center.Z + FYarlungRiverField::DefaultWaterSurfaceLiftCm + RippleZ;
             MinSurfaceZ = FMath::Min(MinSurfaceZ, SurfaceZ);
             MaxSurfaceZ = FMath::Max(MaxSurfaceZ, SurfaceZ);
@@ -771,10 +781,11 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
             VertexIds[Id] = Builder.AppendVertex(Position);
             VertexUvs[Id] = FVector2D(Across01, Flow * 18.0f);
 
-            const FLinearColor DeepWater(0.018f, 0.115f, 0.125f, 1.0f);
-            const FLinearColor GlacialGreen(0.050f, 0.245f, 0.210f, 1.0f);
-            const FLinearColor AeratedFoam(0.58f, 0.70f, 0.62f, 1.0f);
-            const FLinearColor WaterColor = FMath::Lerp(DeepWater, GlacialGreen, 0.36f + 0.20f * BrokenStripe);
+            const FLinearColor DeepWater(0.006f, 0.060f, 0.070f, 1.0f);
+            const FLinearColor GlacialGreen(0.026f, 0.170f, 0.145f, 1.0f);
+            const FLinearColor AeratedFoam(0.66f, 0.78f, 0.70f, 1.0f);
+            const float ChannelTint = 0.18f + 0.20f * BrokenStripe + 0.18f * (1.0f - CrossWake);
+            const FLinearColor WaterColor = FMath::Lerp(DeepWater, GlacialGreen, FMath::Clamp(ChannelTint, 0.0f, 0.52f));
             const FLinearColor FinalColor = FMath::Lerp(WaterColor, AeratedFoam, Foam);
             VertexColors[Id] = FVector4f(FinalColor.R, FinalColor.G, FinalColor.B, 1.0f);
             if (Foam > 0.12f)
