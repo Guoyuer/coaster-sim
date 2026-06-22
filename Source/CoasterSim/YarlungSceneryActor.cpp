@@ -48,6 +48,12 @@ FQuat SurfaceAlignedRotation(const FVector& Normal, float YawDegrees)
     return Yaw * SurfaceTilt;
 }
 
+float YawFacingDirection(const FVector2D& Direction)
+{
+    const FVector2D SafeDirection = Direction.IsNearlyZero() ? FVector2D(1.0f, 0.0f) : Direction.GetSafeNormal();
+    return FMath::RadiansToDegrees(FMath::Atan2(SafeDirection.Y, SafeDirection.X));
+}
+
 }
 
 AYarlungSceneryActor::AYarlungSceneryActor()
@@ -637,7 +643,13 @@ void AYarlungSceneryActor::AddCliffBelt(
                     continue;
                 }
 
-                const float FaceInwardYaw = FMath::RadiansToDegrees(FMath::Atan2((-Side * Right).Y, (-Side * Right).X));
+                const FYarlungRiverQuery RiverQuery = RiverField.QueryNearest(FVector2D(Location2D.X, Location2D.Y));
+                const FVector2D FaceRiverDirection(
+                    RiverQuery.Row.PositionCm.X - Location2D.X,
+                    RiverQuery.Row.PositionCm.Y - Location2D.Y);
+                const FVector2D FallbackInwardDirection(-Side * Right.X, -Side * Right.Y);
+                const float FaceInwardYaw = YawFacingDirection(
+                    FaceRiverDirection.IsNearlyZero() ? FallbackInwardDirection : FaceRiverDirection);
                 const float Yaw = FaceInwardYaw + FMath::Lerp(-Belt.YawJitterDegrees, Belt.YawJitterDegrees, Hash01(SampleIndex * 3.017f + BandIndex + Seed, 23.0f));
                 const float ScaleBase = FMath::Lerp(Belt.ScaleMin, Belt.ScaleMax, Hash01(SampleIndex * 6.971f + BandIndex + Seed, 31.0f));
                 const FVector Scale(
@@ -650,7 +662,7 @@ void AYarlungSceneryActor::AddCliffBelt(
                 {
                     continue;
                 }
-                Component->AddInstance(FTransform(SurfaceAlignedRotation(Normal, Yaw), Location, Scale));
+                Component->AddInstance(FTransform(FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw)), Location, Scale));
             }
         }
     }
