@@ -16,6 +16,20 @@ def yarlung_asset_config():
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def terrain_surface_config():
+    config = yarlung_asset_config()
+    terrain = config.get("terrain")
+    if not isinstance(terrain, dict):
+        raise RuntimeError("Missing terrain config in Config/yarlung-assets.json")
+    surface = terrain.get("surface")
+    if not isinstance(surface, dict):
+        raise RuntimeError("Missing terrain.surface config in Config/yarlung-assets.json")
+    for key in ("base_color", "normal", "orm"):
+        if not surface.get(key):
+            raise RuntimeError(f"Missing terrain.surface.{key} in Config/yarlung-assets.json")
+    return surface
+
+
 def ensure_folder(path):
     if not unreal.EditorAssetLibrary.does_directory_exist(path):
         unreal.EditorAssetLibrary.make_directory(path)
@@ -93,6 +107,83 @@ def create_constant(material, value, x, y):
         y,
     )
     expression.set_editor_property("r", value)
+    return expression
+
+
+def create_texture_coordinate(material, tiling, x, y):
+    expression = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionTextureCoordinate,
+        x,
+        y,
+    )
+    expression.set_editor_property("u_tiling", tiling)
+    expression.set_editor_property("v_tiling", tiling)
+    return expression
+
+
+def load_required_texture(path, label):
+    if not unreal.EditorAssetLibrary.does_asset_exist(path):
+        raise RuntimeError(f"Missing required {label} texture: {path}")
+    texture = unreal.EditorAssetLibrary.load_asset(path)
+    if not isinstance(texture, unreal.Texture):
+        raise RuntimeError(f"Configured {label} asset is not a Texture: {path}")
+    return texture
+
+
+def create_texture_sample(material, texture, x, y, coordinates=None, sampler_type=None):
+    expression = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionTextureSample,
+        x,
+        y,
+    )
+    expression.set_editor_property("texture", texture)
+    if sampler_type is not None:
+        expression.set_editor_property("sampler_type", sampler_type)
+    if coordinates is not None:
+        connected = False
+        for input_name in ("Coordinates", "UVs"):
+            connected = unreal.MaterialEditingLibrary.connect_material_expressions(
+                coordinates,
+                "",
+                expression,
+                input_name,
+            )
+            if connected:
+                break
+        if not connected:
+            raise RuntimeError(f"Unable to connect texture coordinates for {texture.get_path_name()}")
+    return expression
+
+
+def create_multiply(material, a_expression, a_output, b_expression, b_output, x, y, label):
+    expression = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionMultiply,
+        x,
+        y,
+    )
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(a_expression, a_output, expression, "A"):
+        raise RuntimeError(f"Unable to connect {label} A")
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(b_expression, b_output, expression, "B"):
+        raise RuntimeError(f"Unable to connect {label} B")
+    return expression
+
+
+def create_lerp(material, a_expression, a_output, b_expression, b_output, alpha_expression, alpha_output, x, y, label):
+    expression = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionLinearInterpolate,
+        x,
+        y,
+    )
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(a_expression, a_output, expression, "A"):
+        raise RuntimeError(f"Unable to connect {label} A")
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(b_expression, b_output, expression, "B"):
+        raise RuntimeError(f"Unable to connect {label} B")
+    if not unreal.MaterialEditingLibrary.connect_material_expressions(alpha_expression, alpha_output, expression, "Alpha"):
+        raise RuntimeError(f"Unable to connect {label} Alpha")
     return expression
 
 
@@ -212,43 +303,117 @@ def create_yarlung_water_surface_material():
 
 
 def create_mesh_terrain_material():
+    surface = terrain_surface_config()
+    surface_base_color = load_required_texture(surface["base_color"], "terrain base color")
+    surface_normal = load_required_texture(surface["normal"], "terrain normal")
+    surface_orm = load_required_texture(surface["orm"], "terrain ORM")
+    tiling = float(surface.get("tiling", 44.0))
+    detail_strength = float(surface.get("detail_strength", 0.36))
+    roughness_strength = float(surface.get("roughness_strength", 0.42))
+    ao_strength = float(surface.get("ao_strength", 0.30))
+
     material = create_material_asset(MESH_TERRAIN_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     material.set_editor_property("two_sided", False)
 
+    terrain_uv = create_texture_coordinate(material, tiling, -1180, 160)
+    surface_base = create_texture_sample(material, surface_base_color, -900, 120, terrain_uv)
+    surface_normals = create_texture_sample(
+        material,
+        surface_normal,
+        -900,
+        380,
+        terrain_uv,
+        unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL,
+    )
+    surface_masks = create_texture_sample(material, surface_orm, -900, 700, terrain_uv)
+
     vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
         unreal.MaterialExpressionVertexColor,
-        -940,
-        -180,
+        -1180,
+        -220,
     )
-    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 0.78, -640, 40)
-    base_color = unreal.MaterialEditingLibrary.create_material_expression(
+    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 0.78, -900, -40)
+    vertex_base_color = create_multiply(
         material,
-        unreal.MaterialExpressionMultiply,
-        -380,
-        -160,
+        vertex_color,
+        "",
+        albedo_gain,
+        "",
+        -620,
+        -180,
+        "mesh terrain vertex base color",
     )
-    if not unreal.MaterialEditingLibrary.connect_material_expressions(vertex_color, "", base_color, "A"):
-        raise RuntimeError("Unable to connect mesh terrain base color A")
-    if not unreal.MaterialEditingLibrary.connect_material_expressions(albedo_gain, "", base_color, "B"):
-        raise RuntimeError("Unable to connect mesh terrain base color B")
+    textured_base_color = create_multiply(
+        material,
+        vertex_base_color,
+        "",
+        surface_base,
+        "",
+        -320,
+        -40,
+        "mesh terrain surface detail color",
+    )
+    final_base_color = create_lerp(
+        material,
+        vertex_base_color,
+        "",
+        textured_base_color,
+        "",
+        create_scalar_parameter(material, "TerrainSurfaceDetailStrength", detail_strength, -620, 100),
+        "",
+        -80,
+        -140,
+        "mesh terrain macro/detail base color",
+    )
     if not unreal.MaterialEditingLibrary.connect_material_property(
-        base_color,
+        final_base_color,
         "",
         unreal.MaterialProperty.MP_BASE_COLOR,
     ):
         raise RuntimeError("Unable to connect mesh terrain rock BaseColor")
+    if not unreal.MaterialEditingLibrary.connect_material_property(
+        surface_normals,
+        "",
+        unreal.MaterialProperty.MP_NORMAL,
+    ):
+        raise RuntimeError("Unable to connect mesh terrain Normal")
+
+    terrain_roughness = create_lerp(
+        material,
+        create_scalar_parameter(material, "TerrainRoughness", 0.84, -620, 280),
+        "",
+        surface_masks,
+        "G",
+        create_scalar_parameter(material, "TerrainSurfaceRoughnessStrength", roughness_strength, -620, 460),
+        "",
+        -80,
+        340,
+        "mesh terrain roughness",
+    )
 
     connect_material_property(
         material,
-        create_scalar_parameter(material, "TerrainRoughness", 0.84, -640, 220),
+        terrain_roughness,
         unreal.MaterialProperty.MP_ROUGHNESS,
         "mesh terrain Roughness",
     )
+    terrain_ao = create_lerp(
+        material,
+        create_scalar_parameter(material, "TerrainAmbientOcclusion", 0.92, -620, 580),
+        "",
+        surface_masks,
+        "R",
+        create_scalar_parameter(material, "TerrainSurfaceAmbientOcclusionStrength", ao_strength, -620, 760),
+        "",
+        -80,
+        620,
+        "mesh terrain ambient occlusion",
+    )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "TerrainAmbientOcclusion", 0.92, -640, 400),
+        terrain_ao,
         unreal.MaterialProperty.MP_AMBIENT_OCCLUSION,
         "mesh terrain Ambient Occlusion",
     )

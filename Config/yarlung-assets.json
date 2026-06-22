@@ -258,5 +258,16 @@
     "max_width_cm": 52000,
     "shape_dilation": 24000,
     "audio_intensity": 0.65
+  },
+  "terrain": {
+    "surface": {
+      "base_color": "/Game/Fab/Megascans/Surfaces/Forest_Floor_sfjmafua/Medium/sfjmafua_tier_2/Textures/T_sfjmafua_2K_B.T_sfjmafua_2K_B",
+      "normal": "/Game/Fab/Megascans/Surfaces/Forest_Floor_sfjmafua/Medium/sfjmafua_tier_2/Textures/T_sfjmafua_2K_N.T_sfjmafua_2K_N",
+      "orm": "/Game/Fab/Megascans/Surfaces/Forest_Floor_sfjmafua/Medium/sfjmafua_tier_2/Textures/T_sfjmafua_2K_ORM.T_sfjmafua_2K_ORM",
+      "tiling": 44.0,
+      "detail_strength": 0.36,
+      "roughness_strength": 0.42,
+      "ao_strength": 0.30
+    }
   }
 }

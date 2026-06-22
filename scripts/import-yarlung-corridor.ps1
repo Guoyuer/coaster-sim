@@ -24,6 +24,7 @@ $TrackScript = Join-Path $PSScriptRoot "generate-yarlung-track.py"
 $TrackLibScript = Join-Path $PSScriptRoot "yarlung_track_lib.py"
 $TrackVerifyScript = Join-Path $PSScriptRoot "verify-track-clearance.py"
 $MaterialScript = Join-Path $PSScriptRoot "create-coaster-materials.py"
+$MaterialConfig = Join-Path $RepoRoot "Config\yarlung-assets.json"
 $InspectScript = Join-Path $PSScriptRoot "inspect-yarlung-map.py"
 $MaterialSuccessMarker = Join-Path $RepoRoot "Saved\material-generation-ok.txt"
 $MeshTerrainMaterialAsset = Join-Path $RepoRoot "Content\Generated\Materials\M_YarlungMeshTerrain.uasset"
@@ -167,7 +168,7 @@ if (-not $SkipTrackGeneration) {
     }
 }
 
-if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOutput @($MaterialScript) @($MeshTerrainMaterialAsset, $WaterSurfaceMaterialAsset)))) {
+if (-not $SkipMaterials -and ($ForceMaterials -or (Test-AnySourceNewerThanAnyOutput @($MaterialScript, $MaterialConfig) @($MeshTerrainMaterialAsset, $WaterSurfaceMaterialAsset)))) {
     Invoke-TimedStep "import materials" {
         Remove-Item -LiteralPath $MaterialSuccessMarker -ErrorAction SilentlyContinue
 
