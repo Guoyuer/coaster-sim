@@ -212,6 +212,7 @@
       "near_band_count": 9,
       "near_occupancy": 1.0,
       "far_occupancy": 0.96,
+      "track_clearance_cm": 26000.0,
       "river_clearance_cm": 6000.0,
       "min_height_cm": 250000.0,
       "max_height_cm": 500000.0,

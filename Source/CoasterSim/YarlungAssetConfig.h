@@ -45,6 +45,7 @@ struct FYarlungCanopyBeltConfig
     int32 NearBandCount = 0;
     float NearOccupancy = 0.0f;
     float FarOccupancy = 0.0f;
+    float TrackClearanceCm = 0.0f;
     float RiverClearanceCm = 0.0f;
     float MinHeightCm = 0.0f;
     float MaxHeightCm = 0.0f;

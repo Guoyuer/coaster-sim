@@ -25,6 +25,18 @@ void ConfigureTrackProxyComponent(UInstancedStaticMeshComponent* Component, USta
     Component->SetCastShadow(bCastShadow);
 }
 
+void ConfigureSupportProxyComponent(UInstancedStaticMeshComponent* Component, UStaticMesh* Mesh)
+{
+    ConfigureTrackProxyComponent(Component, Mesh, false);
+    if (Component)
+    {
+        // Long generated support legs become hairline clutter in distant
+        // first-person canyon shots. Keep nearby structure for scale and cull
+        // far proxy supports until authored coaster assets replace them.
+        Component->SetCullDistances(30000, 60000);
+    }
+}
+
 FTransform MakeTubeTransform(const FVector& Start, const FVector& End, float DiameterCm)
 {
     const FVector Mid = (Start + End) * 0.5f;
@@ -88,7 +100,7 @@ void ConfigureMeshes(
     ConfigureTrackProxyComponent(RightGuardRail, CylinderMesh, false);
     ConfigureTrackProxyComponent(Ties, CylinderMesh, false);
     ConfigureTrackProxyComponent(TrackBraces, CylinderMesh, false);
-    ConfigureTrackProxyComponent(Supports, CylinderMesh, false);
+    ConfigureSupportProxyComponent(Supports, CylinderMesh);
 }
 
 void ApplyMaterials(
@@ -103,7 +115,7 @@ void ApplyMaterials(
 {
     const FLinearColor TrackRed(0.76f, 0.12f, 0.08f);
     const FLinearColor DarkRed(0.45f, 0.06f, 0.04f);
-    const FLinearColor SupportTeal(0.10f, 0.34f, 0.38f);
+    const FLinearColor SupportSteel(0.36f, 0.43f, 0.40f);
     ApplyTint(LeftRail, TrackRed, 0.9f, 0.30f);
     ApplyTint(RightRail, TrackRed, 0.9f, 0.30f);
     ApplyTint(CenterSpine, DarkRed, 0.9f, 0.34f);
@@ -111,7 +123,7 @@ void ApplyMaterials(
     ApplyTint(RightGuardRail, TrackRed, 0.85f, 0.36f);
     ApplyTint(Ties, DarkRed, 0.85f, 0.42f);
     ApplyTint(TrackBraces, TrackRed, 0.85f, 0.40f);
-    ApplyTint(Supports, SupportTeal, 0.85f, 0.46f);
+    ApplyTint(Supports, SupportSteel, 0.65f, 0.58f);
 }
 
 void SetVisible(
@@ -166,7 +178,7 @@ void Rebuild(
     constexpr float SegmentStep = 160.0f;
     constexpr float TieStep = 260.0f;
     constexpr float BraceStep = 520.0f;
-    constexpr float SupportStep = 9600.0f;
+    constexpr float SupportStep = 22000.0f;
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += SegmentStep)
     {

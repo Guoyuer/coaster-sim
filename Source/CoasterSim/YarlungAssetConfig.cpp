@@ -258,6 +258,7 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.CanopyBelt.NearBandCount = RequiredIntegerField(CanopyBelt, TEXT("near_band_count"), CanopyBeltContext);
     Config.CanopyBelt.NearOccupancy = RequiredNumberField(CanopyBelt, TEXT("near_occupancy"), CanopyBeltContext);
     Config.CanopyBelt.FarOccupancy = RequiredNumberField(CanopyBelt, TEXT("far_occupancy"), CanopyBeltContext);
+    Config.CanopyBelt.TrackClearanceCm = RequiredNumberField(CanopyBelt, TEXT("track_clearance_cm"), CanopyBeltContext);
     Config.CanopyBelt.RiverClearanceCm = RequiredNumberField(CanopyBelt, TEXT("river_clearance_cm"), CanopyBeltContext);
     Config.CanopyBelt.MinHeightCm = RequiredNumberField(CanopyBelt, TEXT("min_height_cm"), CanopyBeltContext);
     Config.CanopyBelt.MaxHeightCm = RequiredNumberField(CanopyBelt, TEXT("max_height_cm"), CanopyBeltContext);
@@ -321,7 +322,9 @@ FYarlungAssetConfig LoadConfigFromDisk()
     }
     if (Config.CanopyBelt.SampleStride <= 0 || Config.CanopyBelt.LateralBandsCm.IsEmpty() ||
         Config.CanopyBelt.NearOccupancy < 0.0f || Config.CanopyBelt.NearOccupancy > 1.0f ||
-        Config.CanopyBelt.FarOccupancy < 0.0f || Config.CanopyBelt.FarOccupancy > 1.0f)
+        Config.CanopyBelt.FarOccupancy < 0.0f || Config.CanopyBelt.FarOccupancy > 1.0f ||
+        Config.CanopyBelt.TrackClearanceCm < 0.0f ||
+        Config.CanopyBelt.ScaleMin <= 0.0f || Config.CanopyBelt.ScaleMax < Config.CanopyBelt.ScaleMin)
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.canopy_belt settings"), *Path));
     }

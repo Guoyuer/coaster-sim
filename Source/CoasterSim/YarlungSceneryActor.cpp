@@ -516,6 +516,7 @@ void AYarlungSceneryActor::AddCanopyBelt(
     {
         return;
     }
+    const float MeshRadiusCm = Component->GetStaticMesh()->GetBounds().SphereRadius;
 
     for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Belt.SampleStride))
     {
@@ -567,6 +568,11 @@ void AYarlungSceneryActor::AddCanopyBelt(
                 const float ZJitter = FMath::Lerp(0.72f, 1.28f, Hash01(SampleIndex * 3.151f + BandIndex + Seed, 23.0f));
                 const FVector Scale(ScaleBase * XYJitter, ScaleBase * FMath::Lerp(0.82f, 1.22f, Keep), ScaleBase * ZJitter);
                 const FVector Location(Location2D.X, Location2D.Y, Height + Belt.HeightOffsetCm);
+                const float ScaledRadiusCm = MeshRadiusCm * Scale.GetMax();
+                if (FVector::Dist(Location, Center) - ScaledRadiusCm < Belt.TrackClearanceCm)
+                {
+                    continue;
+                }
                 const FQuat Rotation(FVector::UpVector, FMath::DegreesToRadians(Yaw));
                 Component->AddInstance(FTransform(Rotation, Location, Scale));
             }
