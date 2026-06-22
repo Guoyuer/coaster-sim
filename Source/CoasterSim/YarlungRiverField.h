@@ -30,7 +30,7 @@ class FYarlungRiverField
 public:
     static constexpr float DefaultWaterSurfaceLiftCm = 20.0f;
 
-    bool LoadFromProjectContent(FString* OutError = nullptr);
+    bool LoadGeneratedCsv(FString* OutError = nullptr);
 
     bool IsValid() const { return Rows.Num() > 0; }
     const TArray<FYarlungRiverRow>& GetRows() const { return Rows; }
@@ -40,7 +40,7 @@ public:
     float ProtectionMask(const FVector2D& Position, float InnerCm, float FadeCm) const;
 
 private:
-    static FString ProjectContentRiverPath();
+    static FString GeneratedRiverCsvPath();
 
     TArray<FYarlungRiverRow> Rows;
 };

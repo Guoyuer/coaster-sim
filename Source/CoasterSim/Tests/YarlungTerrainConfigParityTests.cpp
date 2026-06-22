@@ -9,7 +9,7 @@
 // scripts/test_yarlung_parity.py. Both sides read Config/yarlung-terrain.json, so
 // if anyone edits the JSON (or breaks either river_center_y implementation) one of
 // these two tests goes red instead of the terrain silently diverging from the
-// generated heightmap/textures.
+// generated source height data.
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
     FYarlungTerrainConfigParityTest,

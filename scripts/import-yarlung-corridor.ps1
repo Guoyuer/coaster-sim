@@ -33,7 +33,7 @@ $TrackAsset = Join-Path $RepoRoot "Content\Generated\YarlungLandscape\YarlungTra
 $TrackOverlayAsset = Join-Path $RepoRoot "Saved\Diagnostics\yarlung-track-overlay.png"
 $TrackClearanceCsv = Join-Path $RepoRoot "Saved\Diagnostics\track-clearance.csv"
 $TrackClearancePlot = Join-Path $RepoRoot "Saved\Diagnostics\track-clearance.png"
-$MacroTextureSources = @(
+$CorridorSourceOutputs = @(
     (Join-Path $RepoRoot "Content\Generated\YarlungLandscape\YarlungTsangpo_masks.ppm"),
     (Join-Path $RepoRoot "Content\Generated\YarlungLandscape\YarlungTsangpo_preview.ppm"),
     (Join-Path $RepoRoot "Content\Generated\YarlungLandscape\manifest.json")
@@ -130,7 +130,7 @@ if ($Build) {
     }
 }
 
-if (-not $SkipAssetGeneration -and ($ForceAssetGeneration -or (Test-AnySourceNewerThanAnyOutput @($CorridorSourceAssetScript) (@($CorridorSourceHeightAsset) + $MacroTextureSources)))) {
+if (-not $SkipAssetGeneration -and ($ForceAssetGeneration -or (Test-AnySourceNewerThanAnyOutput @($CorridorSourceAssetScript) (@($CorridorSourceHeightAsset) + $CorridorSourceOutputs)))) {
     Invoke-TimedStep "generate corridor source assets" {
         python $CorridorSourceAssetScript
         if ($LASTEXITCODE -ne 0) {

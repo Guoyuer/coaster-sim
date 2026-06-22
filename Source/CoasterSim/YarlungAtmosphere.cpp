@@ -28,7 +28,7 @@ bool LoadGeneratedRiverAverageZCm(float& OutZCm)
 {
     FYarlungRiverField RiverField;
     FString Error;
-    if (!RiverField.LoadFromProjectContent(&Error))
+    if (!RiverField.LoadGeneratedCsv(&Error))
     {
         UE_LOG(LogTemp, Error, TEXT("Unable to read generated Yarlung river field for fog anchor: %s"), *Error);
         return false;

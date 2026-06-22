@@ -5,7 +5,7 @@
 // Yarlung terrain georeferencing + river layout. The numeric values live in a
 // SINGLE source of truth — Config/yarlung-terrain.json — which BOTH this C++ code
 // (via Config()) and the Python asset pipeline (scripts/yarlung_config.py) read,
-// so the runtime mesh and the generated heightmap/textures can never silently
+// so the runtime mesh and the generated source height data can never silently
 // drift apart. There are deliberately NO compiled-in constants here: the fields
 // default to zero and are populated only from the JSON. A missing/invalid file is
 // a hard setup error: Config() fails the process rather than returning a zeroed

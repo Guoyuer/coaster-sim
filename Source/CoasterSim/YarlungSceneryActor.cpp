@@ -16,7 +16,7 @@
 
 namespace
 {
-// Heightmap dimensions, world bounds, and height encoding all come from
+// Source height grid dimensions, world bounds, and height encoding all come from
 // YarlungTerrain::Config() (Config/yarlung-terrain.json) — the same source the
 // Python pipeline and the import commandlet use.
 
@@ -160,13 +160,13 @@ void AYarlungSceneryActor::RebuildScenery()
     ConfigureMeshesFromAssets(AssetConfig);
 
     TArray<FYarlungSceneryTrackSample> TrackSamples;
-    TArray<uint16> HeightData;
-    if (!LoadSceneryTrack(TrackSamples) || !LoadHeightmap(HeightData))
+    TArray<uint16> EncodedHeights;
+    if (!LoadSceneryTrack(TrackSamples) || !LoadCorridorSourceHeights(EncodedHeights))
     {
-        UE_LOG(LogTemp, Fatal, TEXT("Yarlung scenery requires generated track and heightmap inputs."));
+        UE_LOG(LogTemp, Fatal, TEXT("Yarlung scenery requires generated track and corridor source height inputs."));
     }
 
-    BuildScatter(TrackSamples, HeightData, AssetConfig);
+    BuildScatter(TrackSamples, EncodedHeights, AssetConfig);
     ApplyMaterials(AssetConfig);
 }
 
@@ -259,13 +259,13 @@ bool AYarlungSceneryActor::LoadSceneryTrack(TArray<FYarlungSceneryTrackSample>& 
     return true;
 }
 
-bool AYarlungSceneryActor::LoadHeightmap(TArray<uint16>& OutHeightData) const
+bool AYarlungSceneryActor::LoadCorridorSourceHeights(TArray<uint16>& OutEncodedHeights) const
 {
     const FString Path = FPaths::ProjectContentDir() / HeightmapRelativePath;
     TArray<uint8> RawBytes;
     if (!FFileHelper::LoadFileToArray(RawBytes, *Path))
     {
-        UE_LOG(LogTemp, Error, TEXT("Unable to read Yarlung heightmap for scenery scatter: %s"), *Path);
+        UE_LOG(LogTemp, Error, TEXT("Unable to read Yarlung corridor source heights for scenery scatter: %s"), *Path);
         return false;
     }
 
@@ -273,16 +273,16 @@ bool AYarlungSceneryActor::LoadHeightmap(TArray<uint16>& OutHeightData) const
     const int32 ExpectedByteCount = HeightmapSize * HeightmapSize * sizeof(uint16);
     if (RawBytes.Num() != ExpectedByteCount)
     {
-        UE_LOG(LogTemp, Error, TEXT("Yarlung scenery heightmap has %d bytes; expected %d"), RawBytes.Num(), ExpectedByteCount);
+        UE_LOG(LogTemp, Error, TEXT("Yarlung scenery source heights have %d bytes; expected %d"), RawBytes.Num(), ExpectedByteCount);
         return false;
     }
 
-    OutHeightData.SetNumUninitialized(HeightmapSize * HeightmapSize);
-    FMemory::Memcpy(OutHeightData.GetData(), RawBytes.GetData(), RawBytes.Num());
+    OutEncodedHeights.SetNumUninitialized(HeightmapSize * HeightmapSize);
+    FMemory::Memcpy(OutEncodedHeights.GetData(), RawBytes.GetData(), RawBytes.Num());
     return true;
 }
 
-float AYarlungSceneryActor::SampleHeightCm(const TArray<uint16>& HeightData, float X, float Y) const
+float AYarlungSceneryActor::SampleHeightCm(const TArray<uint16>& EncodedHeights, float X, float Y) const
 {
     const YarlungTerrain::FConfig& Tc = YarlungTerrain::Config();
     const int32 HeightmapSize = Tc.GridSize;
@@ -295,9 +295,9 @@ float AYarlungSceneryActor::SampleHeightCm(const TArray<uint16>& HeightData, flo
     const float Tx = GridX - X0;
     const float Ty = GridY - Y0;
 
-    const auto At = [&HeightData, HeightmapSize](int32 SampleX, int32 SampleY)
+    const auto At = [&EncodedHeights, HeightmapSize](int32 SampleX, int32 SampleY)
     {
-        return YarlungTerrain::HeightValueToCm(HeightData[SampleY * HeightmapSize + SampleX]);
+        return YarlungTerrain::HeightValueToCm(EncodedHeights[SampleY * HeightmapSize + SampleX]);
     };
 
     const float A = FMath::Lerp(At(X0, Y0), At(X1, Y0), Tx);
@@ -305,26 +305,26 @@ float AYarlungSceneryActor::SampleHeightCm(const TArray<uint16>& HeightData, flo
     return FMath::Lerp(A, B, Ty);
 }
 
-FVector AYarlungSceneryActor::SampleNormal(const TArray<uint16>& HeightData, float X, float Y) const
+FVector AYarlungSceneryActor::SampleNormal(const TArray<uint16>& EncodedHeights, float X, float Y) const
 {
     constexpr float StepCm = 1800.0f;
-    const float Left = SampleHeightCm(HeightData, X - StepCm, Y);
-    const float Right = SampleHeightCm(HeightData, X + StepCm, Y);
-    const float Down = SampleHeightCm(HeightData, X, Y - StepCm);
-    const float Up = SampleHeightCm(HeightData, X, Y + StepCm);
+    const float Left = SampleHeightCm(EncodedHeights, X - StepCm, Y);
+    const float Right = SampleHeightCm(EncodedHeights, X + StepCm, Y);
+    const float Down = SampleHeightCm(EncodedHeights, X, Y - StepCm);
+    const float Up = SampleHeightCm(EncodedHeights, X, Y + StepCm);
     return FVector(Left - Right, Down - Up, StepCm * 2.0f).GetSafeNormal();
 }
 
 void AYarlungSceneryActor::BuildScatter(
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-    const TArray<uint16>& HeightData,
+    const TArray<uint16>& EncodedHeights,
     const FYarlungAssetConfig& AssetConfig)
 {
     ClearAllInstances();
 
     FYarlungRiverField RiverField;
     FString RiverLoadError;
-    if (!RiverField.LoadFromProjectContent(&RiverLoadError))
+    if (!RiverField.LoadGeneratedCsv(&RiverLoadError))
     {
         UE_LOG(LogTemp, Fatal, TEXT("Yarlung scenery requires generated river field: %s"), *RiverLoadError);
     }
@@ -345,13 +345,13 @@ void AYarlungSceneryActor::BuildScatter(
         switch (ComponentConfig.Placement)
         {
         case EYarlungSceneryPlacement::Scatter:
-            AddScatterRule(Component, ComponentConfig, *KindConfig, TrackSamples, HeightData, RiverField);
+            AddScatterRule(Component, ComponentConfig, *KindConfig, TrackSamples, EncodedHeights, RiverField);
             break;
         case EYarlungSceneryPlacement::CanopyBelt:
-            AddCanopyBelt(Component, AssetConfig.CanopyBelt, ComponentConfig.Seed, TrackSamples, HeightData, RiverField);
+            AddCanopyBelt(Component, AssetConfig.CanopyBelt, ComponentConfig.Seed, TrackSamples, EncodedHeights, RiverField);
             break;
         case EYarlungSceneryPlacement::CliffBelt:
-            AddCliffBelt(Component, AssetConfig.CliffBelt, ComponentConfig.Seed, TrackSamples, HeightData, RiverField);
+            AddCliffBelt(Component, AssetConfig.CliffBelt, ComponentConfig.Seed, TrackSamples, EncodedHeights, RiverField);
             break;
         }
     }
@@ -376,7 +376,7 @@ void AYarlungSceneryActor::BuildScatter(
 }
 
 bool AYarlungSceneryActor::TryResolvePlacement(
-    const TArray<uint16>& HeightData,
+    const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField,
     const FVector& Center,
     const FVector& Location2D,
@@ -400,9 +400,9 @@ bool AYarlungSceneryActor::TryResolvePlacement(
         return false;
     }
 
-    const float BaseHeight = SampleHeightCm(HeightData, Location2D.X, Location2D.Y);
-    const float TrackBaseHeight = SampleHeightCm(HeightData, Center.X, Center.Y);
-    OutHeightCm = YarlungCorridorProfile::AuthoredHeightCm(
+    const float BaseHeight = SampleHeightCm(EncodedHeights, Location2D.X, Location2D.Y);
+    const float TrackBaseHeight = SampleHeightCm(EncodedHeights, Center.X, Center.Y);
+    OutHeightCm = YarlungCorridorProfile::CorridorTerrainHeightCm(
         FVector2D(Center.X, Center.Y),
         SignedOffsetCm,
         TrackBaseHeight,
@@ -412,7 +412,7 @@ bool AYarlungSceneryActor::TryResolvePlacement(
         return false;
     }
 
-    OutNormal = SampleNormal(HeightData, Location2D.X, Location2D.Y);
+    OutNormal = SampleNormal(EncodedHeights, Location2D.X, Location2D.Y);
     const float Slope = 1.0f - OutNormal.Z;
     return Slope >= MinSlope && Slope <= MaxSlope;
 }
@@ -422,7 +422,7 @@ void AYarlungSceneryActor::AddScatterRule(
     const FYarlungSceneryComponentConfig& ComponentConfig,
     const FYarlungScatterKindConfig& KindConfig,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-    const TArray<uint16>& HeightData,
+    const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField)
 {
     if (!Component || !Component->GetStaticMesh())
@@ -469,7 +469,7 @@ void AYarlungSceneryActor::AddScatterRule(
         float Height = 0.0f;
         FVector Normal = FVector::UpVector;
         if (!TryResolvePlacement(
-            HeightData,
+            EncodedHeights,
             RiverField,
             Center,
             Location2D,
@@ -509,7 +509,7 @@ void AYarlungSceneryActor::AddCanopyBelt(
     const FYarlungCanopyBeltConfig& Belt,
     float Seed,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-    const TArray<uint16>& HeightData,
+    const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField)
 {
     if (!Component || !Component->GetStaticMesh())
@@ -545,7 +545,7 @@ void AYarlungSceneryActor::AddCanopyBelt(
                 float Height = 0.0f;
                 FVector Normal = FVector::UpVector;
                 if (!TryResolvePlacement(
-                    HeightData,
+                    EncodedHeights,
                     RiverField,
                     Center,
                     Location2D,
@@ -579,7 +579,7 @@ void AYarlungSceneryActor::AddCliffBelt(
     const FYarlungCliffBeltConfig& Belt,
     float Seed,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-    const TArray<uint16>& HeightData,
+    const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField)
 {
     if (!Component || !Component->GetStaticMesh())
@@ -615,7 +615,7 @@ void AYarlungSceneryActor::AddCliffBelt(
                 float Height = 0.0f;
                 FVector Normal = FVector::UpVector;
                 if (!TryResolvePlacement(
-                    HeightData,
+                    EncodedHeights,
                     RiverField,
                     Center,
                     Location2D,

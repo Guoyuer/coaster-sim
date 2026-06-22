@@ -50,14 +50,14 @@ bool LoadRiverCsv(const FString& CsvPath, TArray<FYarlungRiverRow>& OutRows, FSt
 }
 }
 
-FString FYarlungRiverField::ProjectContentRiverPath()
+FString FYarlungRiverField::GeneratedRiverCsvPath()
 {
     return YarlungGeneratedPaths::ProjectContentFile(YarlungGeneratedPaths::RiverCsvRelative);
 }
 
-bool FYarlungRiverField::LoadFromProjectContent(FString* OutError)
+bool FYarlungRiverField::LoadGeneratedCsv(FString* OutError)
 {
-    const FString Path = ProjectContentRiverPath();
+    const FString Path = GeneratedRiverCsvPath();
     if (!LoadRiverCsv(Path, Rows, OutError))
     {
         return false;

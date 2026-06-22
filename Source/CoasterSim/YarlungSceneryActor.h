@@ -83,15 +83,15 @@ private:
 
     void RebuildScenery();
     bool LoadSceneryTrack(TArray<FYarlungSceneryTrackSample>& OutSamples) const;
-    bool LoadHeightmap(TArray<uint16>& OutHeightData) const;
-    float SampleHeightCm(const TArray<uint16>& HeightData, float X, float Y) const;
-    FVector SampleNormal(const TArray<uint16>& HeightData, float X, float Y) const;
+    bool LoadCorridorSourceHeights(TArray<uint16>& OutEncodedHeights) const;
+    float SampleHeightCm(const TArray<uint16>& EncodedHeights, float X, float Y) const;
+    FVector SampleNormal(const TArray<uint16>& EncodedHeights, float X, float Y) const;
     void ConfigureMeshesFromAssets(const FYarlungAssetConfig& AssetConfig);
     UHierarchicalInstancedStaticMeshComponent* ComponentByName(const FString& Name) const;
     void ClearAllInstances();
-    void BuildScatter(const TArray<FYarlungSceneryTrackSample>& TrackSamples, const TArray<uint16>& HeightData, const FYarlungAssetConfig& AssetConfig);
+    void BuildScatter(const TArray<FYarlungSceneryTrackSample>& TrackSamples, const TArray<uint16>& EncodedHeights, const FYarlungAssetConfig& AssetConfig);
     bool TryResolvePlacement(
-        const TArray<uint16>& HeightData,
+        const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField,
         const FVector& Center,
         const FVector& Location2D,
@@ -108,21 +108,21 @@ private:
         const FYarlungSceneryComponentConfig& ComponentConfig,
         const FYarlungScatterKindConfig& KindConfig,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-        const TArray<uint16>& HeightData,
+        const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
     void AddCanopyBelt(
         UHierarchicalInstancedStaticMeshComponent* Component,
         const FYarlungCanopyBeltConfig& BeltConfig,
         float Seed,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-        const TArray<uint16>& HeightData,
+        const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
     void AddCliffBelt(
         UHierarchicalInstancedStaticMeshComponent* Component,
         const FYarlungCliffBeltConfig& BeltConfig,
         float Seed,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-        const TArray<uint16>& HeightData,
+        const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
     void ApplyMaterials(const FYarlungAssetConfig& AssetConfig);
 };

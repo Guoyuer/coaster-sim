@@ -23,7 +23,7 @@ bool SpawnYarlungWater(UWorld* World)
 
     FYarlungRiverField RiverField;
     FString RiverLoadError;
-    if (!RiverField.LoadFromProjectContent(&RiverLoadError))
+    if (!RiverField.LoadGeneratedCsv(&RiverLoadError))
     {
         UE_LOG(LogTemp, Error, TEXT("Unable to read generated Yarlung river field for UE Water: %s"), *RiverLoadError);
         return false;

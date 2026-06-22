@@ -6,7 +6,7 @@ namespace YarlungCorridorProfile
 {
 using YarlungTerrain::Smooth01;
 
-float AuthoredHeightCm(const FVector2D& Center, float SignedOffsetCm, float TrackBaseHeight, float BaseHeight)
+float CorridorTerrainHeightCm(const FVector2D& Center, float SignedOffsetCm, float TrackBaseHeight, float BaseHeight)
 {
     const float AbsOffset = FMath::Abs(SignedOffsetCm);
     const float Side = SignedOffsetCm >= 0.0f ? 1.0f : -1.0f;
