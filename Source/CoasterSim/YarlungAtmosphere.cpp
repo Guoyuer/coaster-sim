@@ -65,8 +65,8 @@ void ConfigureCloudMaterial(UVolumetricCloudComponent* Clouds, UObject* Owner)
         return;
     }
 
-    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"), 0.24f);
-    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalDensity"), 0.065f);
+    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"), 0.02f);
+    CloudMID->SetScalarParameterValue(TEXT("Cloud_GlobalDensity"), 0.015f);
     CloudMID->SetScalarParameterValue(TEXT("Layout_CloudGlobalScale"), 18.0f);
     CloudMID->SetScalarParameterValue(TEXT("CloudTextureWeight"), 0.82f);
     CloudMID->SetScalarParameterValue(TEXT("Noise_Strength"), 0.56f);
@@ -74,7 +74,7 @@ void ConfigureCloudMaterial(UVolumetricCloudComponent* Clouds, UObject* Owner)
     CloudMID->SetVectorParameterValue(TEXT("Cloud_AlbedoColor"), FLinearColor(0.96f, 0.97f, 0.93f));
 
     Clouds->SetMaterial(CloudMID);
-    UE_LOG(LogTemp, Display, TEXT("Configured Yarlung volumetric clouds: coverage=0.24 density=0.065 scale=18.0"));
+    UE_LOG(LogTemp, Display, TEXT("Configured Yarlung volumetric clouds: coverage=0.02 density=0.015 scale=18.0"));
 }
 }
 
@@ -89,7 +89,7 @@ void ConfigureComponents(
 {
     if (SkyLight)
     {
-        SkyLight->SetIntensity(0.45f);
+        SkyLight->SetIntensity(0.58f);
         SkyLight->SetRealTimeCapture(true);
     }
 
@@ -111,8 +111,9 @@ void ConfigureComponents(
 
     if (VolumetricClouds)
     {
-        VolumetricClouds->SetLayerBottomAltitude(3.90f);
-        VolumetricClouds->SetLayerHeight(2.00f);
+        VolumetricClouds->SetVisibility(false, true);
+        VolumetricClouds->SetLayerBottomAltitude(4.80f);
+        VolumetricClouds->SetLayerHeight(1.45f);
         VolumetricClouds->SetTracingStartMaxDistance(170.0f);
         VolumetricClouds->SetTracingMaxDistance(150.0f);
         VolumetricClouds->SetbUsePerSampleAtmosphericLightTransmittance(true);
@@ -129,9 +130,9 @@ void ConfigureComponents(
     if (ValleyFog)
     {
         ValleyFog->SetRelativeLocation(FVector::ZeroVector);
-        ValleyFog->SetFogDensity(0.000090f);
+        ValleyFog->SetFogDensity(0.000070f);
         ValleyFog->SetFogHeightFalloff(0.10f);
-        ValleyFog->SetFogMaxOpacity(0.55f);
+        ValleyFog->SetFogMaxOpacity(0.42f);
         ValleyFog->SetStartDistance(9000.0f);
         ValleyFog->SetFogInscatteringColor(FLinearColor(0.60f, 0.72f, 0.86f));
         ValleyFog->SetVolumetricFog(true);

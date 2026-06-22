@@ -47,7 +47,7 @@ void Configure(UCameraComponent* RideCamera)
     RideCamera->PostProcessSettings.bOverride_DepthOfFieldFstop = true;
     RideCamera->PostProcessSettings.DepthOfFieldFstop = 11.0f;
     RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-    RideCamera->PostProcessSettings.AutoExposureBias = 0.20f;
+    RideCamera->PostProcessSettings.AutoExposureBias = 0.55f;
     RideCamera->PostProcessSettings.bOverride_FilmSlope = true;
     RideCamera->PostProcessSettings.FilmSlope = 0.86f;
     RideCamera->PostProcessSettings.bOverride_FilmToe = true;
