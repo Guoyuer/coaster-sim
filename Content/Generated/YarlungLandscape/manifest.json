@@ -46,7 +46,7 @@
         "affected_samples": 48257,
         "max_lowered_cm": 27057.425,
         "mean_lowered_cm": 6266.932,
-        "purpose": "Replace the grazing-angle heightfield cliff wall with a heightfield-friendly natural slope instead of a fascia mesh."
+        "purpose": "Replace the grazing-angle DEM-derived cliff wall with a corridor-mesh-friendly natural slope instead of a fascia mesh."
       }
     },
     "river_mask": {

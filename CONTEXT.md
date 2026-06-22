@@ -18,14 +18,14 @@ Avoid these as default canyon cues:
 - Dominant red/orange desert rock.
 - Dry badlands color palettes.
 - Flat single-color slopes.
-- Ad hoc visual overlays that hide the real Landscape/material problem.
+- Ad hoc visual overlays that hide the real terrain/material problem.
 
 ## Visual Iteration Rule
 
 If a visual result looks poor or unrealistic, first reassess whether the current approach has enough upside before doing more small tweaks. Prefer high-ceiling methods that can approach reality:
 
-- Real DEM or heightmap-driven Landscape geometry.
-- Proper Landscape material layers, masks, satellite/albedo references, and imported assets.
+- DEM/r16-derived terrain data feeding the generated corridor StaticMesh.
+- Proper terrain material layers, masks, satellite/albedo references, and imported assets.
 - Nanite rock and vegetation assets where useful.
 - Root-cause diagnosis of the actual rendered actor/material/texture.
 
@@ -35,8 +35,8 @@ Do not keep iterating low-ceiling fixes such as superficial color nudges, tempor
 
 The target quality bar is photo-real / 3A-style, not prototype-good. The visual pipeline should be built around high-ceiling production methods:
 
-- Landscape is the source of terrain scale and silhouette. Use heightmaps/DEM-like terrain and layer masks for river, forest, rock, alluvial bank, snow, and wetness zones.
-- Landscape material must be layered. Macro color/coverage decides what the mountain looks like from far away; scanned PBR textures provide close-range detail normals, roughness, AO, and breakup.
+- The visible terrain is the generated `SM_YarlungCorridorTerrain` StaticMesh, not UE `ALandscape`. DEM/r16 data remains the offline source for terrain scale, silhouettes, river masks, forest, rock, alluvial bank, snow, and wetness zones.
+- The terrain material must be layered. Macro color/coverage decides what the mountain looks like from far away; scanned PBR textures provide close-range detail normals, roughness, AO, and breakup.
 - Do not use a single PBR photo texture as the whole mountain base color. It creates visible tiling, wrong regional color, and low-end “texture test” visuals.
 - Use Nanite-ready rock assets for cliff faces, boulders, outcrops, and riverbank detail. Scatter them with slope/height/river masks rather than hand-placed ad hoc props.
 - Use foliage/PCG-style vegetation for dense Nyingchi/Yarlung greenery. Basic engine cones, cubes, or spheres are not acceptable vegetation placeholders for final visual direction.
@@ -47,4 +47,4 @@ Current implementation decisions:
 
 - CC0 scanned PBR assets are allowed and preferred for material detail, but they must be used as part of a layered material stack.
 - Temporary geometry that reduces realism should be cut quickly, even if it makes the scene sparser temporarily.
-- The correct next asset steps are Nanite rock/vegetation scatter and Landscape layer masks, not more hand-authored basic-shape clutter.
+- The correct next asset steps are Nanite rock/vegetation scatter and corridor terrain masks, not more hand-authored basic-shape clutter.

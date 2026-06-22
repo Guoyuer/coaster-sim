@@ -186,9 +186,10 @@ focused on first-person visuals instead of repeatedly baking unchanged geometry.
 ## Current High-Ceiling Bias
 
 The project should move toward real assetized scenery and believable camera
-rendering, not more low-ceiling heightfield tweaks. In practical terms:
+rendering, not more low-ceiling tweaks to the same DEM-derived terrain surface.
+In practical terms:
 
-- use `Actor` mode for canyon-wall/forest/water/atmosphere/camera iterations
+- use `Actor` mode for cliff/forest/water/atmosphere/camera iterations
   while the terrain mesh is unchanged
 - use `Material` mode for material graph or opacity/roughness/normal changes
 - use `Terrain` only when the corridor mesh itself changes

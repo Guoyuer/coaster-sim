@@ -557,7 +557,7 @@ def soften_outbound_cliff_slope(
         "affected_samples": affected_count,
         "max_lowered_cm": round(max_lowered, 3),
         "mean_lowered_cm": round(total_lowered / max(1, affected_count), 3),
-        "purpose": "Replace the grazing-angle heightfield cliff wall with a heightfield-friendly natural slope instead of a fascia mesh.",
+        "purpose": "Replace the grazing-angle DEM-derived cliff wall with a corridor-mesh-friendly natural slope instead of a fascia mesh.",
     }
 
 

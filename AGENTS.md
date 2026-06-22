@@ -14,7 +14,7 @@
 ## 1. 真相源文档（每次迭代开始前必读）
 | 文件 | 作用 |
 |---|---|
-| `docs/plans/worlds-longest-coaster.md` | **定位 spec（2026-06-19 重定位，最高层）**：世界最长~5km 沿江往返实景过山车 + 真物理 + 风景优先；轨道/走廊/验收受其约束 |
+| `docs/plans/worlds-longest-coaster.md` | **定位 spec（2026-06-19 重定位，最高层；2026-06-21 拓扑放宽）**：世界最长~5km 风景优先实景过山车 + 真物理；轨道可跨江、高架俯视、贴崖、翻滚，轨道/走廊/验收受其约束 |
 | `docs/plans/photoreal-overhaul.md` | 顺序计划：阶段 0→F，每步目标/改动/验收 |
 | `docs/specs/photoreal-acceptance.md` | 验收 spec：到位定义 + 打分量规 + 每阶段出口标准 |
 | `docs/plans/photoreal-progress.md` | 进度状态（**你每轮都要更新它**，断点续跑靠它） |
@@ -37,7 +37,7 @@
 & "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" CoasterSimEditor Win64 Development "-Project=$PWD\CoasterSim.uproject" -WaitMutex -NoHotReloadFromIDE
 ```
 **重建资产+关卡管线：** `.\scripts\import-yarlung-landscape.ps1 -Build`
-（顺序：生成高度图/macro → 建材质 → 导模型 → commandlet 重建 .umap。**.umap 是生成物，关卡 actor 改动必须改 `YarlungLandscapeImportCommandlet.cpp` 再重跑，手摆会被覆盖。**）
+（顺序：生成 DEM/r16/preview/masks/river CSV → 生成/校验 `YarlungTrack.csv` → 建当前材质 → commandlet 构建 `SM_YarlungCorridorTerrain`、UE Water、scenery 并重建 `.umap`。**.umap 是生成物，关卡 actor 改动必须改 `YarlungLandscapeImportCommandlet.cpp` 再重跑，手摆会被覆盖。**）
 **默认迭代入口（优先用这个，不要手拼慢命令）：**
 ```powershell
 .\scripts\yarlung-agent-status.ps1
@@ -78,7 +78,7 @@
 - ❌ 把永久植被/岩石/天空/水体 scatter 写进 `ACoasterRideActor`。这些属于 commandlet 生成的关卡内容、PCG/Foliage、或独立 scenery actor；`ACoasterRideActor` 只保留仿真、轨道/车、相机和必要的运行时查询。
 - ❌ headless 脚本只信 exit code——保留 success-marker / 资产存在性校验。
 - ❌ 把预算花在相机看不到的走廊外、或高速近景上（违反优先级 2）。
-- ❌ 接 Landscape 近景法线不做宏观/微观尺度分离（会重现 moire）。
+- ❌ 接 corridor terrain / DEM-derived surface 近景法线不做宏观/微观尺度分离（会重现 moire）。
 
 ## 5. 到位 = 停止条件
 全部满足才算到位（细则见 `photoreal-acceptance.md`）：

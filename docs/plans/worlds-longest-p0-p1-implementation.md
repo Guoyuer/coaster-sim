@@ -46,7 +46,7 @@ Steps:
 
 1. Add `scripts/generate-yarlung-track.py`:
    - Read `Content/Generated/YarlungLandscape/manifest.json` and `.r16`.
-   - Extract an approximate thalweg from the real heightfield, not the old
+   - Extract an approximate thalweg from the real DEM/r16 source grid, not the old
      synthetic `river_center_y` fallback.
    - Build a 5km out-and-back route:
      `Station -> Lift -> Outbound -> Turnaround -> Return -> Launch -> Brake`.
