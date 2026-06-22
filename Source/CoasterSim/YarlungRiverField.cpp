@@ -90,7 +90,7 @@ FYarlungRiverQuery FYarlungRiverField::QueryNearest(const FVector2D& Position) c
         Query.DistanceCm = FVector2D::Distance(Position, FVector2D(Query.Row.PositionCm.X, Query.Row.PositionCm.Y));
         Query.SignedDistanceCm = Query.DistanceCm;
         Query.WaterSurfaceZCm = Query.Row.PositionCm.Z + DefaultWaterSurfaceLiftCm;
-        Query.WaterHalfWidthCm = FMath::Clamp(Query.Row.HalfWidthCm * 1.15f, 24000.0f, 38000.0f);
+        Query.WaterHalfWidthCm = FMath::Clamp(Query.Row.HalfWidthCm * 0.38f, 4000.0f, 9000.0f);
         Query.bIsValid = true;
         return Query;
     }
@@ -145,7 +145,7 @@ FYarlungRiverQuery FYarlungRiverField::QueryNearest(const FVector2D& Position) c
     Query.Row.Flow = FMath::Lerp(A.Flow, B.Flow, BestSegmentT);
     Query.DistanceCm = FMath::Sqrt(BestDistanceSquared);
     Query.WaterSurfaceZCm = Query.Row.PositionCm.Z + DefaultWaterSurfaceLiftCm;
-    Query.WaterHalfWidthCm = FMath::Clamp(Query.Row.HalfWidthCm * 1.15f, 24000.0f, 38000.0f);
+    Query.WaterHalfWidthCm = FMath::Clamp(Query.Row.HalfWidthCm * 0.38f, 4000.0f, 9000.0f);
     Query.bIsValid = true;
 
     const FVector2D Right(-BestTangent.Y, BestTangent.X);

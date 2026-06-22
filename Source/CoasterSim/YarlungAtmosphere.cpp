@@ -89,14 +89,14 @@ void ConfigureComponents(
 {
     if (SkyLight)
     {
-        SkyLight->SetIntensity(0.58f);
+        SkyLight->SetIntensity(0.56f);
         SkyLight->SetRealTimeCapture(true);
     }
 
     if (SunLight)
     {
         SunLight->SetRelativeRotation(FRotator(-55.0f, -18.0f, 0.0f));
-        SunLight->SetIntensity(120000.0f);
+        SunLight->SetIntensity(100000.0f);
         SunLight->SetUseTemperature(true);
         SunLight->SetTemperature(6500.0f);
         SunLight->SetLightColor(FLinearColor(1.0f, 1.0f, 1.0f));
@@ -130,15 +130,15 @@ void ConfigureComponents(
     if (ValleyFog)
     {
         ValleyFog->SetRelativeLocation(FVector::ZeroVector);
-        ValleyFog->SetFogDensity(0.000070f);
+        ValleyFog->SetFogDensity(0.000040f);
         ValleyFog->SetFogHeightFalloff(0.10f);
-        ValleyFog->SetFogMaxOpacity(0.42f);
-        ValleyFog->SetStartDistance(9000.0f);
+        ValleyFog->SetFogMaxOpacity(0.24f);
+        ValleyFog->SetStartDistance(18000.0f);
         ValleyFog->SetFogInscatteringColor(FLinearColor(0.60f, 0.72f, 0.86f));
         ValleyFog->SetVolumetricFog(true);
-        ValleyFog->SetVolumetricFogScatteringDistribution(0.38f);
-        ValleyFog->SetVolumetricFogExtinctionScale(0.032f);
-        ValleyFog->SetVolumetricFogDistance(65000.0f);
+        ValleyFog->SetVolumetricFogScatteringDistribution(0.30f);
+        ValleyFog->SetVolumetricFogExtinctionScale(0.014f);
+        ValleyFog->SetVolumetricFogDistance(120000.0f);
     }
 }
 
@@ -155,6 +155,13 @@ bool AnchorFogToGeneratedRiver(UExponentialHeightFogComponent* ValleyFog)
     if (!ValleyFog)
     {
         return false;
+    }
+
+    if (FParse::Param(FCommandLine::Get(), TEXT("YarlungHideFog")))
+    {
+        ValleyFog->SetVisibility(false, true);
+        UE_LOG(LogTemp, Display, TEXT("Yarlung valley fog disabled by -YarlungHideFog."));
+        return true;
     }
 
     float RiverSurfaceZCm = 0.0f;

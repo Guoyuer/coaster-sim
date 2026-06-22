@@ -28,7 +28,7 @@ struct FYarlungRiverQuery
 class FYarlungRiverField
 {
 public:
-    static constexpr float DefaultWaterSurfaceLiftCm = 220.0f;
+    static constexpr float DefaultWaterSurfaceLiftCm = 20.0f;
 
     bool LoadFromProjectContent(FString* OutError = nullptr);
 

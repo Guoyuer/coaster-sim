@@ -164,7 +164,7 @@ def create_yarlung_water_surface_material():
     base_color_param = create_vector_parameter(
         material,
         "BaseColor",
-        unreal.LinearColor(0.012, 0.16, 0.18, 1.0),
+        unreal.LinearColor(0.008, 0.105, 0.125, 1.0),
         -640,
         -300,
     )
@@ -188,19 +188,19 @@ def create_yarlung_water_surface_material():
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Roughness", 0.58, -500, -40),
+        create_scalar_parameter(material, "Roughness", 0.44, -500, -40),
         unreal.MaterialProperty.MP_ROUGHNESS,
         "yarlung water surface Roughness",
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Specular", 0.38, -500, 120),
+        create_scalar_parameter(material, "Specular", 0.55, -500, 120),
         unreal.MaterialProperty.MP_SPECULAR,
         "yarlung water surface Specular",
     )
     connect_material_property(
         material,
-        create_vector_parameter(material, "EmissiveTint", unreal.LinearColor(0.003, 0.010, 0.010, 1.0), -500, 280),
+        create_vector_parameter(material, "EmissiveTint", unreal.LinearColor(0.001, 0.004, 0.004, 1.0), -500, 280),
         unreal.MaterialProperty.MP_EMISSIVE_COLOR,
         "yarlung water surface EmissiveTint",
     )
@@ -222,7 +222,7 @@ def create_mesh_terrain_material():
         -940,
         -180,
     )
-    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 1.35, -640, 40)
+    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 0.92, -640, 40)
     base_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
         unreal.MaterialExpressionMultiply,

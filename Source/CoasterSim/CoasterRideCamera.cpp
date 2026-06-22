@@ -27,9 +27,9 @@ void Configure(UCameraComponent* RideCamera)
     RideCamera->PostProcessSettings.bOverride_VignetteIntensity = true;
     RideCamera->PostProcessSettings.VignetteIntensity = 0.18f;
     RideCamera->PostProcessSettings.bOverride_ColorSaturation = true;
-    RideCamera->PostProcessSettings.ColorSaturation = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
+    RideCamera->PostProcessSettings.ColorSaturation = FVector4(1.12f, 1.12f, 1.12f, 1.0f);
     RideCamera->PostProcessSettings.bOverride_ColorContrast = true;
-    RideCamera->PostProcessSettings.ColorContrast = FVector4(1.02f, 1.02f, 1.02f, 1.0f);
+    RideCamera->PostProcessSettings.ColorContrast = FVector4(1.06f, 1.06f, 1.06f, 1.0f);
     RideCamera->PostProcessSettings.bOverride_ColorGamma = true;
     RideCamera->PostProcessSettings.ColorGamma = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
     RideCamera->PostProcessSettings.bOverride_ColorGain = true;
@@ -47,7 +47,7 @@ void Configure(UCameraComponent* RideCamera)
     RideCamera->PostProcessSettings.bOverride_DepthOfFieldFstop = true;
     RideCamera->PostProcessSettings.DepthOfFieldFstop = 11.0f;
     RideCamera->PostProcessSettings.bOverride_AutoExposureBias = true;
-    RideCamera->PostProcessSettings.AutoExposureBias = 0.55f;
+    RideCamera->PostProcessSettings.AutoExposureBias = 0.75f;
     RideCamera->PostProcessSettings.bOverride_FilmSlope = true;
     RideCamera->PostProcessSettings.FilmSlope = 0.86f;
     RideCamera->PostProcessSettings.bOverride_FilmToe = true;

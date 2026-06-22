@@ -140,14 +140,18 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
     const float Slope = 1.0f - Normal.GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector).Z;
     const float MidSlope = YarlungTerrain::Smooth01((Slope - 0.08f) / 0.24f);
     const float SteepSlope = YarlungTerrain::Smooth01((Slope - 0.22f) / 0.30f);
-    const float ForestElevation = 1.0f - 0.62f * YarlungTerrain::Smooth01((Height01 - 0.76f) / 0.18f);
-    const float ForestDistance = YarlungTerrain::Smooth01((RiverDistance - 9000.0f) / 76000.0f)
+    const float ForestElevation = 1.0f - 0.36f * YarlungTerrain::Smooth01((Height01 - 0.88f) / 0.16f);
+    const float ForestDistance = YarlungTerrain::Smooth01((RiverDistance - 1200.0f) / 38000.0f)
         * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 430000.0f) / 190000.0f));
+    const float WetBank = (1.0f - YarlungTerrain::Smooth01((RiverDistance - 6000.0f) / 18000.0f))
+        * (1.0f - YarlungTerrain::Smooth01((Height01 - 0.86f) / 0.14f));
+    const float MossBank = (1.0f - YarlungTerrain::Smooth01((RiverDistance - 12000.0f) / 48000.0f))
+        * (1.0f - YarlungTerrain::Smooth01((Height01 - 0.90f) / 0.10f));
     const float BroadCanopyPatch = 0.5f + 0.5f * FMath::Sin(X * 0.00088f - Y * 0.00116f + Height * 0.0011f);
     const float FineCanopyPatch = YarlungValueNoise(X * 1.7f, Y * 1.7f);
     const float CanopyMask = YarlungTerrain::Smooth01((BroadCanopyPatch * 0.72f + FineCanopyPatch * 0.28f - 0.22f) / 0.48f);
     const float Forest = FMath::Clamp(
-        ForestDistance * ForestElevation * FMath::Lerp(0.82f, 1.16f, MidSlope) * FMath::Lerp(0.72f, 1.0f, CanopyMask),
+        ForestDistance * ForestElevation * FMath::Lerp(1.02f, 1.30f, MidSlope) * FMath::Lerp(0.82f, 1.0f, CanopyMask),
         0.0f,
         1.0f);
     const float Ravine = MidSlope * YarlungRavineMask(X, Y, RiverField);
@@ -156,20 +160,24 @@ FLinearColor YarlungColorAtPosition(float X, float Y, float Height, const FVecto
         4.0f);
     const float Noise = YarlungValueNoise(X, Y);
 
-    const FLinearColor DeepForest(0.010f + Noise * 0.010f, 0.052f + Noise * 0.036f, 0.022f + Noise * 0.020f, 1.0f);
-    const FLinearColor SunForest(0.026f + Noise * 0.020f, 0.122f + Noise * 0.068f, 0.042f + Noise * 0.036f, 1.0f);
-    const FLinearColor WeatheredRock(0.064f + Height01 * 0.032f, 0.072f + Height01 * 0.034f, 0.070f + Height01 * 0.030f, 1.0f);
-    const FLinearColor WetRock(0.034f + Noise * 0.028f, 0.046f + Noise * 0.032f, 0.042f + Noise * 0.030f, 1.0f);
-    const FLinearColor Scree(0.118f + Noise * 0.038f, 0.116f + Noise * 0.036f, 0.102f + Noise * 0.032f, 1.0f);
+    const FLinearColor DeepForest(0.012f + Noise * 0.010f, 0.082f + Noise * 0.052f, 0.030f + Noise * 0.030f, 1.0f);
+    const FLinearColor SunForest(0.028f + Noise * 0.020f, 0.176f + Noise * 0.086f, 0.058f + Noise * 0.046f, 1.0f);
+    const FLinearColor WeatheredRock(0.070f + Height01 * 0.028f, 0.078f + Height01 * 0.030f, 0.074f + Height01 * 0.026f, 1.0f);
+    const FLinearColor WetRock(0.034f + Noise * 0.022f, 0.048f + Noise * 0.030f, 0.046f + Noise * 0.026f, 1.0f);
+    const FLinearColor MossRock(0.020f + Noise * 0.018f, 0.112f + Noise * 0.052f, 0.044f + Noise * 0.034f, 1.0f);
+    const FLinearColor Scree(0.088f + Noise * 0.032f, 0.088f + Noise * 0.032f, 0.078f + Noise * 0.028f, 1.0f);
     const FLinearColor RavineColor(0.010f, 0.022f, 0.020f, 1.0f);
     const FLinearColor Snow(0.66f, 0.70f, 0.69f, 1.0f);
 
     FLinearColor Base = FMath::Lerp(DeepForest, SunForest, CanopyMask * (1.0f - SteepSlope * 0.45f));
     Base = FMath::Lerp(WeatheredRock, Base, Forest);
+    Base = FMath::Lerp(Base, MossRock, FMath::Clamp(MossBank * 0.36f, 0.0f, 0.36f));
+    Base = FMath::Lerp(Base, WetRock, FMath::Clamp(WetBank * 0.44f, 0.0f, 0.44f));
+    Base = FMath::Lerp(Base, Scree, FMath::Clamp(WetBank * (0.04f + Noise * 0.08f), 0.0f, 0.12f));
     Base = FMath::Lerp(Base, WetRock, FMath::Clamp(RockMask * 0.82f + SteepSlope * RavineStreak * 0.22f, 0.0f, 0.90f));
     Base = FMath::Lerp(Base, Scree, FMath::Clamp(SteepSlope * (1.0f - Forest) * (0.12f + RavineStreak * 0.16f), 0.0f, 0.26f));
     Base = FMath::Lerp(Base, RavineColor, FMath::Clamp(Ravine * 0.58f, 0.0f, 0.68f));
-    Base = FMath::Lerp(Base, Snow, 0.18f * YarlungTerrain::Smooth01((Height01 - 0.992f) / 0.016f));
+    Base = FMath::Lerp(Base, Snow, 0.08f * YarlungTerrain::Smooth01((Height01 - 0.997f) / 0.012f));
     return Base;
 }
 
@@ -294,8 +302,8 @@ float CarveRiverChannelCm(
         return HeightCm;
     }
 
-    const float InnerBankCm = River.WaterHalfWidthCm + 3600.0f;
-    const float OuterBankCm = River.WaterHalfWidthCm + 36000.0f;
+    const float InnerBankCm = River.WaterHalfWidthCm + 1000.0f;
+    const float OuterBankCm = River.WaterHalfWidthCm + 12000.0f;
     if (River.DistanceCm >= OuterBankCm)
     {
         return HeightCm;
@@ -303,8 +311,8 @@ float CarveRiverChannelCm(
 
     const float BankT = YarlungTerrain::Smooth01((River.DistanceCm - InnerBankCm) / (OuterBankCm - InnerBankCm));
     const float CarveAlpha = 1.0f - BankT;
-    const float BankRiseCm = FMath::Max(0.0f, River.DistanceCm - River.WaterHalfWidthCm) * 0.36f;
-    const float TargetHeightCm = River.WaterSurfaceZCm - 520.0f + BankRiseCm;
+    const float BankRiseCm = FMath::Max(0.0f, River.DistanceCm - River.WaterHalfWidthCm) * 0.90f;
+    const float TargetHeightCm = River.WaterSurfaceZCm - 80.0f + BankRiseCm;
     const float CarvedHeightCm = FMath::Min(HeightCm, FMath::Lerp(HeightCm, TargetHeightCm, CarveAlpha));
     const float CarveCm = HeightCm - CarvedHeightCm;
     if (CarveCm > 1.0f)
@@ -637,9 +645,9 @@ UStaticMesh* BuildYarlungCorridorTerrainStaticMesh(const TArray<uint16>& HeightD
 
 // Explicit sloped river-surface ribbon. UE Water's WaterZone renders the river
 // surface as a flat plane at the zone Z, which the descending valley floor buries
-// for most of the route. This mesh follows the riverbed spline at the authored
-// water-surface height, so the water always sits ~5 m above the carved channel
-// floor and reads as a river winding down the gorge.
+// for most of the route. This mesh follows the riverbed spline at a shallow
+// authored surface height and stays inside the carved thalweg instead of reading
+// as a raised floodplain slab.
 const TCHAR* YarlungRiverSurfaceMeshPackagePath = TEXT("/Game/Generated/YarlungLandscape/SM_YarlungRiverSurface");
 const TCHAR* YarlungRiverSurfaceMeshAssetName = TEXT("SM_YarlungRiverSurface");
 
@@ -720,7 +728,7 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
         }
         const FVector2D Normal(-Tangent.Y, Tangent.X);
         // Keep the ribbon inside the flat-carved channel so its banks clear terrain.
-        const float HalfWidth = FMath::Clamp(Rows[Index].HalfWidthCm * 0.42f, 4500.0f, 10500.0f);
+        const float HalfWidth = FMath::Clamp(Rows[Index].HalfWidthCm * 0.38f, 4000.0f, 9000.0f);
         const float Flow = FMath::Clamp(Rows[Index].Flow, 0.0f, 1.0f);
         const float SegmentDropCm = FMath::Abs(Next.Z - Prev.Z);
         const float SegmentLengthCm = FMath::Max(1.0f, FVector2D(Next.X - Prev.X, Next.Y - Prev.Y).Size());
@@ -753,10 +761,10 @@ UStaticMesh* BuildYarlungRiverSurfaceStaticMesh(const FYarlungRiverField& RiverF
             VertexIds[Id] = Builder.AppendVertex(Position);
             VertexUvs[Id] = FVector2D(Across01, Flow * 18.0f);
 
-            const FLinearColor DeepWater(0.012f, 0.18f, 0.20f, 1.0f);
-            const FLinearColor GlacialGreen(0.035f, 0.34f, 0.31f, 1.0f);
-            const FLinearColor AeratedFoam(0.76f, 0.86f, 0.78f, 1.0f);
-            const FLinearColor WaterColor = FMath::Lerp(DeepWater, GlacialGreen, 0.34f + 0.24f * BrokenStripe);
+            const FLinearColor DeepWater(0.018f, 0.115f, 0.125f, 1.0f);
+            const FLinearColor GlacialGreen(0.050f, 0.245f, 0.210f, 1.0f);
+            const FLinearColor AeratedFoam(0.58f, 0.70f, 0.62f, 1.0f);
+            const FLinearColor WaterColor = FMath::Lerp(DeepWater, GlacialGreen, 0.36f + 0.20f * BrokenStripe);
             const FLinearColor FinalColor = FMath::Lerp(WaterColor, AeratedFoam, Foam);
             VertexColors[Id] = FVector4f(FinalColor.R, FinalColor.G, FinalColor.B, 1.0f);
             if (Foam > 0.12f)
