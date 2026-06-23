@@ -25,7 +25,7 @@ The project has made good engineering progress: single visible river surface, sh
 
 ## Agent disposition
 
-- 2026-06-23: Implemented the first P0 response as a system, not a one-off patch. Live `slope_rock_wall_belt` code/config was deleted and replaced with two authored fail-close layers: `hero_rock_wall_groups` for continuous mid/far canyon massing and `foreground_rock_apron_groups` for first-person near-slope breakup. Validation run: `rockwall-system-v1`, contact sheet `Saved/Diagnostics/rockwall-system-v1.png`, map inspect 0 error/0 warning, automation 14/14. Verdict remains PARTIAL: rock massing improved, but exposed corridor terrain still dominates enough that the next systemic fix should be forest-floor/scree/decal/RVT/wet-rock ground coverage, not more rock instances.
+- 2026-06-23: Implemented the first P0 response as a system and then cleaned the temporary split back out. Live `slope_rock_wall_belt` code/config was deleted first; the intermediate `hero_rock_wall_groups` / `foreground_rock_apron_groups` arrays were then removed too because they still encoded special-case visual patches. The current live contract is `rock_wall_profiles` + `rock_wall_segments`: reusable geologic placement profiles plus full-corridor left/right segment facts, with `rock_wall_source` marking mesh sources consumed by segments, and fail-close validation for profile references, component names, side coverage, and full ride-corridor coverage. Validation run: `rockwall-segments-v2`, contact sheet `Saved/Diagnostics/rockwall-segments-v2.png`, map inspect 0 error/0 warning, automation 14/14. Verdict remains PARTIAL: rock massing improved and the pipeline is cleaner, but exposed corridor terrain still dominates enough that the next systemic fix should be forest-floor/scree/decal/RVT/wet-rock ground coverage, not more rock instances.
 
 ## 1. Corridor terrain is still carrying the hero mountain
 
@@ -52,7 +52,7 @@ Priority: P0. This is the biggest AAA gap.
 
 Evidence:
 
-- Live placement types are `scatter`, `canopy_belt`, `cliff_belt`, `ground_cover_belt`, and `slope_rock_wall_belt`.
+- Live placement types are `scatter`, `canopy_belt`, `cliff_belt`, `ground_cover_belt`, and `rock_wall_source`; the actual rock-wall transforms now come from the higher-level `rock_wall_profiles` + `rock_wall_segments` contract.
 - `YarlungSceneryActor` samples along the track or river and applies lateral bands, occupancy, jitter, clearance, slope, and height gates.
 - This is technically clean and fail-close, but the visible result is still evenly procedural: repeated stripes of assets around the route, not a designed shot.
 
@@ -81,7 +81,7 @@ Priority: P0. Do this before adding more HISM density.
 Evidence:
 
 - `cliff_belt` and `river_wall_*` generate many vertical-facing cliff instances, but each instance is still an isolated Megascans mesh.
-- `slope_rock_wall_belt` improved the wrong "fallen timber" read by forcing `slope_rock_wall` assets and chunkier scale, but it still places many independent chunks.
+- `rock_wall_profiles` + `rock_wall_segments` improved the wrong "fallen timber" read by forcing dedicated `slope_rock_wall` sources, chunkier scale, and full-corridor left/right coverage; however it still places overlapping instances rather than generating continuous authored wall meshes.
 - Screenshots show some good rock masses in the canyon, but exposed terrain still determines the main silhouette.
 
 Why it is not AAA:

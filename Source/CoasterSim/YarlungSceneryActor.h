@@ -11,7 +11,8 @@ struct FYarlungAssetConfig;
 struct FYarlungCanopyBeltConfig;
 struct FYarlungCliffBeltConfig;
 struct FYarlungGroundCoverBeltConfig;
-struct FYarlungRockWallGroupConfig;
+struct FYarlungRockWallProfileConfig;
+struct FYarlungRockWallSegmentConfig;
 struct FYarlungSceneryComponentConfig;
 struct FYarlungScatterKindConfig;
 
@@ -156,16 +157,15 @@ private:
         const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
-    void AddRockWallGroups(
-        const TArray<FYarlungRockWallGroupConfig>& Groups,
-        const TCHAR* GroupSetLabel,
+    void AddRockWallSegments(
+        const FYarlungAssetConfig& AssetConfig,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
         const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
-    void AddRockWallGroup(
-        const FYarlungRockWallGroupConfig& Group,
-        const TCHAR* GroupSetLabel,
+    void AddRockWallSegment(
+        const FYarlungRockWallSegmentConfig& Segment,
+        const FYarlungRockWallProfileConfig& Profile,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
         const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,

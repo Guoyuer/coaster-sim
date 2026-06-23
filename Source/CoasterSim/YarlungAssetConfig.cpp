@@ -138,15 +138,10 @@ FYarlungScatterKindConfig ParseScatterKind(const TSharedPtr<FJsonObject>& Object
     return Config;
 }
 
-FYarlungRockWallGroupConfig ParseRockWallGroup(const TSharedPtr<FJsonObject>& Object, const FString& Context)
+FYarlungRockWallProfileConfig ParseRockWallProfile(const FString& Name, const TSharedPtr<FJsonObject>& Object, const FString& Context)
 {
-    FYarlungRockWallGroupConfig Config;
-    Config.Name = RequiredStringField(Object, TEXT("name"), Context);
-    Config.ComponentName = RequiredStringField(Object, TEXT("component"), Context);
-    Config.StartSampleIndex = RequiredIntegerField(Object, TEXT("start_sample"), Context);
-    Config.EndSampleIndex = RequiredIntegerField(Object, TEXT("end_sample"), Context);
-    Config.SampleStride = RequiredIntegerField(Object, TEXT("sample_stride"), Context);
-    Config.Side = RequiredNumberField(Object, TEXT("side"), Context);
+    FYarlungRockWallProfileConfig Config;
+    Config.Name = Name;
     Config.LateralMinCm = RequiredNumberField(Object, TEXT("lateral_min_cm"), Context);
     Config.LateralMaxCm = RequiredNumberField(Object, TEXT("lateral_max_cm"), Context);
     Config.LateralStepCm = RequiredNumberField(Object, TEXT("lateral_step_cm"), Context);
@@ -163,64 +158,130 @@ FYarlungRockWallGroupConfig ParseRockWallGroup(const TSharedPtr<FJsonObject>& Ob
     Config.AlongJitterCm = RequiredNumberField(Object, TEXT("along_jitter_cm"), Context);
     Config.LateralJitterCm = RequiredNumberField(Object, TEXT("lateral_jitter_cm"), Context);
     Config.YawJitterDegrees = RequiredNumberField(Object, TEXT("yaw_jitter_degrees"), Context);
+    return Config;
+}
+
+FYarlungRockWallSegmentConfig ParseRockWallSegment(const TSharedPtr<FJsonObject>& Object, const FString& Context)
+{
+    FYarlungRockWallSegmentConfig Config;
+    Config.Name = RequiredStringField(Object, TEXT("name"), Context);
+    Config.ProfileName = RequiredStringField(Object, TEXT("profile"), Context);
+    Config.ComponentName = RequiredStringField(Object, TEXT("component"), Context);
+    Config.StartSampleIndex = RequiredIntegerField(Object, TEXT("start_sample"), Context);
+    Config.EndSampleIndex = RequiredIntegerField(Object, TEXT("end_sample"), Context);
+    Config.SampleStride = RequiredIntegerField(Object, TEXT("sample_stride"), Context);
+    Config.Side = RequiredNumberField(Object, TEXT("side"), Context);
     Config.Seed = RequiredNumberField(Object, TEXT("seed"), Context);
     return Config;
 }
 
-void ParseRockWallGroupArray(
+void ParseRockWallProfiles(
     const TSharedPtr<FJsonObject>& Scenery,
-    const TCHAR* FieldName,
     const FString& Path,
-    TArray<FYarlungRockWallGroupConfig>& OutGroups)
+    TMap<FString, FYarlungRockWallProfileConfig>& OutProfiles)
 {
-    const TArray<TSharedPtr<FJsonValue>>* Groups = nullptr;
-    if (!Scenery->TryGetArrayField(FieldName, Groups) || !Groups)
+    const TSharedPtr<FJsonObject> Profiles = RequiredObject(Scenery, TEXT("rock_wall_profiles"), Path);
+    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Profiles->Values)
     {
-        FatalAssetConfigError(FString::Printf(TEXT("%s is missing required array 'scenery.%s'"), *Path, FieldName));
-    }
-    if (Groups)
-    {
-        for (const TSharedPtr<FJsonValue>& Value : *Groups)
+        const TSharedPtr<FJsonObject> ProfileObject = Pair.Value->AsObject();
+        if (!ProfileObject.IsValid())
         {
-            const TSharedPtr<FJsonObject> GroupObject = Value->AsObject();
-            if (!GroupObject.IsValid())
+            FatalAssetConfigError(FString::Printf(TEXT("%s scenery.rock_wall_profiles.%s is not an object"), *Path, *Pair.Key));
+        }
+        OutProfiles.Add(Pair.Key, ParseRockWallProfile(
+            Pair.Key,
+            ProfileObject,
+            FString::Printf(TEXT("%s scenery.rock_wall_profiles.%s"), *Path, *Pair.Key)));
+    }
+}
+
+void ParseRockWallSegments(
+    const TSharedPtr<FJsonObject>& Scenery,
+    const FString& Path,
+    TArray<FYarlungRockWallSegmentConfig>& OutSegments)
+{
+    const TArray<TSharedPtr<FJsonValue>>* Segments = nullptr;
+    if (!Scenery->TryGetArrayField(TEXT("rock_wall_segments"), Segments) || !Segments)
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s is missing required array 'scenery.rock_wall_segments'"), *Path));
+    }
+    if (Segments)
+    {
+        for (const TSharedPtr<FJsonValue>& Value : *Segments)
+        {
+            const TSharedPtr<FJsonObject> SegmentObject = Value->AsObject();
+            if (!SegmentObject.IsValid())
             {
-                FatalAssetConfigError(FString::Printf(TEXT("%s has a non-object rock wall group in scenery.%s"), *Path, FieldName));
+                FatalAssetConfigError(FString::Printf(TEXT("%s has a non-object rock wall segment"), *Path));
             }
-            OutGroups.Add(ParseRockWallGroup(
-                GroupObject,
-                FString::Printf(TEXT("%s scenery.%s"), *Path, FieldName)));
+            OutSegments.Add(ParseRockWallSegment(
+                SegmentObject,
+                FString::Printf(TEXT("%s scenery.rock_wall_segments"), *Path)));
         }
     }
 }
 
-void ValidateRockWallGroups(
-    const TArray<FYarlungRockWallGroupConfig>& Groups,
-    const TCHAR* FieldName,
+void ValidateRockWallProfiles(
+    const TMap<FString, FYarlungRockWallProfileConfig>& Profiles,
     const FString& Path)
 {
-    if (Groups.IsEmpty())
+    if (Profiles.IsEmpty())
     {
-        FatalAssetConfigError(FString::Printf(TEXT("%s has no scenery.%s"), *Path, FieldName));
+        FatalAssetConfigError(FString::Printf(TEXT("%s has no scenery.rock_wall_profiles"), *Path));
     }
-    for (const FYarlungRockWallGroupConfig& Group : Groups)
+    for (const TPair<FString, FYarlungRockWallProfileConfig>& Pair : Profiles)
     {
-        if (Group.Name.IsEmpty() || Group.ComponentName.IsEmpty() ||
-            Group.StartSampleIndex < 0 || Group.EndSampleIndex <= Group.StartSampleIndex || Group.SampleStride <= 0 ||
-            (Group.Side != -1.0f && Group.Side != 1.0f) ||
-            Group.LateralMinCm < 0.0f || Group.LateralMaxCm <= Group.LateralMinCm || Group.LateralStepCm <= 0.0f ||
-            Group.TrackClearanceCm < 0.0f || Group.RiverClearanceCm < 0.0f ||
-            Group.MaxHeightCm < Group.MinHeightCm ||
-            Group.MinSlope < 0.0f || Group.MaxSlope < Group.MinSlope ||
-            Group.ScaleMin <= 0.0f || Group.ScaleMax < Group.ScaleMin ||
-            Group.EmbedDepthCm < 0.0f || Group.AlongJitterCm < 0.0f || Group.LateralJitterCm < 0.0f)
+        const FYarlungRockWallProfileConfig& Profile = Pair.Value;
+        if (Profile.Name.IsEmpty() ||
+            Profile.LateralMinCm < 0.0f || Profile.LateralMaxCm <= Profile.LateralMinCm || Profile.LateralStepCm <= 0.0f ||
+            Profile.TrackClearanceCm < 0.0f || Profile.RiverClearanceCm < 0.0f ||
+            Profile.MaxHeightCm < Profile.MinHeightCm ||
+            Profile.MinSlope < 0.0f || Profile.MaxSlope < Profile.MinSlope ||
+            Profile.ScaleMin <= 0.0f || Profile.ScaleMax < Profile.ScaleMin ||
+            Profile.EmbedDepthCm < 0.0f || Profile.AlongJitterCm < 0.0f || Profile.LateralJitterCm < 0.0f)
         {
-            FatalAssetConfigError(FString::Printf(TEXT("%s has invalid rock wall group '%s' in scenery.%s"), *Path, *Group.Name, FieldName));
+            FatalAssetConfigError(FString::Printf(TEXT("%s has invalid rock wall profile '%s'"), *Path, *Pair.Key));
         }
-        if (Group.ComponentName != TEXT("SlopeRockWallA") && Group.ComponentName != TEXT("SlopeRockWallB"))
+    }
+}
+
+void ValidateRockWallSegments(
+    const TMap<FString, FYarlungRockWallProfileConfig>& Profiles,
+    const TArray<FYarlungRockWallSegmentConfig>& Segments,
+    const FString& Path)
+{
+    if (Segments.IsEmpty())
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s has no scenery.rock_wall_segments"), *Path));
+    }
+    int32 LowestStartSample = TNumericLimits<int32>::Max();
+    int32 HighestEndSample = 0;
+    bool bHasLeftSide = false;
+    bool bHasRightSide = false;
+    for (const FYarlungRockWallSegmentConfig& Segment : Segments)
+    {
+        if (Segment.Name.IsEmpty() || Segment.ProfileName.IsEmpty() || Segment.ComponentName.IsEmpty() ||
+            Segment.StartSampleIndex < 0 || Segment.EndSampleIndex <= Segment.StartSampleIndex || Segment.SampleStride <= 0 ||
+            (Segment.Side != -1.0f && Segment.Side != 1.0f))
         {
-            FatalAssetConfigError(FString::Printf(TEXT("%s rock wall group '%s' in scenery.%s must target SlopeRockWallA or SlopeRockWallB"), *Path, *Group.Name, FieldName));
+            FatalAssetConfigError(FString::Printf(TEXT("%s has invalid rock wall segment '%s'"), *Path, *Segment.Name));
         }
+        if (!Profiles.Contains(Segment.ProfileName))
+        {
+            FatalAssetConfigError(FString::Printf(TEXT("%s rock wall segment '%s' references unknown profile '%s'"), *Path, *Segment.Name, *Segment.ProfileName));
+        }
+        if (Segment.ComponentName != TEXT("SlopeRockWallA") && Segment.ComponentName != TEXT("SlopeRockWallB"))
+        {
+            FatalAssetConfigError(FString::Printf(TEXT("%s rock wall segment '%s' must target SlopeRockWallA or SlopeRockWallB"), *Path, *Segment.Name));
+        }
+        LowestStartSample = FMath::Min(LowestStartSample, Segment.StartSampleIndex);
+        HighestEndSample = FMath::Max(HighestEndSample, Segment.EndSampleIndex);
+        bHasLeftSide = bHasLeftSide || Segment.Side == -1.0f;
+        bHasRightSide = bHasRightSide || Segment.Side == 1.0f;
+    }
+    if (LowestStartSample > 0 || HighestEndSample < 224 || !bHasLeftSide || !bHasRightSide)
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s scenery.rock_wall_segments must cover the full ride corridor on both sides"), *Path));
     }
 }
 
@@ -242,9 +303,9 @@ EYarlungSceneryPlacement ParsePlacement(const FString& Value, const FString& Con
     {
         return EYarlungSceneryPlacement::GroundCoverBelt;
     }
-    if (Value.Equals(TEXT("hero_rock_wall_only"), ESearchCase::IgnoreCase))
+    if (Value.Equals(TEXT("rock_wall_source"), ESearchCase::IgnoreCase))
     {
-        return EYarlungSceneryPlacement::HeroRockWallOnly;
+        return EYarlungSceneryPlacement::RockWallSource;
     }
 
     FatalAssetConfigError(FString::Printf(TEXT("%s has unknown placement '%s'"), *Context, *Value));
@@ -397,8 +458,8 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.GroundCoverBelt.AlongJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("along_jitter_cm"), GroundCoverBeltContext);
     Config.GroundCoverBelt.LateralJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("lateral_jitter_cm"), GroundCoverBeltContext);
 
-    ParseRockWallGroupArray(Scenery, TEXT("hero_rock_wall_groups"), Path, Config.HeroRockWallGroups);
-    ParseRockWallGroupArray(Scenery, TEXT("foreground_rock_apron_groups"), Path, Config.ForegroundRockApronGroups);
+    ParseRockWallProfiles(Scenery, Path, Config.RockWallProfiles);
+    ParseRockWallSegments(Scenery, Path, Config.RockWallSegments);
 
     const TSharedPtr<FJsonObject> Water = RequiredObject(Root, TEXT("water"), Path);
     const FString WaterContext = FString::Printf(TEXT("%s water"), *Path);
@@ -437,8 +498,8 @@ FYarlungAssetConfig LoadConfigFromDisk()
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.ground_cover_belt settings"), *Path));
     }
-    ValidateRockWallGroups(Config.HeroRockWallGroups, TEXT("hero_rock_wall_groups"), Path);
-    ValidateRockWallGroups(Config.ForegroundRockApronGroups, TEXT("foreground_rock_apron_groups"), Path);
+    ValidateRockWallProfiles(Config.RockWallProfiles, Path);
+    ValidateRockWallSegments(Config.RockWallProfiles, Config.RockWallSegments, Path);
 
     UE_LOG(LogTemp, Display, TEXT("YarlungAssets: loaded %d scenery components, %d scatter kinds from %s"),
         Config.SceneryComponents.Num(),

@@ -8,7 +8,7 @@ enum class EYarlungSceneryPlacement : uint8
     CanopyBelt,
     CliffBelt,
     GroundCoverBelt,
-    HeroRockWallOnly
+    RockWallSource
 };
 
 struct FYarlungScatterKindConfig
@@ -95,14 +95,9 @@ struct FYarlungGroundCoverBeltConfig
     float LateralJitterCm = 0.0f;
 };
 
-struct FYarlungRockWallGroupConfig
+struct FYarlungRockWallProfileConfig
 {
     FString Name;
-    FString ComponentName;
-    int32 StartSampleIndex = 0;
-    int32 EndSampleIndex = 0;
-    int32 SampleStride = 1;
-    float Side = 1.0f;
     float LateralMinCm = 0.0f;
     float LateralMaxCm = 0.0f;
     float LateralStepCm = 0.0f;
@@ -119,6 +114,17 @@ struct FYarlungRockWallGroupConfig
     float AlongJitterCm = 0.0f;
     float LateralJitterCm = 0.0f;
     float YawJitterDegrees = 0.0f;
+};
+
+struct FYarlungRockWallSegmentConfig
+{
+    FString Name;
+    FString ProfileName;
+    FString ComponentName;
+    int32 StartSampleIndex = 0;
+    int32 EndSampleIndex = 0;
+    int32 SampleStride = 1;
+    float Side = 1.0f;
     float Seed = 0.0f;
 };
 
@@ -134,8 +140,8 @@ struct FYarlungAssetConfig
     FYarlungCanopyBeltConfig CanopyBelt;
     FYarlungCliffBeltConfig CliffBelt;
     FYarlungGroundCoverBeltConfig GroundCoverBelt;
-    TArray<FYarlungRockWallGroupConfig> HeroRockWallGroups;
-    TArray<FYarlungRockWallGroupConfig> ForegroundRockApronGroups;
+    TMap<FString, FYarlungRockWallProfileConfig> RockWallProfiles;
+    TArray<FYarlungRockWallSegmentConfig> RockWallSegments;
     FYarlungWaterConfig Water;
 };
 

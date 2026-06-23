@@ -426,13 +426,12 @@ void AYarlungSceneryActor::BuildScatter(
         case EYarlungSceneryPlacement::GroundCoverBelt:
             AddGroundCoverBelt(Component, ComponentConfig, *KindConfig, AssetConfig.GroundCoverBelt, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
-        case EYarlungSceneryPlacement::HeroRockWallOnly:
+        case EYarlungSceneryPlacement::RockWallSource:
             break;
         }
     }
 
-    AddRockWallGroups(AssetConfig.HeroRockWallGroups, TEXT("hero rock-wall mass"), TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
-    AddRockWallGroups(AssetConfig.ForegroundRockApronGroups, TEXT("foreground rock apron"), TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
+    AddRockWallSegments(AssetConfig, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
 
     UE_LOG(
         LogTemp,
@@ -677,50 +676,54 @@ void AYarlungSceneryActor::AddGroundCoverBelt(
     }
 }
 
-void AYarlungSceneryActor::AddRockWallGroups(
-    const TArray<FYarlungRockWallGroupConfig>& Groups,
-    const TCHAR* GroupSetLabel,
+void AYarlungSceneryActor::AddRockWallSegments(
+    const FYarlungAssetConfig& AssetConfig,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
     const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
     const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField)
 {
     int32 TotalInstances = 0;
-    for (const FYarlungRockWallGroupConfig& Group : Groups)
+    for (const FYarlungRockWallSegmentConfig& Segment : AssetConfig.RockWallSegments)
     {
+        const FYarlungRockWallProfileConfig* Profile = AssetConfig.RockWallProfiles.Find(Segment.ProfileName);
+        if (!Profile)
+        {
+            UE_LOG(LogTemp, Fatal, TEXT("Rock-wall segment '%s' references missing profile: %s"), *Segment.Name, *Segment.ProfileName);
+        }
         int32 GroupInstances = 0;
-        AddRockWallGroup(Group, GroupSetLabel, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField, GroupInstances);
+        AddRockWallSegment(Segment, *Profile, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField, GroupInstances);
         if (GroupInstances <= 0)
         {
-            UE_LOG(LogTemp, Fatal, TEXT("%s group '%s' placed zero instances."), GroupSetLabel, *Group.Name);
+            UE_LOG(LogTemp, Fatal, TEXT("Rock-wall segment '%s' placed zero instances."), *Segment.Name);
         }
         TotalInstances += GroupInstances;
-        UE_LOG(LogTemp, Display, TEXT("Yarlung %s group '%s': instances=%d"), GroupSetLabel, *Group.Name, GroupInstances);
+        UE_LOG(LogTemp, Display, TEXT("Yarlung rock-wall segment '%s' profile=%s instances=%d"), *Segment.Name, *Segment.ProfileName, GroupInstances);
     }
-    UE_LOG(LogTemp, Display, TEXT("Yarlung %s total instances=%d"), GroupSetLabel, TotalInstances);
+    UE_LOG(LogTemp, Display, TEXT("Yarlung rock-wall segments total instances=%d"), TotalInstances);
 }
 
-void AYarlungSceneryActor::AddRockWallGroup(
-    const FYarlungRockWallGroupConfig& Group,
-    const TCHAR* GroupSetLabel,
+void AYarlungSceneryActor::AddRockWallSegment(
+    const FYarlungRockWallSegmentConfig& Segment,
+    const FYarlungRockWallProfileConfig& Profile,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
     const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
     const TArray<uint16>& EncodedHeights,
     const FYarlungRiverField& RiverField,
     int32& InOutPlacedCount)
 {
-    UHierarchicalInstancedStaticMeshComponent* Component = ComponentByName(Group.ComponentName);
+    UHierarchicalInstancedStaticMeshComponent* Component = ComponentByName(Segment.ComponentName);
     if (!Component || !Component->GetStaticMesh())
     {
-        UE_LOG(LogTemp, Fatal, TEXT("%s group '%s' references missing component or mesh: %s"), GroupSetLabel, *Group.Name, *Group.ComponentName);
+        UE_LOG(LogTemp, Fatal, TEXT("Rock-wall segment '%s' references missing component or mesh: %s"), *Segment.Name, *Segment.ComponentName);
     }
 
     const UStaticMesh& Mesh = *Component->GetStaticMesh();
-    const int32 StartSample = FMath::Clamp(Group.StartSampleIndex, 0, FMath::Max(0, TrackSamples.Num() - 2));
-    const int32 EndSample = FMath::Clamp(Group.EndSampleIndex, StartSample + 1, FMath::Max(1, TrackSamples.Num() - 1));
-    const float Side = Group.Side;
+    const int32 StartSample = FMath::Clamp(Segment.StartSampleIndex, 0, FMath::Max(0, TrackSamples.Num() - 2));
+    const int32 EndSample = FMath::Clamp(Segment.EndSampleIndex, StartSample + 1, FMath::Max(1, TrackSamples.Num() - 1));
+    const float Side = Segment.Side;
 
-    for (int32 SampleIndex = StartSample; SampleIndex < EndSample; SampleIndex += FMath::Max(1, Group.SampleStride))
+    for (int32 SampleIndex = StartSample; SampleIndex < EndSample; SampleIndex += FMath::Max(1, Segment.SampleStride))
     {
         const FYarlungSceneryTrackSample& A = TrackSamples[SampleIndex];
         const FYarlungSceneryTrackSample& B = TrackSamples[SampleIndex + 1];
@@ -729,12 +732,12 @@ void AYarlungSceneryActor::AddRockWallGroup(
         const FVector Right = RightFromForward(Forward);
 
         int32 LaneIndex = 0;
-        const float LaneStaggerCm = (SampleIndex % 2 == 0) ? 0.0f : Group.LateralStepCm * 0.45f;
-        for (float LateralCm = Group.LateralMinCm + LaneStaggerCm; LateralCm <= Group.LateralMaxCm; LateralCm += Group.LateralStepCm)
+        const float LaneStaggerCm = (SampleIndex % 2 == 0) ? 0.0f : Profile.LateralStepCm * 0.45f;
+        for (float LateralCm = Profile.LateralMinCm + LaneStaggerCm; LateralCm <= Profile.LateralMaxCm; LateralCm += Profile.LateralStepCm)
         {
-            const float HashBase = SampleIndex * 19.371f + LaneIndex * 7.193f + Group.Seed;
-            const float AlongJitterCm = FMath::Lerp(-Group.AlongJitterCm, Group.AlongJitterCm, Hash01(HashBase, 503.0f));
-            const float LateralJitterCm = FMath::Lerp(-Group.LateralJitterCm, Group.LateralJitterCm, Hash01(HashBase, 509.0f));
+            const float HashBase = SampleIndex * 19.371f + LaneIndex * 7.193f + Segment.Seed;
+            const float AlongJitterCm = FMath::Lerp(-Profile.AlongJitterCm, Profile.AlongJitterCm, Hash01(HashBase, 503.0f));
+            const float LateralJitterCm = FMath::Lerp(-Profile.LateralJitterCm, Profile.LateralJitterCm, Hash01(HashBase, 509.0f));
             const FVector Location2D = Center + Forward * AlongJitterCm + Right * Side * FMath::Max(0.0f, LateralCm + LateralJitterCm);
 
             float Height = 0.0f;
@@ -744,11 +747,11 @@ void AYarlungSceneryActor::AddRockWallGroup(
                 TerrainTrackPoints,
                 RiverField,
                 Location2D,
-                Group.RiverClearanceCm,
-                Group.MinHeightCm,
-                Group.MaxHeightCm,
-                Group.MinSlope,
-                Group.MaxSlope,
+                Profile.RiverClearanceCm,
+                Profile.MinHeightCm,
+                Profile.MaxHeightCm,
+                Profile.MinSlope,
+                Profile.MaxSlope,
                 Height,
                 SurfaceNormal))
             {
@@ -763,16 +766,16 @@ void AYarlungSceneryActor::AddRockWallGroup(
             const FVector2D FallbackInwardDirection(-Side * Right.X, -Side * Right.Y);
             const float FaceInwardYaw = YawFacingDirection(
                 FaceRiverDirection.IsNearlyZero() ? FallbackInwardDirection : FaceRiverDirection);
-            const float Yaw = FaceInwardYaw + FMath::Lerp(-Group.YawJitterDegrees, Group.YawJitterDegrees, Hash01(HashBase, 521.0f));
+            const float Yaw = FaceInwardYaw + FMath::Lerp(-Profile.YawJitterDegrees, Profile.YawJitterDegrees, Hash01(HashBase, 521.0f));
 
-            const float ScaleBase = FMath::Lerp(Group.ScaleMin, Group.ScaleMax, Hash01(HashBase, 541.0f));
+            const float ScaleBase = FMath::Lerp(Profile.ScaleMin, Profile.ScaleMax, Hash01(HashBase, 541.0f));
             const FVector Scale(
                 ScaleBase * FMath::Lerp(1.65f, 3.35f, Hash01(HashBase, 547.0f)),
                 ScaleBase * FMath::Lerp(0.52f, 0.94f, Hash01(HashBase, 557.0f)),
                 ScaleBase * FMath::Lerp(0.95f, 2.05f, Hash01(HashBase, 563.0f)));
-            const FVector Location(Location2D.X, Location2D.Y, Height + Group.HeightOffsetCm - Group.EmbedDepthCm);
+            const FVector Location(Location2D.X, Location2D.Y, Height + Profile.HeightOffsetCm - Profile.EmbedDepthCm);
             const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
-            if (FVector::Dist(Location, Center) - ScaledRadiusCm < Group.TrackClearanceCm)
+            if (FVector::Dist(Location, Center) - ScaledRadiusCm < Profile.TrackClearanceCm)
             {
                 ++LaneIndex;
                 continue;
