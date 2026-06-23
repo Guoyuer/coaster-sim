@@ -74,11 +74,17 @@ float CarveRiverChannelCm(
 
     const float BankT = YarlungTerrain::Smooth01((River.DistanceCm - InnerBankCm) / (OuterBankCm - InnerBankCm));
     const float CarveAlpha = 1.0f - BankT;
-    const float ShoreOffsetCm = FMath::Max(0.0f, River.DistanceCm - River.WaterHalfWidthCm);
-    const float ImmediateBankRiseCm = YarlungTerrain::Smooth01(ShoreOffsetCm / 8500.0f) * 7800.0f;
-    const float OuterBankRiseCm = YarlungTerrain::Smooth01(ShoreOffsetCm / 32000.0f) * 18500.0f;
-    const float BankRiseCm = ImmediateBankRiseCm + OuterBankRiseCm;
-    const float TargetHeightCm = River.WaterSurfaceZCm - 1150.0f + BankRiseCm;
+
+    // The bed profile is anchored to the *visible* water ribbon, not the wider
+    // carved channel. Anchoring the bank rise to the carved (wider) half width
+    // used to leave a flat shelf carved ~11.5m below the water out past the
+    // ribbon edge, which made the opaque ribbon look like a slab floating a
+    // notch above the surrounding ground.
+    const float VisibleHalfWidthCm = FYarlungRiverField::VisibleRibbonHalfWidthCm(River.Row.HalfWidthCm);
+    const float TargetHeightCm = YarlungTerrainSurface::RiverBedTargetHeightCm(
+        River.DistanceCm,
+        River.WaterSurfaceZCm,
+        VisibleHalfWidthCm);
     const float CarvedHeightCm = FMath::Min(HeightCm, FMath::Lerp(HeightCm, TargetHeightCm, CarveAlpha));
     const float CarveCm = HeightCm - CarvedHeightCm;
     if (OutStats && CarveCm > 1.0f)
@@ -92,6 +98,25 @@ float CarveRiverChannelCm(
 
 namespace YarlungTerrainSurface
 {
+float RiverBedTargetHeightCm(
+    float DistanceCm,
+    float WaterSurfaceZCm,
+    float VisibleHalfWidthCm)
+{
+    constexpr float ChannelBedDepthCm = 1150.0f;  // deepest point under the channel center
+    constexpr float ShorelineSubmergeCm = 60.0f;  // bed barely under water at the visible ribbon edge
+
+    const float ChannelT = YarlungTerrain::Smooth01(DistanceCm / FMath::Max(VisibleHalfWidthCm, 1.0f));
+    const float SubmergeCm = FMath::Lerp(ChannelBedDepthCm, ShorelineSubmergeCm, ChannelT);
+
+    const float ShoreOffsetCm = FMath::Max(0.0f, DistanceCm - VisibleHalfWidthCm);
+    const float ImmediateBankRiseCm = YarlungTerrain::Smooth01(ShoreOffsetCm / 8500.0f) * 7800.0f;
+    const float OuterBankRiseCm = YarlungTerrain::Smooth01(ShoreOffsetCm / 32000.0f) * 18500.0f;
+    const float BankRiseCm = ImmediateBankRiseCm + OuterBankRiseCm;
+
+    return WaterSurfaceZCm - SubmergeCm + BankRiseCm;
+}
+
 float SourceHeightCm(const TArray<uint16>& EncodedHeights, float X, float Y)
 {
     const YarlungTerrain::FConfig& Tc = YarlungTerrain::Config();

@@ -260,9 +260,13 @@ def set_optional_material_usage(material, usage_name):
 def create_yarlung_water_surface_material():
     material = create_material_asset(WATER_SURFACE_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
+    # Single Layer Water is the engine's purpose-built river/lake shader: it gives
+    # real depth-based transparency, refraction and underwater scattering in one
+    # opaque pass. The old Default-Lit + opaque setup had no transparency or depth
+    # absorption at all, so the dark low-roughness surface read as glossy plastic.
     material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
     material.set_editor_property("two_sided", True)
-    material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
+    material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_SINGLE_LAYER_WATER)
 
     vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
@@ -298,7 +302,7 @@ def create_yarlung_water_surface_material():
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Roughness", 0.22, -500, -40),
+        create_scalar_parameter(material, "Roughness", 0.06, -500, -40),
         unreal.MaterialProperty.MP_ROUGHNESS,
         "yarlung water surface Roughness",
     )
@@ -310,7 +314,7 @@ def create_yarlung_water_surface_material():
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Opacity", 0.86, -500, 280),
+        create_scalar_parameter(material, "Opacity", 1.0, -500, 280),
         unreal.MaterialProperty.MP_OPACITY,
         "yarlung water surface Opacity",
     )
@@ -358,6 +362,51 @@ def create_yarlung_water_surface_material():
         ),
         unreal.MaterialProperty.MP_EMISSIVE_COLOR,
         "yarlung water surface EmissiveColor",
+    )
+    # Single Layer Water absorption + scattering drive the glacial colour and how
+    # fast the channel goes opaque with depth. Coefficients are per-cm extinction
+    # (red absorbs fastest, so deep mid-channel reads teal while the shallow ~0.6m
+    # shoreline stays clear). Exposed as parameters so they are tunable on a
+    # material instance without recompiling.
+    water_output = unreal.MaterialEditingLibrary.create_material_expression(
+        material,
+        unreal.MaterialExpressionSingleLayerWaterMaterialOutput,
+        320,
+        420,
+    )
+    absorption = create_vector_parameter(
+        material,
+        "WaterAbsorption",
+        unreal.LinearColor(0.0042, 0.0019, 0.0016, 1.0),
+        -120,
+        360,
+    )
+    scattering = create_vector_parameter(
+        material,
+        "WaterScattering",
+        unreal.LinearColor(0.0011, 0.0021, 0.0020, 1.0),
+        -120,
+        520,
+    )
+    def connect_water_coefficient(source, input_names, label):
+        for input_name in input_names:
+            if unreal.MaterialEditingLibrary.connect_material_expressions(
+                source, "", water_output, input_name
+            ):
+                return
+        raise RuntimeError(f"Unable to connect yarlung water {label}")
+
+    # Input display names differ slightly between engine versions, so try the
+    # spaced and unspaced variants.
+    connect_water_coefficient(
+        absorption,
+        ("Absorption Coefficients", "AbsorptionCoefficients"),
+        "absorption coefficients",
+    )
+    connect_water_coefficient(
+        scattering,
+        ("Scattering Coefficients", "ScatteringCoefficients"),
+        "scattering coefficients",
     )
     set_optional_material_usage(material, "MATUSAGE_STATIC_MESH")
     set_optional_material_usage(material, "MATUSAGE_SPLINE_MESHES")

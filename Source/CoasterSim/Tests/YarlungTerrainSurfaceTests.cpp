@@ -147,4 +147,38 @@ bool FYarlungRiverWidthConstantsStayOrderedTest::RunTest(const FString& Paramete
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FYarlungRiverBedMeetsWaterlineAtRibbonEdgeTest,
+    "CoasterSim.Yarlung.TerrainSurface.RiverBedMeetsWaterlineAtRibbonEdge",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FYarlungRiverBedMeetsWaterlineAtRibbonEdgeTest::RunTest(const FString& Parameters)
+{
+    // Offset-invariant: the carved bed profile is purely relative to the water
+    // surface, so the shoreline contract must hold at any centerline elevation.
+    for (const float WaterSurfaceZCm : { 0.0f, 12345.0f, -5000.0f })
+    {
+        const float RiverHalfWidthCm = 22000.0f;  // matches the generated Yarlung river
+        const float VisibleHalfWidth = FYarlungRiverField::VisibleRibbonHalfWidthCm(RiverHalfWidthCm);
+
+        const float CenterZ = YarlungTerrainSurface::RiverBedTargetHeightCm(0.0f, WaterSurfaceZCm, VisibleHalfWidth);
+        const float EdgeZ = YarlungTerrainSurface::RiverBedTargetHeightCm(VisibleHalfWidth, WaterSurfaceZCm, VisibleHalfWidth);
+        const float BankZ = YarlungTerrainSurface::RiverBedTargetHeightCm(VisibleHalfWidth + 12000.0f, WaterSurfaceZCm, VisibleHalfWidth);
+
+        // Channel centre keeps real depth under the (opaque) ribbon.
+        TestTrue(TEXT("Channel centre bed sits well below the water surface"), CenterZ <= WaterSurfaceZCm - 800.0f);
+
+        // Core regression guard: at the visible ribbon edge the bed must hug the
+        // waterline instead of sinking to the old ~11.5m sunken shelf that made
+        // the water look like a slab floating above the ground.
+        TestTrue(TEXT("Bed reaches the waterline at the visible ribbon edge"), WaterSurfaceZCm - EdgeZ < 250.0f);
+        TestTrue(TEXT("Bed stays at or just under the water at the ribbon edge"), EdgeZ <= WaterSurfaceZCm);
+        TestTrue(TEXT("Bed is shallower at the ribbon edge than at the channel centre"), EdgeZ > CenterZ);
+
+        // The bank climbs out of the water beyond the ribbon edge.
+        TestTrue(TEXT("Bank rises above the water surface past the ribbon edge"), BankZ > WaterSurfaceZCm + 3000.0f);
+    }
+    return true;
+}
+
 #endif

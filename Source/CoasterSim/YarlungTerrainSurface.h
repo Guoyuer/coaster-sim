@@ -15,6 +15,15 @@ struct FSurfaceStats
     float MaxRiverCarveCm = 0.0f;
 };
 
+// Target terrain height for the carved river bed/bank at a given perpendicular
+// distance from the river centerline. The bed is deepest under the channel
+// centre and rises to sit just under the waterline exactly at the visible water
+// ribbon edge, then climbs out of the water as the bank. Pure helper so the
+// shoreline contract can be unit tested without a populated river field.
+COASTERSIM_API float RiverBedTargetHeightCm(
+    float DistanceCm,
+    float WaterSurfaceZCm,
+    float VisibleHalfWidthCm);
 COASTERSIM_API float SourceHeightCm(const TArray<uint16>& EncodedHeights, float X, float Y);
 COASTERSIM_API FVector SourceNormal(const TArray<uint16>& EncodedHeights, float X, float Y);
 COASTERSIM_API bool FindNearestTrackProfileFrame(
