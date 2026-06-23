@@ -16,38 +16,43 @@ or `docs/reviews/archive/`.
 Latest run:
 
 ```powershell
-.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Standard -Build -NamePrefix surface-cover-v3 -Times 60,120,180,240
+.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Standard -Build -NamePrefix steep-grounded-rocks-v1 -Times 60,120,180,240
 ```
 
 Evidence:
 
-- Contact sheet: `Saved/Diagnostics/surface-cover-v3.png`
-- Manifest: `Saved/Diagnostics/surface-cover-v3-run.json`
-- RiskGate: `WARN`
-- Worst frame: `surface-cover-v3-t60.png`, risk `1.342`
+- Contact sheet: `Saved/Diagnostics/steep-grounded-rocks-v1.png`
+- Manifest: `Saved/Diagnostics/steep-grounded-rocks-v1-run.json`
+- RiskGate: `FAIL`
+- Worst frame: `steep-grounded-rocks-v1-t60.png`, risk `1.483`
 - Map inspect: 0 errors, 0 warnings
 - Automation: `.\scripts\test-yarlung.ps1 -Build` passed 15/15
 
 Implemented:
 
-- Replaced old `canopy_belt` / `ground_cover_belt` placement with reusable
-  `surface_cover_profiles`.
-- Added systemic profiles for `wet_rock_shore`, `talus_scree`, `forest_floor`,
-  and `canopy_mass`, with track/river anchoring and explicit clearance gates.
-- Added fail-close config validation and automation coverage for surface-cover
-  profile references.
-- Fixed scenery tint application to cover every material slot, so multi-slot
-  shrubs/trees do not leak mismatched branch/trunk materials after tinting.
-- Hardened map inspect so real shrub asset validation checks static mesh source,
-  not material names that can legitimately change after tinting.
+- Added explicit terrain coverage masks in corridor vertex color channels:
+  wet-rock shore, forest-floor, and scree/rock coverage.
+- Rebuilt `M_YarlungMeshTerrain` so those masks drive continuous terrain
+  material blending instead of treating vertex color as final albedo.
+- Fixed rock/cliff placement bugs exposed by the screenshots:
+  rock-wall/cliff/river-wall instances now use upright yaw plus thick geologic
+  scaling instead of thin slab scaling, and every scenery instance grounds its
+  pivot from `StaticMesh` bounds bottom rather than assuming pivot-at-ground.
+- Tightened large cliff/rock-wall placement: big rock massing now requires
+  steeper surfaces, larger track clearance, and negative embed offsets. Low
+  smooth slopes should be covered by material/scree/forest-floor systems, not
+  free-standing cliff slabs.
 
 Visual read:
 
-- Shore rocks and scree are more systematic and less one-off.
-- PN spruce assets are usable only as a limited far canopy hint in this setup;
-  near/mid use reads as individual branchy silhouettes, not AAA forest mass.
-- Still visibly non-AAA: large smooth gray-green corridor terrain remains the
-  dominant hero surface in t60/t120/t180. HISM layers alone are not enough.
+- The previous "thin paper / horizontal plank" rock bug is removed from the
+  validated contact sheet.
+- The large floating-rock read was a real placement bug: large cliff assets
+  were allowed on low smooth slopes and only sampled one pivot point. The
+  stricter placement pass removes the worst false visual richness.
+- Still visibly non-AAA: the result is more honest but emptier. Large smooth
+  green-gray corridor terrain remains the dominant hero surface, especially
+  t60/t120/t180.
 - Water still lacks photo-level flow/shore detail; foreground coaster hardware
   remains too proxy-like.
 
@@ -55,26 +60,28 @@ Visual read:
 
 Highest-return next task:
 
-**Build a continuous terrain material coverage layer** so forest-floor / scree /
-wet-rock shore read as surfaces, not isolated HISM instances.
+**Replace low-slope naked corridor terrain with continuous authored surface
+coverage**, without reintroducing free-standing cliff slabs.
 
 Scope:
 
-- Generate authored masks or vertex-color bands for forest floor, talus/scree,
-  and wet-rock shore from the same river/track field used by surface cover.
-- Feed those masks into the mesh terrain material so the corridor base stops
-  showing as smooth green-gray primer.
-- Keep canopy as a restrained far/mid layer until better tree assets/materials
-  are available.
-- Validate in `Terrain` or `Full` mode, then first-person contact sheet.
+- Tune the new terrain coverage masks/material so low slopes read as wet
+  forest-floor, scree, and wet-rock bands instead of green primer.
+- Add only ground-hugging scree/small-rock/decal-like cover on low slopes; keep
+  large cliff modules on steep slopes and river walls.
+- Rebuild canopy as distant/mid massing, not slope patches or branchy near
+  foreground fillers.
+- Validate in `Terrain` or `Full` mode, then first-person contact sheet. Treat
+  new floating/hovering/sheet-like assets as pipeline bugs, not aesthetic
+  tradeoffs.
 
-Do not simply increase HISM instance counts.
+Do not simply increase HISM counts or relax cliff slope/clearance gates.
 
 ## Active Risks
 
 - Smooth corridor terrain is still the main visual surface in several hero frames.
-- Rock-wall segments are cleaner than patch groups, but they are still instance
-  massing rather than continuous authored wall geometry.
+- Rock-wall segments are cleaner and less bug-prone after grounding/slope gates,
+  but they are now sparse; continuous authored wall geometry is still missing.
 - Water is visible and better contacted to the riverbed, but still reads too flat
   and synthetic.
 - Lack of real cockpit/train foreground hurts first-person scale and photo read.

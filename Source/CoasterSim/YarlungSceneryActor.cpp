@@ -48,10 +48,30 @@ FQuat SurfaceAlignedRotation(const FVector& Normal, float YawDegrees)
     return Yaw * SurfaceTilt;
 }
 
+FQuat UprightYawRotation(float YawDegrees)
+{
+    return FQuat(FVector::UpVector, FMath::DegreesToRadians(YawDegrees));
+}
+
+FVector GeologicWallScale(float ScaleBase, float HashX, float HashY, float HashZ)
+{
+    return FVector(
+        ScaleBase * FMath::Lerp(1.05f, 1.85f, HashX),
+        ScaleBase * FMath::Lerp(1.00f, 1.70f, HashY),
+        ScaleBase * FMath::Lerp(1.20f, 2.35f, HashZ));
+}
+
 float ScaledHorizontalRadiusCm(const UStaticMesh& Mesh, const FVector& Scale)
 {
     const FVector Extent = Mesh.GetBounds().BoxExtent;
     return FMath::Max(Extent.X * FMath::Abs(Scale.X), Extent.Y * FMath::Abs(Scale.Y));
+}
+
+float GroundedPivotZCm(const UStaticMesh& Mesh, const FVector& Scale, float SurfaceZCm, float HeightOffsetCm, float EmbedDepthCm)
+{
+    const FBoxSphereBounds Bounds = Mesh.GetBounds();
+    const float LocalBottomZ = Bounds.Origin.Z - Bounds.BoxExtent.Z;
+    return SurfaceZCm - LocalBottomZ * Scale.Z + HeightOffsetCm - EmbedDepthCm;
 }
 
 float YawFacingDirection(const FVector2D& Direction)
@@ -581,7 +601,7 @@ void AYarlungSceneryActor::AddScatterRule(
                 : (bCanopyTree
                     ? FVector(ScaleBase * FMath::Lerp(0.85f, 1.55f, Hash01(Index * 9.0f + Seed, 1.0f)), ScaleBase * FMath::Lerp(0.85f, 1.55f, Hash01(Index * 7.0f + Seed, 2.0f)), ScaleBase * FMath::Lerp(0.80f, 1.35f, Hash01(Index * 5.0f + Seed, 3.0f)))
                     : FVector(ScaleBase * FMath::Lerp(0.8f, 1.55f, Hash01(Index * 9.0f + Seed, 1.0f)), ScaleBase * FMath::Lerp(0.75f, 1.3f, Hash01(Index * 7.0f + Seed, 2.0f)), ScaleBase * FMath::Lerp(0.75f, 1.8f, Hash01(Index * 5.0f + Seed, 3.0f)))));
-        const FVector Location(Location2D.X, Location2D.Y, Height + KindConfig.HeightOffsetCm);
+        const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(*Component->GetStaticMesh(), Scale, Height, KindConfig.HeightOffsetCm, 0.0f));
         const FQuat Rotation = KindConfig.bAlignToSurface
             ? SurfaceAlignedRotation(Normal, Yaw)
             : FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw));
@@ -676,7 +696,7 @@ void AYarlungSceneryActor::AddSurfaceCoverLayer(
                     ScaleBase * FMath::Lerp(0.86f, 1.30f, Hash01(SampleIndex * 4.0f + BandIndex + Seed, 53.0f)),
                     ScaleBase * FMath::Lerp(0.82f, 1.24f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
                     ScaleBase * FMath::Lerp(0.62f, 1.18f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f))));
-        const FVector Location(Location2D.X, Location2D.Y, Height + Profile.HeightOffsetCm);
+        const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Profile.HeightOffsetCm, 0.0f));
         const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
         FVector TrackCenter = FVector::ZeroVector;
         float SignedTrackOffsetCm = 0.0f;
@@ -837,11 +857,12 @@ void AYarlungSceneryActor::AddRockWallSegment(
             const float Yaw = FaceInwardYaw + FMath::Lerp(-Profile.YawJitterDegrees, Profile.YawJitterDegrees, Hash01(HashBase, 521.0f));
 
             const float ScaleBase = FMath::Lerp(Profile.ScaleMin, Profile.ScaleMax, Hash01(HashBase, 541.0f));
-            const FVector Scale(
-                ScaleBase * FMath::Lerp(1.65f, 3.35f, Hash01(HashBase, 547.0f)),
-                ScaleBase * FMath::Lerp(0.52f, 0.94f, Hash01(HashBase, 557.0f)),
-                ScaleBase * FMath::Lerp(0.95f, 2.05f, Hash01(HashBase, 563.0f)));
-            const FVector Location(Location2D.X, Location2D.Y, Height + Profile.HeightOffsetCm - Profile.EmbedDepthCm);
+            const FVector Scale = GeologicWallScale(
+                ScaleBase,
+                Hash01(HashBase, 547.0f),
+                Hash01(HashBase, 557.0f),
+                Hash01(HashBase, 563.0f));
+            const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Profile.HeightOffsetCm, Profile.EmbedDepthCm));
             const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
             if (FVector::Dist(Location, Center) - ScaledRadiusCm < Profile.TrackClearanceCm)
             {
@@ -849,7 +870,7 @@ void AYarlungSceneryActor::AddRockWallSegment(
                 continue;
             }
 
-            Component->AddInstance(FTransform(SurfaceAlignedRotation(SurfaceNormal, Yaw), Location, Scale));
+            Component->AddInstance(FTransform(UprightYawRotation(Yaw), Location, Scale));
             ++InOutPlacedCount;
             ++LaneIndex;
         }
@@ -922,17 +943,18 @@ void AYarlungSceneryActor::AddCliffBelt(
                     FaceRiverDirection.IsNearlyZero() ? FallbackInwardDirection : FaceRiverDirection);
                 const float Yaw = FaceInwardYaw + FMath::Lerp(-Belt.YawJitterDegrees, Belt.YawJitterDegrees, Hash01(SampleIndex * 3.017f + BandIndex + Seed, 23.0f));
                 const float ScaleBase = FMath::Lerp(Belt.ScaleMin, Belt.ScaleMax, Hash01(SampleIndex * 6.971f + BandIndex + Seed, 31.0f));
-                const FVector Scale(
-                    ScaleBase * FMath::Lerp(0.95f, 2.15f, Hash01(SampleIndex * 7.0f + BandIndex + Seed, 41.0f)),
-                    ScaleBase * FMath::Lerp(0.42f, 0.92f, Hash01(SampleIndex * 9.0f + BandIndex + Seed, 43.0f)),
-                    ScaleBase * FMath::Lerp(0.85f, 1.65f, Hash01(SampleIndex * 5.0f + BandIndex + Seed, 47.0f)));
-                const FVector Location(Location2D.X, Location2D.Y, Height + Belt.HeightOffsetCm);
+                const FVector Scale = GeologicWallScale(
+                    ScaleBase,
+                    Hash01(SampleIndex * 7.0f + BandIndex + Seed, 41.0f),
+                    Hash01(SampleIndex * 9.0f + BandIndex + Seed, 43.0f),
+                    Hash01(SampleIndex * 5.0f + BandIndex + Seed, 47.0f));
+                const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Belt.HeightOffsetCm, 0.0f));
                 const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
                 if (FVector::Dist(Location, Center) - ScaledRadiusCm < Belt.TrackClearanceCm)
                 {
                     continue;
                 }
-                Component->AddInstance(FTransform(FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw)), Location, Scale));
+                Component->AddInstance(FTransform(UprightYawRotation(Yaw), Location, Scale));
             }
         }
     }
@@ -1018,10 +1040,11 @@ void AYarlungSceneryActor::AddRiverWallCliffs(
                 const float FaceRiverYaw = YawFacingDirection(RiverCenter - LocationXY);
                 const float Yaw = FaceRiverYaw + FMath::Lerp(-Belt.RiverWallYawJitterDegrees, Belt.RiverWallYawJitterDegrees, Hash01(RiverIndex * 4.113f + BandIndex + Seed, 89.0f));
                 const float ScaleBase = FMath::Lerp(Belt.RiverWallScaleMin, Belt.RiverWallScaleMax, Hash01(RiverIndex * 6.331f + BandIndex + Seed, 97.0f));
-                const FVector Scale(
-                    ScaleBase * FMath::Lerp(1.15f, 2.65f, Hash01(RiverIndex * 5.0f + BandIndex + Seed, 101.0f)),
-                    ScaleBase * FMath::Lerp(0.36f, 0.78f, Hash01(RiverIndex * 7.0f + BandIndex + Seed, 103.0f)),
-                    ScaleBase * FMath::Lerp(0.95f, 1.85f, Hash01(RiverIndex * 9.0f + BandIndex + Seed, 107.0f)));
+                const FVector Scale = GeologicWallScale(
+                    ScaleBase,
+                    Hash01(RiverIndex * 5.0f + BandIndex + Seed, 101.0f),
+                    Hash01(RiverIndex * 7.0f + BandIndex + Seed, 103.0f),
+                    Hash01(RiverIndex * 9.0f + BandIndex + Seed, 107.0f));
                 const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
                 const float HorizontalTrackDistanceCm = FVector2D::Distance(LocationXY, FVector2D(TrackCenter.X, TrackCenter.Y));
                 if (HorizontalTrackDistanceCm - ScaledRadiusCm < Belt.TrackClearanceCm)
@@ -1029,8 +1052,8 @@ void AYarlungSceneryActor::AddRiverWallCliffs(
                     continue;
                 }
 
-                const FVector Location(LocationXY.X, LocationXY.Y, Height + Belt.RiverWallHeightOffsetCm);
-                Component->AddInstance(FTransform(FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw)), Location, Scale));
+                const FVector Location(LocationXY.X, LocationXY.Y, GroundedPivotZCm(Mesh, Scale, Height, Belt.RiverWallHeightOffsetCm, 0.0f));
+                Component->AddInstance(FTransform(UprightYawRotation(Yaw), Location, Scale));
             }
         }
     }
