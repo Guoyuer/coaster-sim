@@ -170,6 +170,7 @@ def main():
         real_rock_or_cliff_instances = 0
         for component in actor.get_components_by_class(unreal.HierarchicalInstancedStaticMeshComponent):
             material_names = [object_path(component.get_material(slot)) for slot in range(component.get_num_materials())]
+            static_mesh_path = object_path(component.get_editor_property("static_mesh"))
             instance_count = component.get_instance_count()
             total_instances += instance_count
             is_rock_or_cliff = (
@@ -181,16 +182,16 @@ def main():
                 if not any("/Game/Fab/" in material_name for material_name in material_names):
                     raise RuntimeError(
                         f"Rock/cliff scatter must use real Fab materials, got {component.get_name()} materials={material_names}"
-                    )
+                )
                 real_rock_or_cliff_instances += instance_count
             if component.get_name().startswith("ForestShrubs"):
-                uses_real_spruce_asset = any("/Game/PN_interactiveSpruceForest/" in material_name for material_name in material_names)
+                uses_real_spruce_asset = "/Game/PN_interactiveSpruceForest/" in static_mesh_path
                 if not uses_real_spruce_asset:
                     bad_forest_shrub_instances += instance_count
             emit(
                 f"[YARLUNG-INSPECT] scenery_component={component.get_name()} "
                 f"class={component.get_class().get_name()} hidden={component.get_editor_property('hidden_in_game')} "
-                f"materials={material_names} instances={instance_count}"
+                f"static_mesh={static_mesh_path} materials={material_names} instances={instance_count}"
             )
         if bad_forest_shrub_instances != 0:
             raise RuntimeError(f"Known-bad shrub proxy scatter must stay disabled: {bad_forest_shrub_instances} instances")

@@ -417,15 +417,19 @@ void AYarlungSceneryActor::BuildScatter(
         case EYarlungSceneryPlacement::Scatter:
             AddScatterRule(Component, ComponentConfig, *KindConfig, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
-        case EYarlungSceneryPlacement::CanopyBelt:
-            AddCanopyBelt(Component, AssetConfig.CanopyBelt, ComponentConfig.Seed, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
-            break;
         case EYarlungSceneryPlacement::CliffBelt:
             AddCliffBelt(Component, AssetConfig.CliffBelt, ComponentConfig.Seed, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
-        case EYarlungSceneryPlacement::GroundCoverBelt:
-            AddGroundCoverBelt(Component, ComponentConfig, *KindConfig, AssetConfig.GroundCoverBelt, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
+        case EYarlungSceneryPlacement::SurfaceCover:
+        {
+            const FYarlungSurfaceCoverProfileConfig* Profile = AssetConfig.SurfaceCoverProfiles.Find(ComponentConfig.SurfaceCoverProfileName);
+            if (!Profile)
+            {
+                UE_LOG(LogTemp, Fatal, TEXT("Surface cover component '%s' references missing profile: %s"), *ComponentConfig.Name, *ComponentConfig.SurfaceCoverProfileName);
+            }
+            AddSurfaceCoverLayer(Component, ComponentConfig, *Profile, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
+        }
         case EYarlungSceneryPlacement::RockWallSource:
             break;
         }
@@ -585,11 +589,10 @@ void AYarlungSceneryActor::AddScatterRule(
     }
 }
 
-void AYarlungSceneryActor::AddGroundCoverBelt(
+void AYarlungSceneryActor::AddSurfaceCoverLayer(
     UHierarchicalInstancedStaticMeshComponent* Component,
     const FYarlungSceneryComponentConfig& ComponentConfig,
-    const FYarlungScatterKindConfig& KindConfig,
-    const FYarlungGroundCoverBeltConfig& Belt,
+    const FYarlungSurfaceCoverProfileConfig& Profile,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
     const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
     const TArray<uint16>& EncodedHeights,
@@ -601,79 +604,144 @@ void AYarlungSceneryActor::AddGroundCoverBelt(
     }
 
     const bool bScree = ComponentConfig.Kind.Contains(TEXT("scree"), ESearchCase::IgnoreCase);
+    const bool bCanopy = ComponentConfig.Kind == TEXT("canopy_tree");
     const UStaticMesh& Mesh = *Component->GetStaticMesh();
     const float Seed = ComponentConfig.Seed;
+    int32 PlacedCount = 0;
 
-    for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Belt.SampleStride))
+    const auto AddAtLocation = [&](
+        int32 SampleIndex,
+        int32 BandIndex,
+        float Side,
+        const FVector& Center,
+        const FVector& Forward,
+        const FVector& Right)
     {
-        const FYarlungSceneryTrackSample& A = TrackSamples[SampleIndex];
-        const FYarlungSceneryTrackSample& B = TrackSamples[SampleIndex + 1];
-        const FVector Center = (A.Position + B.Position) * 0.5f;
-        const FVector Forward = HorizontalForward(TrackSamples, SampleIndex);
-        const FVector Right = RightFromForward(Forward);
-
-        for (float Side : { -1.0f, 1.0f })
+        const float Keep = Hash01(SampleIndex * 1.517f + BandIndex * 5.913f + Seed, Side > 0.0f ? 29.0f : 31.0f);
+        if (Keep > Profile.Occupancy)
         {
-            for (int32 BandIndex = 0; BandIndex < Belt.LateralBandsCm.Num(); ++BandIndex)
+            return;
+        }
+
+        const float AlongJitterCm = FMath::Lerp(-Profile.AlongJitterCm, Profile.AlongJitterCm, Hash01(SampleIndex * 2.317f + BandIndex + Seed, 37.0f));
+        const float LateralJitterCm = FMath::Lerp(-Profile.LateralJitterCm, Profile.LateralJitterCm, Hash01(SampleIndex * 3.719f + BandIndex + Seed, 41.0f));
+        const float LateralCm = FMath::Max(0.0f, Profile.LateralBandsCm[BandIndex] + LateralJitterCm);
+        const float SignedOffsetCm = Side * LateralCm;
+        const FVector Location2D = Center + Forward * AlongJitterCm + Right * SignedOffsetCm;
+
+        float Height = 0.0f;
+        FVector Normal = FVector::UpVector;
+        if (!TryResolvePlacement(
+            EncodedHeights,
+            TerrainTrackPoints,
+            RiverField,
+            Location2D,
+            Profile.RiverClearanceCm,
+            Profile.MinHeightCm,
+            Profile.MaxHeightCm,
+            Profile.MinSlope,
+            Profile.MaxSlope,
+            Height,
+            Normal))
+        {
+            return;
+        }
+
+        float Yaw = Hash01(SampleIndex * 7.071f + BandIndex + Seed, 43.0f) * 360.0f;
+        if (Profile.bFaceRiver)
+        {
+            const FYarlungRiverQuery RiverQuery = RiverField.QueryNearest(FVector2D(Location2D.X, Location2D.Y));
+            const FVector2D FaceRiverDirection(
+                RiverQuery.Row.PositionCm.X - Location2D.X,
+                RiverQuery.Row.PositionCm.Y - Location2D.Y);
+            if (!FaceRiverDirection.IsNearlyZero())
             {
-                const float Keep = Hash01(SampleIndex * 1.517f + BandIndex * 5.913f + Seed, Side > 0.0f ? 29.0f : 31.0f);
-                if (Keep > Belt.Occupancy)
-                {
-                    continue;
-                }
+                Yaw = YawFacingDirection(FaceRiverDirection);
+            }
+        }
+        Yaw += FMath::Lerp(-Profile.YawJitterDegrees, Profile.YawJitterDegrees, Hash01(SampleIndex * 11.071f + BandIndex + Seed, 44.0f));
 
-                const float AlongJitterCm = FMath::Lerp(-Belt.AlongJitterCm, Belt.AlongJitterCm, Hash01(SampleIndex * 2.317f + BandIndex + Seed, 37.0f));
-                const float LateralJitterCm = FMath::Lerp(-Belt.LateralJitterCm, Belt.LateralJitterCm, Hash01(SampleIndex * 3.719f + BandIndex + Seed, 41.0f));
-                const float LateralCm = FMath::Max(0.0f, Belt.LateralBandsCm[BandIndex] + LateralJitterCm);
-                if (LateralCm < KindConfig.MinLateralCm || LateralCm > KindConfig.MaxLateralCm)
-                {
-                    continue;
-                }
-                const float SignedOffsetCm = Side * LateralCm;
-                const FVector Location2D = Center + Forward * AlongJitterCm + Right * SignedOffsetCm;
+        const float ScaleBase = FMath::Lerp(Profile.ScaleMin, Profile.ScaleMax, Hash01(SampleIndex * 5.317f + BandIndex + Seed, 47.0f));
+        const FVector Scale = bScree
+            ? FVector(
+                ScaleBase * FMath::Lerp(0.75f, 1.90f, Hash01(SampleIndex * 4.0f + BandIndex + Seed, 53.0f)),
+                ScaleBase * FMath::Lerp(0.65f, 1.45f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
+                ScaleBase * FMath::Lerp(0.28f, 0.76f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f)))
+            : (bCanopy
+                ? FVector(
+                    ScaleBase * FMath::Lerp(0.92f, 1.55f, Hash01(SampleIndex * 4.0f + BandIndex + Seed, 53.0f)),
+                    ScaleBase * FMath::Lerp(0.92f, 1.55f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
+                    ScaleBase * FMath::Lerp(0.82f, 1.30f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f)))
+                : FVector(
+                    ScaleBase * FMath::Lerp(0.86f, 1.30f, Hash01(SampleIndex * 4.0f + BandIndex + Seed, 53.0f)),
+                    ScaleBase * FMath::Lerp(0.82f, 1.24f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
+                    ScaleBase * FMath::Lerp(0.62f, 1.18f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f))));
+        const FVector Location(Location2D.X, Location2D.Y, Height + Profile.HeightOffsetCm);
+        const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
+        FVector TrackCenter = FVector::ZeroVector;
+        float SignedTrackOffsetCm = 0.0f;
+        if (!ProjectOntoTrackCorridor(TrackSamples, FVector2D(Location2D.X, Location2D.Y), TrackCenter, SignedTrackOffsetCm))
+        {
+            return;
+        }
+        if (FVector2D::Distance(FVector2D(Location2D.X, Location2D.Y), FVector2D(TrackCenter.X, TrackCenter.Y)) - ScaledRadiusCm < Profile.TrackClearanceCm)
+        {
+            return;
+        }
+        const FQuat Rotation = Profile.bAlignToSurface
+            ? SurfaceAlignedRotation(Normal, Yaw)
+            : FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw));
+        Component->AddInstance(FTransform(Rotation, Location, Scale));
+        ++PlacedCount;
+    };
 
-                float Height = 0.0f;
-                FVector Normal = FVector::UpVector;
-                if (!TryResolvePlacement(
-                    EncodedHeights,
-                    TerrainTrackPoints,
-                    RiverField,
-                    Location2D,
-                    KindConfig.RiverClearanceCm,
-                    KindConfig.MinHeightCm,
-                    KindConfig.MaxHeightCm,
-                    KindConfig.MinSlope,
-                    KindConfig.MaxSlope,
-                    Height,
-                    Normal))
-                {
-                    continue;
-                }
+    if (Profile.Anchor == EYarlungSurfaceCoverAnchor::Track)
+    {
+        for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Profile.SampleStride))
+        {
+            const FYarlungSceneryTrackSample& A = TrackSamples[SampleIndex];
+            const FYarlungSceneryTrackSample& B = TrackSamples[SampleIndex + 1];
+            const FVector Center = (A.Position + B.Position) * 0.5f;
+            const FVector Forward = HorizontalForward(TrackSamples, SampleIndex);
+            const FVector Right = RightFromForward(Forward);
 
-                const float Yaw = Hash01(SampleIndex * 7.071f + BandIndex + Seed, 43.0f) * 360.0f;
-                const float ScaleBase = FMath::Lerp(KindConfig.ScaleMin, KindConfig.ScaleMax, Hash01(SampleIndex * 5.317f + BandIndex + Seed, 47.0f));
-                const FVector Scale = bScree
-                    ? FVector(
-                        ScaleBase * FMath::Lerp(0.75f, 1.75f, Hash01(SampleIndex * 4.0f + BandIndex + Seed, 53.0f)),
-                        ScaleBase * FMath::Lerp(0.65f, 1.35f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
-                        ScaleBase * FMath::Lerp(0.32f, 0.82f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f)))
-                    : FVector(
-                        ScaleBase * FMath::Lerp(0.86f, 1.30f, Hash01(SampleIndex * 4.0f + BandIndex + Seed, 53.0f)),
-                        ScaleBase * FMath::Lerp(0.82f, 1.24f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
-                        ScaleBase * FMath::Lerp(0.74f, 1.16f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f)));
-                const FVector Location(Location2D.X, Location2D.Y, Height + KindConfig.HeightOffsetCm);
-                const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
-                if (FVector::Dist(Location, Center) - ScaledRadiusCm < Belt.TrackClearanceCm)
+            for (float Side : { -1.0f, 1.0f })
+            {
+                for (int32 BandIndex = 0; BandIndex < Profile.LateralBandsCm.Num(); ++BandIndex)
                 {
-                    continue;
+                    AddAtLocation(SampleIndex, BandIndex, Side, Center, Forward, Right);
                 }
-                const FQuat Rotation = KindConfig.bAlignToSurface
-                    ? SurfaceAlignedRotation(Normal, Yaw)
-                    : FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw));
-                Component->AddInstance(FTransform(Rotation, Location, Scale));
             }
         }
     }
+    else
+    {
+        const TArray<FYarlungRiverRow>& RiverRows = RiverField.GetRows();
+        for (int32 RiverIndex = 1; RiverIndex + 1 < RiverRows.Num(); RiverIndex += FMath::Max(1, Profile.SampleStride))
+        {
+            const FYarlungRiverRow& Row = RiverRows[RiverIndex];
+            const FVector2D Prev(RiverRows[RiverIndex - 1].PositionCm.X, RiverRows[RiverIndex - 1].PositionCm.Y);
+            const FVector2D Next(RiverRows[RiverIndex + 1].PositionCm.X, RiverRows[RiverIndex + 1].PositionCm.Y);
+            const FVector2D Tangent2D = (Next - Prev).GetSafeNormal();
+            if (Tangent2D.IsNearlyZero())
+            {
+                continue;
+            }
+
+            const FVector Center(Row.PositionCm.X, Row.PositionCm.Y, Row.PositionCm.Z);
+            const FVector Forward(Tangent2D.X, Tangent2D.Y, 0.0f);
+            const FVector Right(-Tangent2D.Y, Tangent2D.X, 0.0f);
+            for (float Side : { -1.0f, 1.0f })
+            {
+                for (int32 BandIndex = 0; BandIndex < Profile.LateralBandsCm.Num(); ++BandIndex)
+                {
+                    AddAtLocation(RiverIndex, BandIndex, Side, Center, Forward, Right);
+                }
+            }
+        }
+    }
+
+    UE_LOG(LogTemp, Display, TEXT("Yarlung surface cover component '%s' profile=%s instances=%d"), *ComponentConfig.Name, *Profile.Name, PlacedCount);
 }
 
 void AYarlungSceneryActor::AddRockWallSegments(
@@ -784,82 +852,6 @@ void AYarlungSceneryActor::AddRockWallSegment(
             Component->AddInstance(FTransform(SurfaceAlignedRotation(SurfaceNormal, Yaw), Location, Scale));
             ++InOutPlacedCount;
             ++LaneIndex;
-        }
-    }
-}
-
-void AYarlungSceneryActor::AddCanopyBelt(
-    UHierarchicalInstancedStaticMeshComponent* Component,
-    const FYarlungCanopyBeltConfig& Belt,
-    float Seed,
-    const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-    const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
-    const TArray<uint16>& EncodedHeights,
-    const FYarlungRiverField& RiverField)
-{
-    if (!Component || !Component->GetStaticMesh())
-    {
-        return;
-    }
-    const UStaticMesh& Mesh = *Component->GetStaticMesh();
-
-    for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Belt.SampleStride))
-    {
-        const FYarlungSceneryTrackSample& A = TrackSamples[SampleIndex];
-        const FYarlungSceneryTrackSample& B = TrackSamples[SampleIndex + 1];
-        const FVector Center = (A.Position + B.Position) * 0.5f;
-        const FVector Forward = HorizontalForward(TrackSamples, SampleIndex);
-        const FVector Right = RightFromForward(Forward);
-
-        for (float Side : { -1.0f, 1.0f })
-        {
-            for (int32 BandIndex = 0; BandIndex < Belt.LateralBandsCm.Num(); ++BandIndex)
-            {
-                const float Occupancy = BandIndex < Belt.NearBandCount ? Belt.NearOccupancy : Belt.FarOccupancy;
-                const float Keep = Hash01(SampleIndex * 1.977f + BandIndex * 6.113f + Seed, Side > 0.0f ? 0.19f : 0.73f);
-                if (Keep > Occupancy)
-                {
-                    continue;
-                }
-
-                const float AlongJitterCm = FMath::Lerp(-2200.0f, 2200.0f, Hash01(SampleIndex * 3.717f + BandIndex + Seed, 2.0f));
-                const float LateralJitterCm = FMath::Lerp(-3600.0f, 3600.0f, Hash01(SampleIndex * 4.513f + BandIndex + Seed, 5.0f));
-                const float LateralCm = FMath::Max(0.0f, Belt.LateralBandsCm[BandIndex] + LateralJitterCm);
-                const float SignedOffsetCm = Side * LateralCm;
-                const FVector Location2D = Center + Forward * AlongJitterCm + Right * SignedOffsetCm;
-
-                float Height = 0.0f;
-                FVector Normal = FVector::UpVector;
-                if (!TryResolvePlacement(
-                    EncodedHeights,
-                    TerrainTrackPoints,
-                    RiverField,
-                    Location2D,
-                    Belt.RiverClearanceCm,
-                    Belt.MinHeightCm,
-                    Belt.MaxHeightCm,
-                    0.0f,
-                    Belt.MaxSlope,
-                    Height,
-                    Normal))
-                {
-                    continue;
-                }
-
-                const float Yaw = Hash01(SampleIndex * 7.071f + BandIndex + Seed, 97.0f) * 360.0f;
-                const float ScaleBase = FMath::Lerp(Belt.ScaleMin, Belt.ScaleMax, Hash01(SampleIndex * 5.317f + BandIndex + Seed, 13.0f));
-                const float XYJitter = FMath::Lerp(0.86f, 1.42f, Hash01(SampleIndex * 2.911f + BandIndex + Seed, 17.0f));
-                const float ZJitter = FMath::Lerp(0.72f, 1.28f, Hash01(SampleIndex * 3.151f + BandIndex + Seed, 23.0f));
-                const FVector Scale(ScaleBase * XYJitter, ScaleBase * FMath::Lerp(0.82f, 1.22f, Keep), ScaleBase * ZJitter);
-                const FVector Location(Location2D.X, Location2D.Y, Height + Belt.HeightOffsetCm);
-                const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
-                if (FVector::Dist(Location, Center) - ScaledRadiusCm < Belt.TrackClearanceCm)
-                {
-                    continue;
-                }
-                const FQuat Rotation(FVector::UpVector, FMath::DegreesToRadians(Yaw));
-                Component->AddInstance(FTransform(Rotation, Location, Scale));
-            }
         }
     }
 }
@@ -1054,14 +1046,23 @@ void AYarlungSceneryActor::ApplyMaterials(const FYarlungAssetConfig& AssetConfig
             UE_LOG(LogTemp, Fatal, TEXT("Yarlung tint material setup failed for scenery component."));
         }
 
-        Component->SetMaterial(0, TintMaterial);
-        UMaterialInstanceDynamic* Material = Component->CreateAndSetMaterialInstanceDynamic(0);
-        if (Material)
+        const int32 SlotCount = Component->GetNumMaterials();
+        if (SlotCount <= 0)
         {
-            Material->SetVectorParameterValue(TEXT("Color"), Color);
-            Material->SetVectorParameterValue(TEXT("BaseColor"), Color);
-            Material->SetScalarParameterValue(TEXT("Roughness"), 0.92f);
-            Material->SetScalarParameterValue(TEXT("Specular"), 0.04f);
+            UE_LOG(LogTemp, Fatal, TEXT("Yarlung tint target has no material slots: %s"), *Component->GetName());
+        }
+
+        for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
+        {
+            Component->SetMaterial(SlotIndex, TintMaterial);
+            UMaterialInstanceDynamic* Material = Component->CreateAndSetMaterialInstanceDynamic(SlotIndex);
+            if (Material)
+            {
+                Material->SetVectorParameterValue(TEXT("Color"), Color);
+                Material->SetVectorParameterValue(TEXT("BaseColor"), Color);
+                Material->SetScalarParameterValue(TEXT("Roughness"), 0.92f);
+                Material->SetScalarParameterValue(TEXT("Specular"), 0.04f);
+            }
         }
     };
 

@@ -8,13 +8,12 @@
 
 class UHierarchicalInstancedStaticMeshComponent;
 struct FYarlungAssetConfig;
-struct FYarlungCanopyBeltConfig;
 struct FYarlungCliffBeltConfig;
-struct FYarlungGroundCoverBeltConfig;
 struct FYarlungRockWallProfileConfig;
 struct FYarlungRockWallSegmentConfig;
 struct FYarlungSceneryComponentConfig;
 struct FYarlungScatterKindConfig;
+struct FYarlungSurfaceCoverProfileConfig;
 
 USTRUCT()
 struct FYarlungSceneryTrackSample
@@ -124,14 +123,6 @@ private:
         const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
-    void AddCanopyBelt(
-        UHierarchicalInstancedStaticMeshComponent* Component,
-        const FYarlungCanopyBeltConfig& BeltConfig,
-        float Seed,
-        const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-        const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
-        const TArray<uint16>& EncodedHeights,
-        const class FYarlungRiverField& RiverField);
     void AddCliffBelt(
         UHierarchicalInstancedStaticMeshComponent* Component,
         const FYarlungCliffBeltConfig& BeltConfig,
@@ -148,11 +139,10 @@ private:
         const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
-    void AddGroundCoverBelt(
+    void AddSurfaceCoverLayer(
         UHierarchicalInstancedStaticMeshComponent* Component,
         const FYarlungSceneryComponentConfig& ComponentConfig,
-        const FYarlungScatterKindConfig& KindConfig,
-        const FYarlungGroundCoverBeltConfig& BeltConfig,
+        const FYarlungSurfaceCoverProfileConfig& Profile,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
         const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,

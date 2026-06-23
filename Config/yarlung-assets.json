@@ -13,29 +13,30 @@
         "name": "RiverbankBoulders",
         "mesh": "/Game/Fab/Megascans/3D/Beach_Boulder_uisjbbis/Medium/uisjbbis_tier_2/StaticMeshes/uisjbbis_tier_2.uisjbbis_tier_2",
         "kind": "riverbank_boulder",
-        "placement": "scatter",
-        "count": 900,
-        "seed": 71
+        "placement": "surface_cover",
+        "seed": 71,
+        "profile": "wet_rock_shore"
       },
       {
         "name": "ScreeBoulders",
         "mesh": "/Game/Fab/Megascans/3D/Beach_Boulder_uisjbbis/Medium/uisjbbis_tier_2/StaticMeshes/uisjbbis_tier_2.uisjbbis_tier_2",
         "kind": "talus_scree",
-        "placement": "ground_cover_belt",
-        "seed": 83
+        "placement": "surface_cover",
+        "seed": 83,
+        "profile": "talus_scree"
       },
       {
         "name": "UnderstoryClumps",
         "mesh": "/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_05.spruce_small_05",
         "kind": "shrub",
-        "placement": "scatter",
-        "count": 900,
+        "placement": "surface_cover",
         "seed": 3,
         "tint": [
           0.035,
           0.16,
           0.055
-        ]
+        ],
+        "profile": "forest_floor"
       },
       {
         "name": "CliffRockFacesA",
@@ -97,48 +98,66 @@
         "name": "ForestShrubsA",
         "mesh": "/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_06.spruce_small_06",
         "kind": "shrub",
-        "placement": "scatter",
-        "count": 760,
+        "placement": "surface_cover",
         "seed": 43,
         "tint": [
           0.026,
           0.13,
           0.048
-        ]
+        ],
+        "profile": "forest_floor"
       },
       {
         "name": "ForestShrubsB",
         "mesh": "/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_07.spruce_small_07",
         "kind": "shrub",
-        "placement": "scatter",
-        "count": 760,
+        "placement": "surface_cover",
         "seed": 59,
         "tint": [
           0.045,
           0.18,
           0.068
-        ]
+        ],
+        "profile": "forest_floor"
       },
       {
         "name": "CanopyTreesA",
-        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/full/high/spruce_full_01.spruce_full_01",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/full/low/spruce_full_01_low.spruce_full_01_low",
         "kind": "canopy_tree",
-        "placement": "canopy_belt",
-        "seed": 131
+        "placement": "surface_cover",
+        "seed": 131,
+        "tint": [
+          0.024,
+          0.118,
+          0.045
+        ],
+        "profile": "canopy_mass"
       },
       {
         "name": "CanopyTreesB",
-        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/full/high/spruce_full_02.spruce_full_02",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/full/low/spruce_full_02_low.spruce_full_02_low",
         "kind": "canopy_tree",
-        "placement": "canopy_belt",
-        "seed": 149
+        "placement": "surface_cover",
+        "seed": 149,
+        "tint": [
+          0.018,
+          0.095,
+          0.038
+        ],
+        "profile": "canopy_mass"
       },
       {
         "name": "CanopyTreesC",
-        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/full/high/spruce_full_03.spruce_full_03",
+        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/full/low/spruce_full_03_low.spruce_full_03_low",
         "kind": "canopy_tree",
-        "placement": "canopy_belt",
-        "seed": 167
+        "placement": "surface_cover",
+        "seed": 167,
+        "tint": [
+          0.032,
+          0.14,
+          0.052
+        ],
+        "profile": "canopy_mass"
       }
     ],
     "kinds": {
@@ -248,37 +267,6 @@
         "align_to_surface": true
       }
     },
-    "canopy_belt": {
-      "sample_stride": 1,
-      "lateral_bands_cm": [
-        4500,
-        6000,
-        7000,
-        9000,
-        13000,
-        18000,
-        25000,
-        34000,
-        46000,
-        62000,
-        82000,
-        108000,
-        138000,
-        176000,
-        222000
-      ],
-      "near_band_count": 9,
-      "near_occupancy": 1,
-      "far_occupancy": 0.96,
-      "track_clearance_cm": 32000,
-      "river_clearance_cm": 6000,
-      "min_height_cm": 250000,
-      "max_height_cm": 500000,
-      "max_slope": 1,
-      "scale_min": 1.85,
-      "scale_max": 5.35,
-      "height_offset_cm": 50
-    },
     "cliff_belt": {
       "sample_stride": 2,
       "lateral_bands_cm": [
@@ -320,25 +308,6 @@
       "river_wall_along_jitter_cm": 5600,
       "river_wall_lateral_jitter_cm": 9000,
       "river_wall_yaw_jitter_degrees": 24
-    },
-    "ground_cover_belt": {
-      "sample_stride": 1,
-      "lateral_bands_cm": [
-        12000,
-        20000,
-        30000,
-        42000,
-        58000,
-        78000,
-        104000,
-        136000,
-        172000,
-        214000
-      ],
-      "occupancy": 0.82,
-      "track_clearance_cm": 24000,
-      "along_jitter_cm": 3800,
-      "lateral_jitter_cm": 5200
     },
     "rock_wall_profiles": {
       "near_slope_coverage": {
@@ -403,7 +372,7 @@
         "component": "SlopeRockWallA",
         "start_sample": 0,
         "end_sample": 224,
-        "sample_stride": 2,
+        "sample_stride": 1,
         "side": -1,
         "seed": 557
       },
@@ -457,7 +426,125 @@
         "side": 1,
         "seed": 521
       }
-    ]
+    ],
+    "surface_cover_profiles": {
+      "wet_rock_shore": {
+        "anchor": "river",
+        "sample_stride": 1,
+        "lateral_bands_cm": [
+          6500,
+          10000,
+          15000,
+          23000,
+          34000,
+          50000,
+          72000
+        ],
+        "occupancy": 0.96,
+        "track_clearance_cm": 22000,
+        "river_clearance_cm": 5200,
+        "min_height_cm": 250000,
+        "max_height_cm": 435000,
+        "min_slope": 0,
+        "max_slope": 0.92,
+        "scale_min": 0.45,
+        "scale_max": 2.25,
+        "height_offset_cm": 12,
+        "along_jitter_cm": 1400,
+        "lateral_jitter_cm": 1300,
+        "yaw_jitter_degrees": 18,
+        "align_to_surface": true,
+        "face_river": true
+      },
+      "talus_scree": {
+        "anchor": "track",
+        "sample_stride": 1,
+        "lateral_bands_cm": [
+          7000,
+          12000,
+          18000,
+          26000,
+          38000,
+          54000,
+          76000,
+          104000,
+          138000,
+          178000,
+          220000
+        ],
+        "occupancy": 0.9,
+        "track_clearance_cm": 18000,
+        "river_clearance_cm": 7500,
+        "min_height_cm": 250000,
+        "max_height_cm": 515000,
+        "min_slope": 0.015,
+        "max_slope": 1,
+        "scale_min": 0.35,
+        "scale_max": 2.35,
+        "height_offset_cm": 10,
+        "along_jitter_cm": 2600,
+        "lateral_jitter_cm": 3400,
+        "yaw_jitter_degrees": 28,
+        "align_to_surface": true,
+        "face_river": false
+      },
+      "forest_floor": {
+        "anchor": "track",
+        "sample_stride": 1,
+        "lateral_bands_cm": [
+          9000,
+          14000,
+          21000,
+          31000,
+          45000,
+          65000,
+          90000,
+          124000
+        ],
+        "occupancy": 0.94,
+        "track_clearance_cm": 26000,
+        "river_clearance_cm": 12500,
+        "min_height_cm": 255000,
+        "max_height_cm": 465000,
+        "min_slope": 0,
+        "max_slope": 0.82,
+        "scale_min": 0.28,
+        "scale_max": 0.82,
+        "height_offset_cm": 8,
+        "along_jitter_cm": 2600,
+        "lateral_jitter_cm": 3600,
+        "yaw_jitter_degrees": 32,
+        "align_to_surface": true,
+        "face_river": false
+      },
+      "canopy_mass": {
+        "anchor": "track",
+        "sample_stride": 1,
+        "lateral_bands_cm": [
+          76000,
+          108000,
+          146000,
+          190000,
+          240000,
+          296000
+        ],
+        "occupancy": 0.62,
+        "track_clearance_cm": 68000,
+        "river_clearance_cm": 22000,
+        "min_height_cm": 250000,
+        "max_height_cm": 505000,
+        "min_slope": 0,
+        "max_slope": 0.72,
+        "scale_min": 0.34,
+        "scale_max": 0.82,
+        "height_offset_cm": 8,
+        "along_jitter_cm": 3600,
+        "lateral_jitter_cm": 5200,
+        "yaw_jitter_degrees": 180,
+        "align_to_surface": false,
+        "face_river": false
+      }
+    }
   },
   "water": {
     "surface_material": "/Game/Generated/Materials/M_YarlungWaterSurface.M_YarlungWaterSurface"

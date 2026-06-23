@@ -161,6 +161,65 @@ FYarlungRockWallProfileConfig ParseRockWallProfile(const FString& Name, const TS
     return Config;
 }
 
+EYarlungSurfaceCoverAnchor ParseSurfaceCoverAnchor(const FString& Value, const FString& Context)
+{
+    if (Value.Equals(TEXT("track"), ESearchCase::IgnoreCase))
+    {
+        return EYarlungSurfaceCoverAnchor::Track;
+    }
+    if (Value.Equals(TEXT("river"), ESearchCase::IgnoreCase))
+    {
+        return EYarlungSurfaceCoverAnchor::River;
+    }
+    FatalAssetConfigError(FString::Printf(TEXT("%s has unknown surface cover anchor '%s'"), *Context, *Value));
+    return EYarlungSurfaceCoverAnchor::Track;
+}
+
+FYarlungSurfaceCoverProfileConfig ParseSurfaceCoverProfile(const FString& Name, const TSharedPtr<FJsonObject>& Object, const FString& Context)
+{
+    FYarlungSurfaceCoverProfileConfig Config;
+    Config.Name = Name;
+    Config.Anchor = ParseSurfaceCoverAnchor(RequiredStringField(Object, TEXT("anchor"), Context), Context);
+    Config.SampleStride = RequiredIntegerField(Object, TEXT("sample_stride"), Context);
+    Config.LateralBandsCm = RequiredNumberArrayField(Object, TEXT("lateral_bands_cm"), Context);
+    Config.Occupancy = RequiredNumberField(Object, TEXT("occupancy"), Context);
+    Config.TrackClearanceCm = RequiredNumberField(Object, TEXT("track_clearance_cm"), Context);
+    Config.RiverClearanceCm = RequiredNumberField(Object, TEXT("river_clearance_cm"), Context);
+    Config.MinHeightCm = RequiredNumberField(Object, TEXT("min_height_cm"), Context);
+    Config.MaxHeightCm = RequiredNumberField(Object, TEXT("max_height_cm"), Context);
+    Config.MinSlope = RequiredNumberField(Object, TEXT("min_slope"), Context);
+    Config.MaxSlope = RequiredNumberField(Object, TEXT("max_slope"), Context);
+    Config.ScaleMin = RequiredNumberField(Object, TEXT("scale_min"), Context);
+    Config.ScaleMax = RequiredNumberField(Object, TEXT("scale_max"), Context);
+    Config.HeightOffsetCm = RequiredNumberField(Object, TEXT("height_offset_cm"), Context);
+    Config.AlongJitterCm = RequiredNumberField(Object, TEXT("along_jitter_cm"), Context);
+    Config.LateralJitterCm = RequiredNumberField(Object, TEXT("lateral_jitter_cm"), Context);
+    Config.YawJitterDegrees = RequiredNumberField(Object, TEXT("yaw_jitter_degrees"), Context);
+    Config.bAlignToSurface = RequiredBoolField(Object, TEXT("align_to_surface"), Context);
+    Config.bFaceRiver = RequiredBoolField(Object, TEXT("face_river"), Context);
+    return Config;
+}
+
+void ParseSurfaceCoverProfiles(
+    const TSharedPtr<FJsonObject>& Scenery,
+    const FString& Path,
+    TMap<FString, FYarlungSurfaceCoverProfileConfig>& OutProfiles)
+{
+    const TSharedPtr<FJsonObject> Profiles = RequiredObject(Scenery, TEXT("surface_cover_profiles"), Path);
+    for (const TPair<FString, TSharedPtr<FJsonValue>>& Pair : Profiles->Values)
+    {
+        const TSharedPtr<FJsonObject> ProfileObject = Pair.Value->AsObject();
+        if (!ProfileObject.IsValid())
+        {
+            FatalAssetConfigError(FString::Printf(TEXT("%s scenery.surface_cover_profiles.%s is not an object"), *Path, *Pair.Key));
+        }
+        OutProfiles.Add(Pair.Key, ParseSurfaceCoverProfile(
+            Pair.Key,
+            ProfileObject,
+            FString::Printf(TEXT("%s scenery.surface_cover_profiles.%s"), *Path, *Pair.Key)));
+    }
+}
+
 FYarlungRockWallSegmentConfig ParseRockWallSegment(const TSharedPtr<FJsonObject>& Object, const FString& Context)
 {
     FYarlungRockWallSegmentConfig Config;
@@ -285,23 +344,44 @@ void ValidateRockWallSegments(
     }
 }
 
+void ValidateSurfaceCoverProfiles(
+    const TMap<FString, FYarlungSurfaceCoverProfileConfig>& Profiles,
+    const FString& Path)
+{
+    if (Profiles.IsEmpty())
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s has no scenery.surface_cover_profiles"), *Path));
+    }
+    for (const TPair<FString, FYarlungSurfaceCoverProfileConfig>& Pair : Profiles)
+    {
+        const FYarlungSurfaceCoverProfileConfig& Profile = Pair.Value;
+        if (Profile.Name.IsEmpty() ||
+            Profile.SampleStride <= 0 || Profile.LateralBandsCm.IsEmpty() ||
+            Profile.Occupancy < 0.0f || Profile.Occupancy > 1.0f ||
+            Profile.TrackClearanceCm < 0.0f || Profile.RiverClearanceCm < 0.0f ||
+            Profile.MaxHeightCm < Profile.MinHeightCm ||
+            Profile.MinSlope < 0.0f || Profile.MaxSlope < Profile.MinSlope ||
+            Profile.ScaleMin <= 0.0f || Profile.ScaleMax < Profile.ScaleMin ||
+            Profile.AlongJitterCm < 0.0f || Profile.LateralJitterCm < 0.0f)
+        {
+            FatalAssetConfigError(FString::Printf(TEXT("%s has invalid surface cover profile '%s'"), *Path, *Pair.Key));
+        }
+    }
+}
+
 EYarlungSceneryPlacement ParsePlacement(const FString& Value, const FString& Context)
 {
     if (Value.Equals(TEXT("scatter"), ESearchCase::IgnoreCase))
     {
         return EYarlungSceneryPlacement::Scatter;
     }
-    if (Value.Equals(TEXT("canopy_belt"), ESearchCase::IgnoreCase))
-    {
-        return EYarlungSceneryPlacement::CanopyBelt;
-    }
     if (Value.Equals(TEXT("cliff_belt"), ESearchCase::IgnoreCase))
     {
         return EYarlungSceneryPlacement::CliffBelt;
     }
-    if (Value.Equals(TEXT("ground_cover_belt"), ESearchCase::IgnoreCase))
+    if (Value.Equals(TEXT("surface_cover"), ESearchCase::IgnoreCase))
     {
-        return EYarlungSceneryPlacement::GroundCoverBelt;
+        return EYarlungSceneryPlacement::SurfaceCover;
     }
     if (Value.Equals(TEXT("rock_wall_source"), ESearchCase::IgnoreCase))
     {
@@ -333,6 +413,13 @@ FYarlungAssetConfig LoadConfigFromDisk()
     }
 
     const TSharedPtr<FJsonObject> Scenery = RequiredObject(Root, TEXT("scenery"), Path);
+    if (Scenery->HasField(TEXT("canopy_belt")) || Scenery->HasField(TEXT("ground_cover_belt")))
+    {
+        FatalAssetConfigError(FString::Printf(
+            TEXT("%s uses removed scenery canopy/ground-cover belt fields; use scenery.surface_cover_profiles instead"),
+            *Path));
+    }
+
     const TArray<TSharedPtr<FJsonValue>>* Components = nullptr;
     if (!Scenery->TryGetArrayField(TEXT("components"), Components) || !Components)
     {
@@ -355,6 +442,14 @@ FYarlungAssetConfig LoadConfigFromDisk()
             Component.Kind = RequiredStringField(ComponentObject, TEXT("kind"), ComponentContext);
             const FString PerComponentContext = FString::Printf(TEXT("%s component '%s'"), *Path, *Component.Name);
             Component.Placement = ParsePlacement(RequiredStringField(ComponentObject, TEXT("placement"), PerComponentContext), PerComponentContext);
+            if (Component.Placement == EYarlungSceneryPlacement::SurfaceCover)
+            {
+                Component.SurfaceCoverProfileName = RequiredStringField(ComponentObject, TEXT("profile"), PerComponentContext);
+            }
+            else if (ComponentObject->HasField(TEXT("profile")))
+            {
+                FatalAssetConfigError(FString::Printf(TEXT("%s component '%s' declares profile but is not surface_cover"), *Path, *Component.Name));
+            }
             Component.Count = Component.Placement == EYarlungSceneryPlacement::Scatter
                 ? RequiredIntegerField(ComponentObject, TEXT("count"), PerComponentContext)
                 : 0;
@@ -406,22 +501,6 @@ FYarlungAssetConfig LoadConfigFromDisk()
         }
     }
 
-    const TSharedPtr<FJsonObject> CanopyBelt = RequiredObject(Scenery, TEXT("canopy_belt"), Path);
-    const FString CanopyBeltContext = FString::Printf(TEXT("%s scenery.canopy_belt"), *Path);
-    Config.CanopyBelt.SampleStride = RequiredIntegerField(CanopyBelt, TEXT("sample_stride"), CanopyBeltContext);
-    Config.CanopyBelt.LateralBandsCm = RequiredNumberArrayField(CanopyBelt, TEXT("lateral_bands_cm"), CanopyBeltContext);
-    Config.CanopyBelt.NearBandCount = RequiredIntegerField(CanopyBelt, TEXT("near_band_count"), CanopyBeltContext);
-    Config.CanopyBelt.NearOccupancy = RequiredNumberField(CanopyBelt, TEXT("near_occupancy"), CanopyBeltContext);
-    Config.CanopyBelt.FarOccupancy = RequiredNumberField(CanopyBelt, TEXT("far_occupancy"), CanopyBeltContext);
-    Config.CanopyBelt.TrackClearanceCm = RequiredNumberField(CanopyBelt, TEXT("track_clearance_cm"), CanopyBeltContext);
-    Config.CanopyBelt.RiverClearanceCm = RequiredNumberField(CanopyBelt, TEXT("river_clearance_cm"), CanopyBeltContext);
-    Config.CanopyBelt.MinHeightCm = RequiredNumberField(CanopyBelt, TEXT("min_height_cm"), CanopyBeltContext);
-    Config.CanopyBelt.MaxHeightCm = RequiredNumberField(CanopyBelt, TEXT("max_height_cm"), CanopyBeltContext);
-    Config.CanopyBelt.MaxSlope = RequiredNumberField(CanopyBelt, TEXT("max_slope"), CanopyBeltContext);
-    Config.CanopyBelt.ScaleMin = RequiredNumberField(CanopyBelt, TEXT("scale_min"), CanopyBeltContext);
-    Config.CanopyBelt.ScaleMax = RequiredNumberField(CanopyBelt, TEXT("scale_max"), CanopyBeltContext);
-    Config.CanopyBelt.HeightOffsetCm = RequiredNumberField(CanopyBelt, TEXT("height_offset_cm"), CanopyBeltContext);
-
     const TSharedPtr<FJsonObject> CliffBelt = RequiredObject(Scenery, TEXT("cliff_belt"), Path);
     const FString CliffBeltContext = FString::Printf(TEXT("%s scenery.cliff_belt"), *Path);
     Config.CliffBelt.SampleStride = RequiredIntegerField(CliffBelt, TEXT("sample_stride"), CliffBeltContext);
@@ -449,15 +528,7 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.CliffBelt.RiverWallLateralJitterCm = RequiredNumberField(CliffBelt, TEXT("river_wall_lateral_jitter_cm"), CliffBeltContext);
     Config.CliffBelt.RiverWallYawJitterDegrees = RequiredNumberField(CliffBelt, TEXT("river_wall_yaw_jitter_degrees"), CliffBeltContext);
 
-    const TSharedPtr<FJsonObject> GroundCoverBelt = RequiredObject(Scenery, TEXT("ground_cover_belt"), Path);
-    const FString GroundCoverBeltContext = FString::Printf(TEXT("%s scenery.ground_cover_belt"), *Path);
-    Config.GroundCoverBelt.SampleStride = RequiredIntegerField(GroundCoverBelt, TEXT("sample_stride"), GroundCoverBeltContext);
-    Config.GroundCoverBelt.LateralBandsCm = RequiredNumberArrayField(GroundCoverBelt, TEXT("lateral_bands_cm"), GroundCoverBeltContext);
-    Config.GroundCoverBelt.Occupancy = RequiredNumberField(GroundCoverBelt, TEXT("occupancy"), GroundCoverBeltContext);
-    Config.GroundCoverBelt.TrackClearanceCm = RequiredNumberField(GroundCoverBelt, TEXT("track_clearance_cm"), GroundCoverBeltContext);
-    Config.GroundCoverBelt.AlongJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("along_jitter_cm"), GroundCoverBeltContext);
-    Config.GroundCoverBelt.LateralJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("lateral_jitter_cm"), GroundCoverBeltContext);
-
+    ParseSurfaceCoverProfiles(Scenery, Path, Config.SurfaceCoverProfiles);
     ParseRockWallProfiles(Scenery, Path, Config.RockWallProfiles);
     ParseRockWallSegments(Scenery, Path, Config.RockWallSegments);
 
@@ -473,14 +544,6 @@ FYarlungAssetConfig LoadConfigFromDisk()
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s is missing water.surface_material"), *Path));
     }
-    if (Config.CanopyBelt.SampleStride <= 0 || Config.CanopyBelt.LateralBandsCm.IsEmpty() ||
-        Config.CanopyBelt.NearOccupancy < 0.0f || Config.CanopyBelt.NearOccupancy > 1.0f ||
-        Config.CanopyBelt.FarOccupancy < 0.0f || Config.CanopyBelt.FarOccupancy > 1.0f ||
-        Config.CanopyBelt.TrackClearanceCm < 0.0f ||
-        Config.CanopyBelt.ScaleMin <= 0.0f || Config.CanopyBelt.ScaleMax < Config.CanopyBelt.ScaleMin)
-    {
-        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.canopy_belt settings"), *Path));
-    }
     if (Config.CliffBelt.SampleStride <= 0 || Config.CliffBelt.LateralBandsCm.IsEmpty() ||
         Config.CliffBelt.Occupancy < 0.0f || Config.CliffBelt.Occupancy > 1.0f ||
         Config.CliffBelt.TrackClearanceCm < 0.0f ||
@@ -491,12 +554,14 @@ FYarlungAssetConfig LoadConfigFromDisk()
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.cliff_belt settings"), *Path));
     }
-    if (Config.GroundCoverBelt.SampleStride <= 0 || Config.GroundCoverBelt.LateralBandsCm.IsEmpty() ||
-        Config.GroundCoverBelt.Occupancy < 0.0f || Config.GroundCoverBelt.Occupancy > 1.0f ||
-        Config.GroundCoverBelt.TrackClearanceCm < 0.0f ||
-        Config.GroundCoverBelt.AlongJitterCm < 0.0f || Config.GroundCoverBelt.LateralJitterCm < 0.0f)
+    ValidateSurfaceCoverProfiles(Config.SurfaceCoverProfiles, Path);
+    for (const FYarlungSceneryComponentConfig& Component : Config.SceneryComponents)
     {
-        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.ground_cover_belt settings"), *Path));
+        if (Component.Placement == EYarlungSceneryPlacement::SurfaceCover &&
+            !Config.SurfaceCoverProfiles.Contains(Component.SurfaceCoverProfileName))
+        {
+            FatalAssetConfigError(FString::Printf(TEXT("%s component '%s' references unknown surface cover profile '%s'"), *Path, *Component.Name, *Component.SurfaceCoverProfileName));
+        }
     }
     ValidateRockWallProfiles(Config.RockWallProfiles, Path);
     ValidateRockWallSegments(Config.RockWallProfiles, Config.RockWallSegments, Path);
