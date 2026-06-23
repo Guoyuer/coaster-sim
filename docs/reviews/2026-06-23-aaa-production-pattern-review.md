@@ -23,6 +23,10 @@ The user's production-pattern critique is correct. The current visuals are not m
 
 The project has made good engineering progress: single visible river surface, shared terrain/scenery height model, fail-close asset config, Megascans path validation, generated map pipeline, and cleaner track rendering. But those fixes mostly make the scene coherent and debuggable. They do not yet replace the production pattern that makes the frame read like "smooth slope with assets on top."
 
+## Agent disposition
+
+- 2026-06-23: Implemented the first P0 response as a system, not a one-off patch. Live `slope_rock_wall_belt` code/config was deleted and replaced with two authored fail-close layers: `hero_rock_wall_groups` for continuous mid/far canyon massing and `foreground_rock_apron_groups` for first-person near-slope breakup. Validation run: `rockwall-system-v1`, contact sheet `Saved/Diagnostics/rockwall-system-v1.png`, map inspect 0 error/0 warning, automation 14/14. Verdict remains PARTIAL: rock massing improved, but exposed corridor terrain still dominates enough that the next systemic fix should be forest-floor/scree/decal/RVT/wet-rock ground coverage, not more rock instances.
+
 ## 1. Corridor terrain is still carrying the hero mountain
 
 Evidence:

@@ -91,28 +91,6 @@ TArray<float> RequiredNumberArrayField(const TSharedPtr<FJsonObject>& Object, co
     return Values;
 }
 
-TArray<FIntPoint> RequiredIntegerPairArrayField(const TSharedPtr<FJsonObject>& Object, const TCHAR* Name, const FString& Context)
-{
-    const TArray<float> RawValues = RequiredNumberArrayField(Object, Name, Context);
-    if (RawValues.Num() == 0 || RawValues.Num() % 2 != 0)
-    {
-        FatalAssetConfigError(FString::Printf(TEXT("%s.%s must contain start/end integer pairs"), *Context, Name));
-    }
-
-    TArray<FIntPoint> Ranges;
-    for (int32 Index = 0; Index + 1 < RawValues.Num(); Index += 2)
-    {
-        const int32 Start = FMath::RoundToInt(RawValues[Index]);
-        const int32 End = FMath::RoundToInt(RawValues[Index + 1]);
-        if (Start < 0 || End <= Start)
-        {
-            FatalAssetConfigError(FString::Printf(TEXT("%s.%s has invalid range %d..%d"), *Context, Name, Start, End));
-        }
-        Ranges.Add(FIntPoint(Start, End));
-    }
-    return Ranges;
-}
-
 bool OptionalColorArrayField(const TSharedPtr<FJsonObject>& Object, const TCHAR* Name, FLinearColor& OutColor, const FString& Context)
 {
     if (!Object.IsValid() || !Object->HasField(Name))
@@ -160,6 +138,92 @@ FYarlungScatterKindConfig ParseScatterKind(const TSharedPtr<FJsonObject>& Object
     return Config;
 }
 
+FYarlungRockWallGroupConfig ParseRockWallGroup(const TSharedPtr<FJsonObject>& Object, const FString& Context)
+{
+    FYarlungRockWallGroupConfig Config;
+    Config.Name = RequiredStringField(Object, TEXT("name"), Context);
+    Config.ComponentName = RequiredStringField(Object, TEXT("component"), Context);
+    Config.StartSampleIndex = RequiredIntegerField(Object, TEXT("start_sample"), Context);
+    Config.EndSampleIndex = RequiredIntegerField(Object, TEXT("end_sample"), Context);
+    Config.SampleStride = RequiredIntegerField(Object, TEXT("sample_stride"), Context);
+    Config.Side = RequiredNumberField(Object, TEXT("side"), Context);
+    Config.LateralMinCm = RequiredNumberField(Object, TEXT("lateral_min_cm"), Context);
+    Config.LateralMaxCm = RequiredNumberField(Object, TEXT("lateral_max_cm"), Context);
+    Config.LateralStepCm = RequiredNumberField(Object, TEXT("lateral_step_cm"), Context);
+    Config.TrackClearanceCm = RequiredNumberField(Object, TEXT("track_clearance_cm"), Context);
+    Config.RiverClearanceCm = RequiredNumberField(Object, TEXT("river_clearance_cm"), Context);
+    Config.MinHeightCm = RequiredNumberField(Object, TEXT("min_height_cm"), Context);
+    Config.MaxHeightCm = RequiredNumberField(Object, TEXT("max_height_cm"), Context);
+    Config.MinSlope = RequiredNumberField(Object, TEXT("min_slope"), Context);
+    Config.MaxSlope = RequiredNumberField(Object, TEXT("max_slope"), Context);
+    Config.ScaleMin = RequiredNumberField(Object, TEXT("scale_min"), Context);
+    Config.ScaleMax = RequiredNumberField(Object, TEXT("scale_max"), Context);
+    Config.HeightOffsetCm = RequiredNumberField(Object, TEXT("height_offset_cm"), Context);
+    Config.EmbedDepthCm = RequiredNumberField(Object, TEXT("embed_depth_cm"), Context);
+    Config.AlongJitterCm = RequiredNumberField(Object, TEXT("along_jitter_cm"), Context);
+    Config.LateralJitterCm = RequiredNumberField(Object, TEXT("lateral_jitter_cm"), Context);
+    Config.YawJitterDegrees = RequiredNumberField(Object, TEXT("yaw_jitter_degrees"), Context);
+    Config.Seed = RequiredNumberField(Object, TEXT("seed"), Context);
+    return Config;
+}
+
+void ParseRockWallGroupArray(
+    const TSharedPtr<FJsonObject>& Scenery,
+    const TCHAR* FieldName,
+    const FString& Path,
+    TArray<FYarlungRockWallGroupConfig>& OutGroups)
+{
+    const TArray<TSharedPtr<FJsonValue>>* Groups = nullptr;
+    if (!Scenery->TryGetArrayField(FieldName, Groups) || !Groups)
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s is missing required array 'scenery.%s'"), *Path, FieldName));
+    }
+    if (Groups)
+    {
+        for (const TSharedPtr<FJsonValue>& Value : *Groups)
+        {
+            const TSharedPtr<FJsonObject> GroupObject = Value->AsObject();
+            if (!GroupObject.IsValid())
+            {
+                FatalAssetConfigError(FString::Printf(TEXT("%s has a non-object rock wall group in scenery.%s"), *Path, FieldName));
+            }
+            OutGroups.Add(ParseRockWallGroup(
+                GroupObject,
+                FString::Printf(TEXT("%s scenery.%s"), *Path, FieldName)));
+        }
+    }
+}
+
+void ValidateRockWallGroups(
+    const TArray<FYarlungRockWallGroupConfig>& Groups,
+    const TCHAR* FieldName,
+    const FString& Path)
+{
+    if (Groups.IsEmpty())
+    {
+        FatalAssetConfigError(FString::Printf(TEXT("%s has no scenery.%s"), *Path, FieldName));
+    }
+    for (const FYarlungRockWallGroupConfig& Group : Groups)
+    {
+        if (Group.Name.IsEmpty() || Group.ComponentName.IsEmpty() ||
+            Group.StartSampleIndex < 0 || Group.EndSampleIndex <= Group.StartSampleIndex || Group.SampleStride <= 0 ||
+            (Group.Side != -1.0f && Group.Side != 1.0f) ||
+            Group.LateralMinCm < 0.0f || Group.LateralMaxCm <= Group.LateralMinCm || Group.LateralStepCm <= 0.0f ||
+            Group.TrackClearanceCm < 0.0f || Group.RiverClearanceCm < 0.0f ||
+            Group.MaxHeightCm < Group.MinHeightCm ||
+            Group.MinSlope < 0.0f || Group.MaxSlope < Group.MinSlope ||
+            Group.ScaleMin <= 0.0f || Group.ScaleMax < Group.ScaleMin ||
+            Group.EmbedDepthCm < 0.0f || Group.AlongJitterCm < 0.0f || Group.LateralJitterCm < 0.0f)
+        {
+            FatalAssetConfigError(FString::Printf(TEXT("%s has invalid rock wall group '%s' in scenery.%s"), *Path, *Group.Name, FieldName));
+        }
+        if (Group.ComponentName != TEXT("SlopeRockWallA") && Group.ComponentName != TEXT("SlopeRockWallB"))
+        {
+            FatalAssetConfigError(FString::Printf(TEXT("%s rock wall group '%s' in scenery.%s must target SlopeRockWallA or SlopeRockWallB"), *Path, *Group.Name, FieldName));
+        }
+    }
+}
+
 EYarlungSceneryPlacement ParsePlacement(const FString& Value, const FString& Context)
 {
     if (Value.Equals(TEXT("scatter"), ESearchCase::IgnoreCase))
@@ -178,9 +242,9 @@ EYarlungSceneryPlacement ParsePlacement(const FString& Value, const FString& Con
     {
         return EYarlungSceneryPlacement::GroundCoverBelt;
     }
-    if (Value.Equals(TEXT("slope_rock_wall_belt"), ESearchCase::IgnoreCase))
+    if (Value.Equals(TEXT("hero_rock_wall_only"), ESearchCase::IgnoreCase))
     {
-        return EYarlungSceneryPlacement::SlopeRockWallBelt;
+        return EYarlungSceneryPlacement::HeroRockWallOnly;
     }
 
     FatalAssetConfigError(FString::Printf(TEXT("%s has unknown placement '%s'"), *Context, *Value));
@@ -249,7 +313,7 @@ FYarlungAssetConfig LoadConfigFromDisk()
             }
             if (Component.Placement != EYarlungSceneryPlacement::Scatter && ComponentObject->HasField(TEXT("count")))
             {
-                FatalAssetConfigError(FString::Printf(TEXT("%s component '%s' uses belt placement but still declares count"), *Path, *Component.Name));
+                FatalAssetConfigError(FString::Printf(TEXT("%s component '%s' uses non-scatter placement but still declares count"), *Path, *Component.Name));
             }
             if (Component.MeshPath.IsEmpty())
             {
@@ -333,24 +397,8 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.GroundCoverBelt.AlongJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("along_jitter_cm"), GroundCoverBeltContext);
     Config.GroundCoverBelt.LateralJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("lateral_jitter_cm"), GroundCoverBeltContext);
 
-    const TSharedPtr<FJsonObject> SlopeRockWallBelt = RequiredObject(Scenery, TEXT("slope_rock_wall_belt"), Path);
-    const FString SlopeRockWallBeltContext = FString::Printf(TEXT("%s scenery.slope_rock_wall_belt"), *Path);
-    Config.SlopeRockWallBelt.SampleStride = RequiredIntegerField(SlopeRockWallBelt, TEXT("sample_stride"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.SampleRanges = RequiredIntegerPairArrayField(SlopeRockWallBelt, TEXT("sample_ranges"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.LateralBandsCm = RequiredNumberArrayField(SlopeRockWallBelt, TEXT("lateral_bands_cm"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.Occupancy = RequiredNumberField(SlopeRockWallBelt, TEXT("occupancy"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.TrackClearanceCm = RequiredNumberField(SlopeRockWallBelt, TEXT("track_clearance_cm"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.RiverClearanceCm = RequiredNumberField(SlopeRockWallBelt, TEXT("river_clearance_cm"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.MinHeightCm = RequiredNumberField(SlopeRockWallBelt, TEXT("min_height_cm"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.MaxHeightCm = RequiredNumberField(SlopeRockWallBelt, TEXT("max_height_cm"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.MinSlope = RequiredNumberField(SlopeRockWallBelt, TEXT("min_slope"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.MaxSlope = RequiredNumberField(SlopeRockWallBelt, TEXT("max_slope"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.ScaleMin = RequiredNumberField(SlopeRockWallBelt, TEXT("scale_min"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.ScaleMax = RequiredNumberField(SlopeRockWallBelt, TEXT("scale_max"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.HeightOffsetCm = RequiredNumberField(SlopeRockWallBelt, TEXT("height_offset_cm"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.AlongJitterCm = RequiredNumberField(SlopeRockWallBelt, TEXT("along_jitter_cm"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.LateralJitterCm = RequiredNumberField(SlopeRockWallBelt, TEXT("lateral_jitter_cm"), SlopeRockWallBeltContext);
-    Config.SlopeRockWallBelt.YawJitterDegrees = RequiredNumberField(SlopeRockWallBelt, TEXT("yaw_jitter_degrees"), SlopeRockWallBeltContext);
+    ParseRockWallGroupArray(Scenery, TEXT("hero_rock_wall_groups"), Path, Config.HeroRockWallGroups);
+    ParseRockWallGroupArray(Scenery, TEXT("foreground_rock_apron_groups"), Path, Config.ForegroundRockApronGroups);
 
     const TSharedPtr<FJsonObject> Water = RequiredObject(Root, TEXT("water"), Path);
     const FString WaterContext = FString::Printf(TEXT("%s water"), *Path);
@@ -389,17 +437,8 @@ FYarlungAssetConfig LoadConfigFromDisk()
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.ground_cover_belt settings"), *Path));
     }
-    if (Config.SlopeRockWallBelt.SampleStride <= 0 || Config.SlopeRockWallBelt.SampleRanges.IsEmpty() ||
-        Config.SlopeRockWallBelt.LateralBandsCm.IsEmpty() ||
-        Config.SlopeRockWallBelt.Occupancy < 0.0f || Config.SlopeRockWallBelt.Occupancy > 1.0f ||
-        Config.SlopeRockWallBelt.TrackClearanceCm < 0.0f || Config.SlopeRockWallBelt.RiverClearanceCm < 0.0f ||
-        Config.SlopeRockWallBelt.MaxHeightCm < Config.SlopeRockWallBelt.MinHeightCm ||
-        Config.SlopeRockWallBelt.MinSlope < 0.0f || Config.SlopeRockWallBelt.MaxSlope < Config.SlopeRockWallBelt.MinSlope ||
-        Config.SlopeRockWallBelt.ScaleMin <= 0.0f || Config.SlopeRockWallBelt.ScaleMax < Config.SlopeRockWallBelt.ScaleMin ||
-        Config.SlopeRockWallBelt.AlongJitterCm < 0.0f || Config.SlopeRockWallBelt.LateralJitterCm < 0.0f)
-    {
-        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.slope_rock_wall_belt settings"), *Path));
-    }
+    ValidateRockWallGroups(Config.HeroRockWallGroups, TEXT("hero_rock_wall_groups"), Path);
+    ValidateRockWallGroups(Config.ForegroundRockApronGroups, TEXT("foreground_rock_apron_groups"), Path);
 
     UE_LOG(LogTemp, Display, TEXT("YarlungAssets: loaded %d scenery components, %d scatter kinds from %s"),
         Config.SceneryComponents.Num(),

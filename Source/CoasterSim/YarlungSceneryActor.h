@@ -11,9 +11,9 @@ struct FYarlungAssetConfig;
 struct FYarlungCanopyBeltConfig;
 struct FYarlungCliffBeltConfig;
 struct FYarlungGroundCoverBeltConfig;
+struct FYarlungRockWallGroupConfig;
 struct FYarlungSceneryComponentConfig;
 struct FYarlungScatterKindConfig;
-struct FYarlungSlopeRockWallBeltConfig;
 
 USTRUCT()
 struct FYarlungSceneryTrackSample
@@ -156,14 +156,20 @@ private:
         const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
-    void AddSlopeRockWallBelt(
-        UHierarchicalInstancedStaticMeshComponent* Component,
-        const FYarlungSceneryComponentConfig& ComponentConfig,
-        const FYarlungScatterKindConfig& KindConfig,
-        const FYarlungSlopeRockWallBeltConfig& BeltConfig,
+    void AddRockWallGroups(
+        const TArray<FYarlungRockWallGroupConfig>& Groups,
+        const TCHAR* GroupSetLabel,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
         const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
+    void AddRockWallGroup(
+        const FYarlungRockWallGroupConfig& Group,
+        const TCHAR* GroupSetLabel,
+        const TArray<FYarlungSceneryTrackSample>& TrackSamples,
+        const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
+        const TArray<uint16>& EncodedHeights,
+        const class FYarlungRiverField& RiverField,
+        int32& InOutPlacedCount);
     void ApplyMaterials(const FYarlungAssetConfig& AssetConfig);
 };
