@@ -17,14 +17,16 @@ Latest run:
 
 ```powershell
 .\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Standard -Build -NamePrefix low-slope-coverage-v3
+.\scripts\iterate-yarlung.ps1 -Mode Material -Preset Standard -Build -NamePrefix cleanup-material-v1
 ```
 
 Evidence:
 
-- Contact sheet: `Saved/Diagnostics/low-slope-coverage-v3.png`
-- Manifest: `Saved/Diagnostics/low-slope-coverage-v3-run.json`
+- Contact sheets: `Saved/Diagnostics/low-slope-coverage-v3.png`,
+  `Saved/Diagnostics/cleanup-material-v1.png`
+- Manifest: `Saved/Diagnostics/cleanup-material-v1-run.json`
 - RiskGate: `FAIL`
-- Worst frame: `low-slope-coverage-v3-t30.png`, risk `1.712`
+- Worst frame: `cleanup-material-v1-t30.png`, risk `1.710`
 - Map inspect: 0 errors, 0 warnings
 - Automation: `.\scripts\test-yarlung.ps1 -Build` passed 15/15
 
@@ -33,9 +35,12 @@ Implemented:
 - Fixed a material pipeline bug exposed by screenshot fail-close:
   `M_YarlungWaterSurface` still contained an invalid UE 5.8
   `SingleLayerWaterMaterialOutput` graph, so `-game` screenshots compiled it
-  to Default Material. The Python generator now replaces the generated water
-  material asset and emits a simpler transparent Default Lit water material
-  that compiles reliably.
+  to Default Material. The Python generator now rebuilds the generated water
+  material graph in-place and emits a simpler transparent Default Lit water
+  material that compiles reliably.
+- Removed the temporary delete/recreate material path. Generated materials now
+  reuse existing `Material` assets and fail loudly if the asset type is wrong,
+  avoiding UE reference-gather warnings during routine material iterations.
 - Tuned low-slope terrain coverage so forest-floor no longer dominates the
   whole corridor. Wet-rock and scree masks now carry more of the canyon floor,
   and material detail contributes more to final terrain albedo.
@@ -45,7 +50,7 @@ Implemented:
 Visual read:
 
 - The water material bug is fixed: screenshots no longer trip the default
-  material gate, and water remains visible.
+  material gate, material import reports 0 warnings, and water remains visible.
 - Low slopes are less green-primer and more wet-rock/scree-gray than
   `steep-grounded-rocks-v1`, but the macro read is still too smooth and
   terrain-driven. This is a partial improvement, not AAA.

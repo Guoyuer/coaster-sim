@@ -39,19 +39,13 @@ def ensure_folder(path):
         unreal.EditorAssetLibrary.make_directory(path)
 
 
-def create_material_asset(name, package_path, replace=False):
+def create_material_asset(name, package_path):
     asset_path = f"{package_path}/{name}"
     if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
-        if replace:
-            if not unreal.EditorAssetLibrary.delete_asset(asset_path):
-                raise RuntimeError(f"Unable to replace existing material: {asset_path}")
-            if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
-                raise RuntimeError(f"Material still exists after replace delete: {asset_path}")
-        else:
-            material = unreal.EditorAssetLibrary.load_asset(asset_path)
-            if isinstance(material, unreal.Material):
-                return material
-            raise RuntimeError(f"Existing asset is not a Material: {asset_path}")
+        material = unreal.EditorAssetLibrary.load_asset(asset_path)
+        if isinstance(material, unreal.Material):
+            return material
+        raise RuntimeError(f"Existing asset is not a Material: {asset_path}")
 
     material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
         name,
@@ -264,7 +258,7 @@ def set_optional_material_usage(material, usage_name):
 
 
 def create_yarlung_water_surface_material():
-    material = create_material_asset(WATER_SURFACE_MATERIAL_NAME, PACKAGE_PATH, replace=True)
+    material = create_material_asset(WATER_SURFACE_MATERIAL_NAME, PACKAGE_PATH)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     # Keep this material in the subset that UE Python can generate and validate.
     # SingleLayerWater's custom-output inputs are protected in UE 5.8 Python; a
