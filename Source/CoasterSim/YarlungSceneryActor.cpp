@@ -181,16 +181,6 @@ AYarlungSceneryActor::AYarlungSceneryActor()
     CliffRockFacesF->SetCastShadow(true);
     CliffRockFacesF->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    ForestFloorHalfA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ForestFloorHalfA"));
-    ForestFloorHalfA->SetupAttachment(SceneRoot);
-    ForestFloorHalfA->SetCastShadow(false);
-    ForestFloorHalfA->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    ForestFloorHalfB = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ForestFloorHalfB"));
-    ForestFloorHalfB->SetupAttachment(SceneRoot);
-    ForestFloorHalfB->SetCastShadow(false);
-    ForestFloorHalfB->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
     SlopeRockWallA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("SlopeRockWallA"));
     SlopeRockWallA->SetupAttachment(SceneRoot);
     SlopeRockWallA->SetCastShadow(true);
@@ -200,11 +190,6 @@ AYarlungSceneryActor::AYarlungSceneryActor()
     SlopeRockWallB->SetupAttachment(SceneRoot);
     SlopeRockWallB->SetCastShadow(true);
     SlopeRockWallB->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    SlopeForestPatchA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("SlopeForestPatchA"));
-    SlopeForestPatchA->SetupAttachment(SceneRoot);
-    SlopeForestPatchA->SetCastShadow(false);
-    SlopeForestPatchA->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
     ForestShrubsA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("ForestShrubsA"));
     ForestShrubsA->SetupAttachment(SceneRoot);
@@ -257,11 +242,8 @@ void AYarlungSceneryActor::BeginPlay()
         CliffRockFacesD->SetVisibility(false, true);
         CliffRockFacesE->SetVisibility(false, true);
         CliffRockFacesF->SetVisibility(false, true);
-        ForestFloorHalfA->SetVisibility(false, true);
-        ForestFloorHalfB->SetVisibility(false, true);
         SlopeRockWallA->SetVisibility(false, true);
         SlopeRockWallB->SetVisibility(false, true);
-        SlopeForestPatchA->SetVisibility(false, true);
         ForestShrubsA->SetVisibility(false, true);
         ForestShrubsB->SetVisibility(false, true);
         CanopyTreesA->SetVisibility(false, true);
@@ -323,11 +305,8 @@ UHierarchicalInstancedStaticMeshComponent* AYarlungSceneryActor::ComponentByName
     if (Name == TEXT("CliffRockFacesD")) { return CliffRockFacesD; }
     if (Name == TEXT("CliffRockFacesE")) { return CliffRockFacesE; }
     if (Name == TEXT("CliffRockFacesF")) { return CliffRockFacesF; }
-    if (Name == TEXT("ForestFloorHalfA")) { return ForestFloorHalfA; }
-    if (Name == TEXT("ForestFloorHalfB")) { return ForestFloorHalfB; }
     if (Name == TEXT("SlopeRockWallA")) { return SlopeRockWallA; }
     if (Name == TEXT("SlopeRockWallB")) { return SlopeRockWallB; }
-    if (Name == TEXT("SlopeForestPatchA")) { return SlopeForestPatchA; }
     if (Name == TEXT("ForestShrubsA")) { return ForestShrubsA; }
     if (Name == TEXT("ForestShrubsB")) { return ForestShrubsB; }
     if (Name == TEXT("CanopyTreesA")) { return CanopyTreesA; }
@@ -348,11 +327,8 @@ void AYarlungSceneryActor::ClearAllInstances()
     CliffRockFacesD->ClearInstances();
     CliffRockFacesE->ClearInstances();
     CliffRockFacesF->ClearInstances();
-    ForestFloorHalfA->ClearInstances();
-    ForestFloorHalfB->ClearInstances();
     SlopeRockWallA->ClearInstances();
     SlopeRockWallB->ClearInstances();
-    SlopeForestPatchA->ClearInstances();
     ForestShrubsA->ClearInstances();
     ForestShrubsB->ClearInstances();
     CanopyTreesA->ClearInstances();
@@ -462,8 +438,8 @@ void AYarlungSceneryActor::BuildScatter(
         case EYarlungSceneryPlacement::GroundCoverBelt:
             AddGroundCoverBelt(Component, ComponentConfig, *KindConfig, AssetConfig.GroundCoverBelt, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
-        case EYarlungSceneryPlacement::SlopePatchBelt:
-            AddSlopePatchBelt(Component, ComponentConfig, *KindConfig, AssetConfig.SlopePatchBelt, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
+        case EYarlungSceneryPlacement::SlopeRockWallBelt:
+            AddSlopeRockWallBelt(Component, ComponentConfig, *KindConfig, AssetConfig.SlopeRockWallBelt, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
         }
     }
@@ -471,7 +447,7 @@ void AYarlungSceneryActor::BuildScatter(
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Yarlung scatter instances: rocks=%d riverbank=%d scree=%d understory=%d cliff_a=%d cliff_b=%d cliff_c=%d cliff_d=%d cliff_e=%d cliff_f=%d forest_half_a=%d forest_half_b=%d slope_rock_a=%d slope_rock_b=%d slope_forest_a=%d shrubs_a=%d shrubs_b=%d canopy_a=%d canopy_b=%d canopy_c=%d"),
+        TEXT("Yarlung scatter instances: rocks=%d riverbank=%d scree=%d understory=%d cliff_a=%d cliff_b=%d cliff_c=%d cliff_d=%d cliff_e=%d cliff_f=%d slope_rock_a=%d slope_rock_b=%d shrubs_a=%d shrubs_b=%d canopy_a=%d canopy_b=%d canopy_c=%d"),
         RockOutcrops->GetInstanceCount(),
         RiverbankBoulders->GetInstanceCount(),
         ScreeBoulders->GetInstanceCount(),
@@ -482,11 +458,8 @@ void AYarlungSceneryActor::BuildScatter(
         CliffRockFacesD->GetInstanceCount(),
         CliffRockFacesE->GetInstanceCount(),
         CliffRockFacesF->GetInstanceCount(),
-        ForestFloorHalfA->GetInstanceCount(),
-        ForestFloorHalfB->GetInstanceCount(),
         SlopeRockWallA->GetInstanceCount(),
         SlopeRockWallB->GetInstanceCount(),
-        SlopeForestPatchA->GetInstanceCount(),
         ForestShrubsA->GetInstanceCount(),
         ForestShrubsB->GetInstanceCount(),
         CanopyTreesA->GetInstanceCount(),
@@ -714,11 +687,11 @@ void AYarlungSceneryActor::AddGroundCoverBelt(
     }
 }
 
-void AYarlungSceneryActor::AddSlopePatchBelt(
+void AYarlungSceneryActor::AddSlopeRockWallBelt(
     UHierarchicalInstancedStaticMeshComponent* Component,
     const FYarlungSceneryComponentConfig& ComponentConfig,
     const FYarlungScatterKindConfig& KindConfig,
-    const FYarlungSlopePatchBeltConfig& Belt,
+    const FYarlungSlopeRockWallBeltConfig& Belt,
     const TArray<FYarlungSceneryTrackSample>& TrackSamples,
     const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
     const TArray<uint16>& EncodedHeights,
@@ -728,11 +701,12 @@ void AYarlungSceneryActor::AddSlopePatchBelt(
     {
         return;
     }
+    if (ComponentConfig.Kind != TEXT("slope_rock_wall"))
+    {
+        UE_LOG(LogTemp, Fatal, TEXT("slope_rock_wall_belt only accepts slope_rock_wall assets; %s uses kind %s"), *ComponentConfig.Name, *ComponentConfig.Kind);
+    }
 
     const UStaticMesh& Mesh = *Component->GetStaticMesh();
-    const bool bRockWall = ComponentConfig.Kind.Contains(TEXT("rock_wall"), ESearchCase::IgnoreCase);
-    const bool bScree = ComponentConfig.Kind.Contains(TEXT("scree"), ESearchCase::IgnoreCase);
-    const bool bForest = ComponentConfig.Kind.Contains(TEXT("forest"), ESearchCase::IgnoreCase);
     const float Seed = ComponentConfig.Seed;
 
     for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Belt.SampleStride))
@@ -803,20 +777,10 @@ void AYarlungSceneryActor::AddSlopePatchBelt(
                 // Strata-block proportions (~3:1 max), not the old ~9:1 plank that
                 // read as fallen timber. Width/height stay chunky so the surface-
                 // aligned slab beds into the slope instead of floating end-up.
-                const FVector Scale = bRockWall
-                    ? FVector(
-                        ScaleBase * FMath::Lerp(1.15f, 1.95f, Hash01(SampleIndex * 7.0f + BandIndex + Seed, 151.0f)),
-                        ScaleBase * FMath::Lerp(0.62f, 0.98f, Hash01(SampleIndex * 9.0f + BandIndex + Seed, 157.0f)),
-                        ScaleBase * FMath::Lerp(0.72f, 1.25f, Hash01(SampleIndex * 11.0f + BandIndex + Seed, 163.0f)))
-                    : (bForest
-                        ? FVector(
-                            ScaleBase * FMath::Lerp(0.72f, 1.18f, Hash01(SampleIndex * 7.0f + BandIndex + Seed, 151.0f)),
-                            ScaleBase * FMath::Lerp(0.72f, 1.16f, Hash01(SampleIndex * 9.0f + BandIndex + Seed, 157.0f)),
-                            ScaleBase * FMath::Lerp(0.70f, 1.05f, Hash01(SampleIndex * 11.0f + BandIndex + Seed, 163.0f)))
-                        : FVector(
-                            ScaleBase * FMath::Lerp(0.85f, 1.65f, Hash01(SampleIndex * 7.0f + BandIndex + Seed, 151.0f)),
-                            ScaleBase * FMath::Lerp(0.70f, 1.25f, Hash01(SampleIndex * 9.0f + BandIndex + Seed, 157.0f)),
-                            ScaleBase * FMath::Lerp(0.30f, 0.74f, Hash01(SampleIndex * 11.0f + BandIndex + Seed, 163.0f))));
+                const FVector Scale(
+                    ScaleBase * FMath::Lerp(1.15f, 1.95f, Hash01(SampleIndex * 7.0f + BandIndex + Seed, 151.0f)),
+                    ScaleBase * FMath::Lerp(0.62f, 0.98f, Hash01(SampleIndex * 9.0f + BandIndex + Seed, 157.0f)),
+                    ScaleBase * FMath::Lerp(0.72f, 1.25f, Hash01(SampleIndex * 11.0f + BandIndex + Seed, 163.0f)));
 
                 const FVector Location(Location2D.X, Location2D.Y, Height + FMath::Max(Belt.HeightOffsetCm, KindConfig.HeightOffsetCm));
                 const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
@@ -825,7 +789,7 @@ void AYarlungSceneryActor::AddSlopePatchBelt(
                     continue;
                 }
 
-                const FQuat Rotation = bScree || KindConfig.bAlignToSurface
+                const FQuat Rotation = KindConfig.bAlignToSurface
                     ? SurfaceAlignedRotation(Normal, Yaw)
                     : FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw));
                 Component->AddInstance(FTransform(Rotation, Location, Scale));

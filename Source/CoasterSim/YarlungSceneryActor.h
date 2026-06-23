@@ -13,7 +13,7 @@ struct FYarlungCliffBeltConfig;
 struct FYarlungGroundCoverBeltConfig;
 struct FYarlungSceneryComponentConfig;
 struct FYarlungScatterKindConfig;
-struct FYarlungSlopePatchBeltConfig;
+struct FYarlungSlopeRockWallBeltConfig;
 
 USTRUCT()
 struct FYarlungSceneryTrackSample
@@ -70,19 +70,10 @@ private:
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesF;
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
-    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ForestFloorHalfA;
-
-    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
-    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ForestFloorHalfB;
-
-    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> SlopeRockWallA;
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> SlopeRockWallB;
-
-    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
-    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> SlopeForestPatchA;
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> ForestShrubsA;
@@ -165,11 +156,11 @@ private:
         const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
         const class FYarlungRiverField& RiverField);
-    void AddSlopePatchBelt(
+    void AddSlopeRockWallBelt(
         UHierarchicalInstancedStaticMeshComponent* Component,
         const FYarlungSceneryComponentConfig& ComponentConfig,
         const FYarlungScatterKindConfig& KindConfig,
-        const FYarlungSlopePatchBeltConfig& BeltConfig,
+        const FYarlungSlopeRockWallBeltConfig& BeltConfig,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
         const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,

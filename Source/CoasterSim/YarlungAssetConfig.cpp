@@ -178,9 +178,9 @@ EYarlungSceneryPlacement ParsePlacement(const FString& Value, const FString& Con
     {
         return EYarlungSceneryPlacement::GroundCoverBelt;
     }
-    if (Value.Equals(TEXT("slope_patch_belt"), ESearchCase::IgnoreCase))
+    if (Value.Equals(TEXT("slope_rock_wall_belt"), ESearchCase::IgnoreCase))
     {
-        return EYarlungSceneryPlacement::SlopePatchBelt;
+        return EYarlungSceneryPlacement::SlopeRockWallBelt;
     }
 
     FatalAssetConfigError(FString::Printf(TEXT("%s has unknown placement '%s'"), *Context, *Value));
@@ -333,24 +333,24 @@ FYarlungAssetConfig LoadConfigFromDisk()
     Config.GroundCoverBelt.AlongJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("along_jitter_cm"), GroundCoverBeltContext);
     Config.GroundCoverBelt.LateralJitterCm = RequiredNumberField(GroundCoverBelt, TEXT("lateral_jitter_cm"), GroundCoverBeltContext);
 
-    const TSharedPtr<FJsonObject> SlopePatchBelt = RequiredObject(Scenery, TEXT("slope_patch_belt"), Path);
-    const FString SlopePatchBeltContext = FString::Printf(TEXT("%s scenery.slope_patch_belt"), *Path);
-    Config.SlopePatchBelt.SampleStride = RequiredIntegerField(SlopePatchBelt, TEXT("sample_stride"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.SampleRanges = RequiredIntegerPairArrayField(SlopePatchBelt, TEXT("sample_ranges"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.LateralBandsCm = RequiredNumberArrayField(SlopePatchBelt, TEXT("lateral_bands_cm"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.Occupancy = RequiredNumberField(SlopePatchBelt, TEXT("occupancy"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.TrackClearanceCm = RequiredNumberField(SlopePatchBelt, TEXT("track_clearance_cm"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.RiverClearanceCm = RequiredNumberField(SlopePatchBelt, TEXT("river_clearance_cm"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.MinHeightCm = RequiredNumberField(SlopePatchBelt, TEXT("min_height_cm"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.MaxHeightCm = RequiredNumberField(SlopePatchBelt, TEXT("max_height_cm"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.MinSlope = RequiredNumberField(SlopePatchBelt, TEXT("min_slope"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.MaxSlope = RequiredNumberField(SlopePatchBelt, TEXT("max_slope"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.ScaleMin = RequiredNumberField(SlopePatchBelt, TEXT("scale_min"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.ScaleMax = RequiredNumberField(SlopePatchBelt, TEXT("scale_max"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.HeightOffsetCm = RequiredNumberField(SlopePatchBelt, TEXT("height_offset_cm"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.AlongJitterCm = RequiredNumberField(SlopePatchBelt, TEXT("along_jitter_cm"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.LateralJitterCm = RequiredNumberField(SlopePatchBelt, TEXT("lateral_jitter_cm"), SlopePatchBeltContext);
-    Config.SlopePatchBelt.YawJitterDegrees = RequiredNumberField(SlopePatchBelt, TEXT("yaw_jitter_degrees"), SlopePatchBeltContext);
+    const TSharedPtr<FJsonObject> SlopeRockWallBelt = RequiredObject(Scenery, TEXT("slope_rock_wall_belt"), Path);
+    const FString SlopeRockWallBeltContext = FString::Printf(TEXT("%s scenery.slope_rock_wall_belt"), *Path);
+    Config.SlopeRockWallBelt.SampleStride = RequiredIntegerField(SlopeRockWallBelt, TEXT("sample_stride"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.SampleRanges = RequiredIntegerPairArrayField(SlopeRockWallBelt, TEXT("sample_ranges"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.LateralBandsCm = RequiredNumberArrayField(SlopeRockWallBelt, TEXT("lateral_bands_cm"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.Occupancy = RequiredNumberField(SlopeRockWallBelt, TEXT("occupancy"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.TrackClearanceCm = RequiredNumberField(SlopeRockWallBelt, TEXT("track_clearance_cm"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.RiverClearanceCm = RequiredNumberField(SlopeRockWallBelt, TEXT("river_clearance_cm"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.MinHeightCm = RequiredNumberField(SlopeRockWallBelt, TEXT("min_height_cm"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.MaxHeightCm = RequiredNumberField(SlopeRockWallBelt, TEXT("max_height_cm"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.MinSlope = RequiredNumberField(SlopeRockWallBelt, TEXT("min_slope"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.MaxSlope = RequiredNumberField(SlopeRockWallBelt, TEXT("max_slope"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.ScaleMin = RequiredNumberField(SlopeRockWallBelt, TEXT("scale_min"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.ScaleMax = RequiredNumberField(SlopeRockWallBelt, TEXT("scale_max"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.HeightOffsetCm = RequiredNumberField(SlopeRockWallBelt, TEXT("height_offset_cm"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.AlongJitterCm = RequiredNumberField(SlopeRockWallBelt, TEXT("along_jitter_cm"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.LateralJitterCm = RequiredNumberField(SlopeRockWallBelt, TEXT("lateral_jitter_cm"), SlopeRockWallBeltContext);
+    Config.SlopeRockWallBelt.YawJitterDegrees = RequiredNumberField(SlopeRockWallBelt, TEXT("yaw_jitter_degrees"), SlopeRockWallBeltContext);
 
     const TSharedPtr<FJsonObject> Water = RequiredObject(Root, TEXT("water"), Path);
     const FString WaterContext = FString::Printf(TEXT("%s water"), *Path);
@@ -389,16 +389,16 @@ FYarlungAssetConfig LoadConfigFromDisk()
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.ground_cover_belt settings"), *Path));
     }
-    if (Config.SlopePatchBelt.SampleStride <= 0 || Config.SlopePatchBelt.SampleRanges.IsEmpty() ||
-        Config.SlopePatchBelt.LateralBandsCm.IsEmpty() ||
-        Config.SlopePatchBelt.Occupancy < 0.0f || Config.SlopePatchBelt.Occupancy > 1.0f ||
-        Config.SlopePatchBelt.TrackClearanceCm < 0.0f || Config.SlopePatchBelt.RiverClearanceCm < 0.0f ||
-        Config.SlopePatchBelt.MaxHeightCm < Config.SlopePatchBelt.MinHeightCm ||
-        Config.SlopePatchBelt.MinSlope < 0.0f || Config.SlopePatchBelt.MaxSlope < Config.SlopePatchBelt.MinSlope ||
-        Config.SlopePatchBelt.ScaleMin <= 0.0f || Config.SlopePatchBelt.ScaleMax < Config.SlopePatchBelt.ScaleMin ||
-        Config.SlopePatchBelt.AlongJitterCm < 0.0f || Config.SlopePatchBelt.LateralJitterCm < 0.0f)
+    if (Config.SlopeRockWallBelt.SampleStride <= 0 || Config.SlopeRockWallBelt.SampleRanges.IsEmpty() ||
+        Config.SlopeRockWallBelt.LateralBandsCm.IsEmpty() ||
+        Config.SlopeRockWallBelt.Occupancy < 0.0f || Config.SlopeRockWallBelt.Occupancy > 1.0f ||
+        Config.SlopeRockWallBelt.TrackClearanceCm < 0.0f || Config.SlopeRockWallBelt.RiverClearanceCm < 0.0f ||
+        Config.SlopeRockWallBelt.MaxHeightCm < Config.SlopeRockWallBelt.MinHeightCm ||
+        Config.SlopeRockWallBelt.MinSlope < 0.0f || Config.SlopeRockWallBelt.MaxSlope < Config.SlopeRockWallBelt.MinSlope ||
+        Config.SlopeRockWallBelt.ScaleMin <= 0.0f || Config.SlopeRockWallBelt.ScaleMax < Config.SlopeRockWallBelt.ScaleMin ||
+        Config.SlopeRockWallBelt.AlongJitterCm < 0.0f || Config.SlopeRockWallBelt.LateralJitterCm < 0.0f)
     {
-        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.slope_patch_belt settings"), *Path));
+        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.slope_rock_wall_belt settings"), *Path));
     }
 
     UE_LOG(LogTemp, Display, TEXT("YarlungAssets: loaded %d scenery components, %d scatter kinds from %s"),

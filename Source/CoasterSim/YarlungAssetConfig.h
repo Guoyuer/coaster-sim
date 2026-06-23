@@ -8,7 +8,7 @@ enum class EYarlungSceneryPlacement : uint8
     CanopyBelt,
     CliffBelt,
     GroundCoverBelt,
-    SlopePatchBelt
+    SlopeRockWallBelt
 };
 
 struct FYarlungScatterKindConfig
@@ -95,7 +95,7 @@ struct FYarlungGroundCoverBeltConfig
     float LateralJitterCm = 0.0f;
 };
 
-struct FYarlungSlopePatchBeltConfig
+struct FYarlungSlopeRockWallBeltConfig
 {
     int32 SampleStride = 1;
     TArray<FIntPoint> SampleRanges;
@@ -127,7 +127,7 @@ struct FYarlungAssetConfig
     FYarlungCanopyBeltConfig CanopyBelt;
     FYarlungCliffBeltConfig CliffBelt;
     FYarlungGroundCoverBeltConfig GroundCoverBelt;
-    FYarlungSlopePatchBeltConfig SlopePatchBelt;
+    FYarlungSlopeRockWallBeltConfig SlopeRockWallBelt;
     FYarlungWaterConfig Water;
 };
 

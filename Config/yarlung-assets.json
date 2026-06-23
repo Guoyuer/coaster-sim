@@ -80,39 +80,18 @@
         "seed": 67.0
       },
       {
-        "name": "ForestFloorHalfA",
-        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01",
-        "kind": "forest_floor_half",
-        "placement": "ground_cover_belt",
-        "seed": 89.0
-      },
-      {
-        "name": "ForestFloorHalfB",
-        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_03.spruce_half_03",
-        "kind": "forest_floor_half",
-        "placement": "ground_cover_belt",
-        "seed": 97.0
-      },
-      {
         "name": "SlopeRockWallA",
         "mesh": "/Game/Fab/Megascans/3D/Quarry_Cliff_uchwaffda/High/uchwaffda_tier_1/StaticMeshes/uchwaffda_tier_1.uchwaffda_tier_1",
         "kind": "slope_rock_wall",
-        "placement": "slope_patch_belt",
+        "placement": "slope_rock_wall_belt",
         "seed": 211.0
       },
       {
         "name": "SlopeRockWallB",
         "mesh": "/Game/Fab/Megascans/3D/Nordic_Forest_Cliff_Large_xibsff1/Medium/xibsff1_tier_2/StaticMeshes/xibsff1_tier_2.xibsff1_tier_2",
         "kind": "slope_rock_wall",
-        "placement": "slope_patch_belt",
+        "placement": "slope_rock_wall_belt",
         "seed": 223.0
-      },
-      {
-        "name": "SlopeForestPatchA",
-        "mesh": "/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_01.spruce_half_01",
-        "kind": "slope_forest_patch",
-        "placement": "slope_patch_belt",
-        "seed": 239.0
       },
       {
         "name": "ForestShrubsA",
@@ -238,21 +217,6 @@
         "height_offset_cm": 45.0,
         "align_to_surface": false
       },
-      "forest_floor_half": {
-        "side_bias": 0.58,
-        "distance_power": 0.94,
-        "min_lateral_cm": 18000.0,
-        "max_lateral_cm": 210000.0,
-        "river_clearance_cm": 18000.0,
-        "min_height_cm": 250000.0,
-        "max_height_cm": 488000.0,
-        "min_slope": 0.0,
-        "max_slope": 1.0,
-        "scale_min": 1.15,
-        "scale_max": 3.45,
-        "height_offset_cm": 34.0,
-        "align_to_surface": false
-      },
       "slope_rock_wall": {
         "side_bias": 0.5,
         "distance_power": 1.0,
@@ -267,21 +231,6 @@
         "scale_max": 5.8,
         "height_offset_cm": 28.0,
         "align_to_surface": true
-      },
-      "slope_forest_patch": {
-        "side_bias": 0.5,
-        "distance_power": 1.0,
-        "min_lateral_cm": 34000.0,
-        "max_lateral_cm": 210000.0,
-        "river_clearance_cm": 18000.0,
-        "min_height_cm": 250000.0,
-        "max_height_cm": 492000.0,
-        "min_slope": 0.0,
-        "max_slope": 0.86,
-        "scale_min": 1.05,
-        "scale_max": 2.15,
-        "height_offset_cm": 36.0,
-        "align_to_surface": false
       },
       "shrub": {
         "side_bias": 0.58,
@@ -391,7 +340,7 @@
       "along_jitter_cm": 3800.0,
       "lateral_jitter_cm": 5200.0
     },
-    "slope_patch_belt": {
+    "slope_rock_wall_belt": {
       "sample_stride": 1,
       "sample_ranges": [
         0.0,
