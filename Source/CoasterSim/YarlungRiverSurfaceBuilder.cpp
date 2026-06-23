@@ -16,6 +16,67 @@
 #include "StaticMeshAttributes.h"
 #include "UObject/Linker.h"
 
+namespace
+{
+struct FRiverSurfaceRow
+{
+    FVector PositionCm = FVector::ZeroVector;
+    float HalfWidthCm = 0.0f;
+    float Flow = 0.0f;
+};
+
+float SmoothSignedFlowNoise(float Flow, float Phase)
+{
+    const float TwoPi = UE_TWO_PI;
+    return 0.56f * FMath::Sin(Flow * TwoPi * 1.7f + Phase)
+        + 0.31f * FMath::Sin(Flow * TwoPi * 3.9f + Phase * 1.73f)
+        + 0.13f * FMath::Sin(Flow * TwoPi * 8.1f + Phase * 2.41f);
+}
+
+TArray<FRiverSurfaceRow> BuildResampledSurfaceRows(const TArray<FYarlungRiverRow>& SourceRows)
+{
+    constexpr float MaxSegmentLengthCm = 600.0f;
+
+    TArray<FRiverSurfaceRow> SurfaceRows;
+    if (SourceRows.IsEmpty())
+    {
+        return SurfaceRows;
+    }
+
+    for (int32 Index = 0; Index + 1 < SourceRows.Num(); ++Index)
+    {
+        const FYarlungRiverRow& A = SourceRows[Index];
+        const FYarlungRiverRow& B = SourceRows[Index + 1];
+        const FVector Segment = B.PositionCm - A.PositionCm;
+        const int32 StepCount = FMath::Max(1, FMath::CeilToInt(FVector2D(Segment.X, Segment.Y).Size() / MaxSegmentLengthCm));
+
+        const FVector P0 = SourceRows[FMath::Max(Index - 1, 0)].PositionCm;
+        const FVector P1 = A.PositionCm;
+        const FVector P2 = B.PositionCm;
+        const FVector P3 = SourceRows[FMath::Min(Index + 2, SourceRows.Num() - 1)].PositionCm;
+        const FVector ArriveTangent = (P2 - P0) * 0.5f;
+        const FVector LeaveTangent = (P3 - P1) * 0.5f;
+
+        for (int32 Step = 0; Step < StepCount; ++Step)
+        {
+            const float T = static_cast<float>(Step) / static_cast<float>(StepCount);
+            FRiverSurfaceRow Row;
+            Row.PositionCm = FMath::CubicInterp(P1, ArriveTangent, P2, LeaveTangent, T);
+            Row.HalfWidthCm = FMath::Lerp(A.HalfWidthCm, B.HalfWidthCm, T);
+            Row.Flow = FMath::Lerp(A.Flow, B.Flow, T);
+            SurfaceRows.Add(Row);
+        }
+    }
+
+    FRiverSurfaceRow LastRow;
+    LastRow.PositionCm = SourceRows.Last().PositionCm;
+    LastRow.HalfWidthCm = SourceRows.Last().HalfWidthCm;
+    LastRow.Flow = SourceRows.Last().Flow;
+    SurfaceRows.Add(LastRow);
+    return SurfaceRows;
+}
+}
+
 namespace YarlungRiverSurfaceBuilder
 {
 UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
@@ -29,10 +90,17 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
         UE_LOG(LogTemp, Fatal, TEXT("Missing required river surface material: %s"), *WaterConfig.SurfaceMaterialPath);
     }
 
-    const TArray<FYarlungRiverRow>& Rows = RiverField.GetRows();
+    const TArray<FYarlungRiverRow>& SourceRows = RiverField.GetRows();
+    if (SourceRows.Num() < 2)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Too few river rows to build river surface: %d"), SourceRows.Num());
+        return nullptr;
+    }
+
+    const TArray<FRiverSurfaceRow> Rows = BuildResampledSurfaceRows(SourceRows);
     if (Rows.Num() < 2)
     {
-        UE_LOG(LogTemp, Error, TEXT("Too few river rows to build river surface: %d"), Rows.Num());
+        UE_LOG(LogTemp, Error, TEXT("Too few resampled river surface rows: %d"), Rows.Num());
         return nullptr;
     }
 
@@ -108,19 +176,9 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
         const float SegmentDropCm = FMath::Abs(Next.Z - Prev.Z);
         const float SegmentLengthCm = FMath::Max(1.0f, FVector2D(Next.X - Prev.X, Next.Y - Prev.Y).Size());
         const float SlopeRapid = YarlungTerrain::Smooth01((SegmentDropCm / SegmentLengthCm - 0.018f) / 0.055f);
-        const float LeftBankScale = FMath::Clamp(
-            0.95f
-                + 0.16f * YarlungDeterministicNoise::Signed(Flow * 93000.0f + 17.0f, Flow * 51000.0f)
-                + 0.08f * YarlungDeterministicNoise::Signed(Flow * 311000.0f, Flow * 177000.0f + 41.0f),
-            0.78f,
-            1.16f);
-        const float RightBankScale = FMath::Clamp(
-            0.96f
-                + 0.15f * YarlungDeterministicNoise::Signed(Flow * 87000.0f + 83.0f, Flow * 61000.0f + 29.0f)
-                + 0.08f * YarlungDeterministicNoise::Signed(Flow * 293000.0f + 19.0f, Flow * 193000.0f),
-            0.78f,
-            1.15f);
-        const float CenterWanderCm = HalfWidth * 0.055f * YarlungDeterministicNoise::Signed(Flow * 71000.0f, Flow * 139000.0f + 11.0f);
+        const float LeftBankScale = FMath::Clamp(0.97f + 0.07f * SmoothSignedFlowNoise(Flow, 0.6f), 0.88f, 1.08f);
+        const float RightBankScale = FMath::Clamp(0.98f + 0.07f * SmoothSignedFlowNoise(Flow, 2.2f), 0.88f, 1.08f);
+        const float CenterWanderCm = HalfWidth * 0.022f * SmoothSignedFlowNoise(Flow, 4.1f);
 
         for (int32 CrossIndex = 0; CrossIndex < CrossSamples; ++CrossIndex)
         {
@@ -170,8 +228,8 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
 
             const float SideWidthFactor = AcrossSigned >= 0.0f ? LeftBankScale : RightBankScale;
             const float EdgeIrregularityCm = HalfWidth
-                * 0.045f
-                * YarlungDeterministicNoise::Signed(Flow * 410000.0f + AcrossSigned * 57000.0f, Flow * 233000.0f - AcrossSigned * 99000.0f)
+                * 0.012f
+                * SmoothSignedFlowNoise(Flow, AcrossSigned >= 0.0f ? 5.3f : 7.1f)
                 * FMath::Pow(FMath::Abs(AcrossSigned), 1.7f);
             const float AcrossOffsetCm = CenterWanderCm + AcrossSigned * HalfWidth * SideWidthFactor + EdgeIrregularityCm;
             const FVector Position(
@@ -296,8 +354,9 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Built Yarlung river surface ribbon: %s rows=%d cross_lanes=%d foam_vertices=%d surface_z_cm=%.0f..%.0f"),
+        TEXT("Built Yarlung river surface ribbon: %s source_rows=%d surface_rows=%d cross_lanes=%d foam_vertices=%d surface_z_cm=%.0f..%.0f"),
         *StaticMesh->GetPathName(),
+        SourceRows.Num(),
         RowCount,
         CrossSamples,
         FoamVertexCount,
