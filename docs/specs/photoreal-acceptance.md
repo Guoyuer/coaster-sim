@@ -1,6 +1,6 @@
 # 照片级验收 Spec（Definition of Done + 打分量规）
 
-> 配套：流程见 `docs/plans/photoreal-overhaul.md`，操作见 `AGENTS.md`，进度见 `docs/plans/photoreal-progress.md`。
+> 配套：计划见 `docs/plans/photoreal-plan.md`，操作见 `AGENTS.md`，进度见 `docs/plans/photoreal-progress.md`。
 > 一切验收基于**真实第一人称帧**（offscreen-shot @ ≥1440p，固定英雄段时间点），对照 `docs/refs/` 参照照片或授权明确的外部参考链接。
 
 ## 1. "到位"的定义
