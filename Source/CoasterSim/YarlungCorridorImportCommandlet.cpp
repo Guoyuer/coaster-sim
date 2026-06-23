@@ -77,8 +77,14 @@ FLinearColor YarlungSurfaceCoverageAtPosition(float X, float Y, float Height, co
             + YarlungDeterministicNoise::Value01(X * 0.118f - Height * 0.011f, Y * 0.093f + Height * 0.017f) * 0.38f,
         0.0f,
         1.0f);
+    const float LowSlopeBreakup = FMath::Clamp(
+        YarlungDeterministicNoise::Value01(X * 0.036f + Height * 0.009f, Y * 0.057f - Height * 0.012f) * 0.55f
+            + YarlungDeterministicNoise::Value01(X * 0.091f - Height * 0.016f, Y * 0.077f + Height * 0.010f) * 0.45f,
+        0.0f,
+        1.0f);
     const float CanyonSlopeBand = YarlungTerrain::Smooth01((RiverDistance - 18000.0f) / 90000.0f)
         * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 300000.0f) / 150000.0f));
+    const float LowSlopeCanyonFloor = CanyonSlopeBand * (1.0f - SteepSlope) * YarlungTerrain::Smooth01((RiverDistance - 22000.0f) / 110000.0f);
     const float SlopePatch = FMath::Clamp(
         CanyonSlopeBand
             * YarlungTerrain::Smooth01((Slope - 0.025f) / 0.20f)
@@ -105,9 +111,10 @@ FLinearColor YarlungSurfaceCoverageAtPosition(float X, float Y, float Height, co
         4.0f);
 
     const float ForestFloorMask = FMath::Clamp(
-        Forest * (0.70f - SteepSlope * 0.32f)
-            + SlopePatch * (1.0f - SteepSlope) * 0.18f
-            + CanopyMask * ForestDistance * 0.10f,
+        Forest * (0.36f - SteepSlope * 0.18f)
+            + SlopePatch * (1.0f - SteepSlope) * 0.10f
+            + CanopyMask * ForestDistance * 0.06f
+            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((LowSlopeBreakup - 0.18f) / 0.62f) * 0.16f,
         0.0f,
         1.0f);
     const float ScreeMask = FMath::Clamp(
@@ -115,14 +122,16 @@ FLinearColor YarlungSurfaceCoverageAtPosition(float X, float Y, float Height, co
             + SteepSlope * (1.0f - ForestFloorMask) * (0.34f + RavineStreak * 0.24f)
             + SlopePatch * SteepSlope * 0.28f
             + Ravine * 0.45f
-            + WetBank * 0.10f,
+            + WetBank * 0.10f
+            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((LowSlopeBreakup - 0.48f) / 0.30f) * 0.42f,
         0.0f,
         1.0f);
     const float WetRockCoverage = FMath::Clamp(
         WetRockMask * 0.52f
             + WetBank * 0.58f
             + SlopePatch * (0.08f + SteepSlope * 0.14f)
-            + Ravine * 0.18f,
+            + Ravine * 0.18f
+            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((0.50f - LowSlopeBreakup) / 0.34f) * 0.30f,
         0.0f,
         1.0f);
 

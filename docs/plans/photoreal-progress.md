@@ -16,64 +16,61 @@ or `docs/reviews/archive/`.
 Latest run:
 
 ```powershell
-.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Standard -Build -NamePrefix steep-grounded-rocks-v1 -Times 60,120,180,240
+.\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Standard -Build -NamePrefix low-slope-coverage-v3
 ```
 
 Evidence:
 
-- Contact sheet: `Saved/Diagnostics/steep-grounded-rocks-v1.png`
-- Manifest: `Saved/Diagnostics/steep-grounded-rocks-v1-run.json`
+- Contact sheet: `Saved/Diagnostics/low-slope-coverage-v3.png`
+- Manifest: `Saved/Diagnostics/low-slope-coverage-v3-run.json`
 - RiskGate: `FAIL`
-- Worst frame: `steep-grounded-rocks-v1-t60.png`, risk `1.483`
+- Worst frame: `low-slope-coverage-v3-t30.png`, risk `1.712`
 - Map inspect: 0 errors, 0 warnings
 - Automation: `.\scripts\test-yarlung.ps1 -Build` passed 15/15
 
 Implemented:
 
-- Added explicit terrain coverage masks in corridor vertex color channels:
-  wet-rock shore, forest-floor, and scree/rock coverage.
-- Rebuilt `M_YarlungMeshTerrain` so those masks drive continuous terrain
-  material blending instead of treating vertex color as final albedo.
-- Fixed rock/cliff placement bugs exposed by the screenshots:
-  rock-wall/cliff/river-wall instances now use upright yaw plus thick geologic
-  scaling instead of thin slab scaling, and every scenery instance grounds its
-  pivot from `StaticMesh` bounds bottom rather than assuming pivot-at-ground.
-- Tightened large cliff/rock-wall placement: big rock massing now requires
-  steeper surfaces, larger track clearance, and negative embed offsets. Low
-  smooth slopes should be covered by material/scree/forest-floor systems, not
-  free-standing cliff slabs.
+- Fixed a material pipeline bug exposed by screenshot fail-close:
+  `M_YarlungWaterSurface` still contained an invalid UE 5.8
+  `SingleLayerWaterMaterialOutput` graph, so `-game` screenshots compiled it
+  to Default Material. The Python generator now replaces the generated water
+  material asset and emits a simpler transparent Default Lit water material
+  that compiles reliably.
+- Tuned low-slope terrain coverage so forest-floor no longer dominates the
+  whole corridor. Wet-rock and scree masks now carry more of the canyon floor,
+  and material detail contributes more to final terrain albedo.
+- Preserved the previous large-rock hardening: no visible return of the
+  paper-thin slab or large floating-rock bug in the validated contact sheet.
 
 Visual read:
 
-- The previous "thin paper / horizontal plank" rock bug is removed from the
-  validated contact sheet.
-- The large floating-rock read was a real placement bug: large cliff assets
-  were allowed on low smooth slopes and only sampled one pivot point. The
-  stricter placement pass removes the worst false visual richness.
-- Still visibly non-AAA: the result is more honest but emptier. Large smooth
-  green-gray corridor terrain remains the dominant hero surface, especially
-  t60/t120/t180.
-- Water still lacks photo-level flow/shore detail; foreground coaster hardware
-  remains too proxy-like.
+- The water material bug is fixed: screenshots no longer trip the default
+  material gate, and water remains visible.
+- Low slopes are less green-primer and more wet-rock/scree-gray than
+  `steep-grounded-rocks-v1`, but the macro read is still too smooth and
+  terrain-driven. This is a partial improvement, not AAA.
+- Rock placement remains cleaner, but the composition is still sparse; the
+  hero view needs authored wall/slope set pieces, not more global scatter.
+- Water still lacks photo-level flow, foam, reflection, and wet shore breakup;
+  foreground coaster hardware remains too proxy-like.
 
 ## Next Task
 
 Highest-return next task:
 
-**Replace low-slope naked corridor terrain with continuous authored surface
-coverage**, without reintroducing free-standing cliff slabs.
+**Build authored slope/wall set pieces over the remaining smooth corridor
+terrain**, without relaxing the grounded-rock gates.
 
 Scope:
 
-- Tune the new terrain coverage masks/material so low slopes read as wet
-  forest-floor, scree, and wet-rock bands instead of green primer.
-- Add only ground-hugging scree/small-rock/decal-like cover on low slopes; keep
-  large cliff modules on steep slopes and river walls.
-- Rebuild canopy as distant/mid massing, not slope patches or branchy near
-  foreground fillers.
-- Validate in `Terrain` or `Full` mode, then first-person contact sheet. Treat
-  new floating/hovering/sheet-like assets as pipeline bugs, not aesthetic
-  tradeoffs.
+- Add explicit authored near/mid slope patches or rock-wall kitbash groups at
+  the hero time windows where v3 still shows smooth terrain as the main subject.
+- Keep large cliff modules on steep surfaces/river walls only; low slopes get
+  ground-hugging scree, wet-rock shore, and forest-floor coverage.
+- Improve composition at the same time: make the rail guide the eye across the
+  river/along the wall instead of pointing at a broad empty slope.
+- Validate in `Actor` or `Terrain` mode, then open the first-person contact
+  sheet. Treat new floating/hovering/sheet-like assets as pipeline bugs.
 
 Do not simply increase HISM counts or relax cliff slope/clearance gates.
 

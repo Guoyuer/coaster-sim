@@ -39,13 +39,19 @@ def ensure_folder(path):
         unreal.EditorAssetLibrary.make_directory(path)
 
 
-def create_material_asset(name, package_path):
+def create_material_asset(name, package_path, replace=False):
     asset_path = f"{package_path}/{name}"
     if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
-        material = unreal.EditorAssetLibrary.load_asset(asset_path)
-        if isinstance(material, unreal.Material):
-            return material
-        raise RuntimeError(f"Existing asset is not a Material: {asset_path}")
+        if replace:
+            if not unreal.EditorAssetLibrary.delete_asset(asset_path):
+                raise RuntimeError(f"Unable to replace existing material: {asset_path}")
+            if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
+                raise RuntimeError(f"Material still exists after replace delete: {asset_path}")
+        else:
+            material = unreal.EditorAssetLibrary.load_asset(asset_path)
+            if isinstance(material, unreal.Material):
+                return material
+            raise RuntimeError(f"Existing asset is not a Material: {asset_path}")
 
     material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
         name,
@@ -258,15 +264,15 @@ def set_optional_material_usage(material, usage_name):
 
 
 def create_yarlung_water_surface_material():
-    material = create_material_asset(WATER_SURFACE_MATERIAL_NAME, PACKAGE_PATH)
+    material = create_material_asset(WATER_SURFACE_MATERIAL_NAME, PACKAGE_PATH, replace=True)
     unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
-    # Single Layer Water is the engine's purpose-built river/lake shader: it gives
-    # real depth-based transparency, refraction and underwater scattering in one
-    # opaque pass. The old Default-Lit + opaque setup had no transparency or depth
-    # absorption at all, so the dark low-roughness surface read as glossy plastic.
-    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
+    # Keep this material in the subset that UE Python can generate and validate.
+    # SingleLayerWater's custom-output inputs are protected in UE 5.8 Python; a
+    # half-connected graph compiles to DefaultMaterial at runtime, which is worse
+    # than a simpler transparent material that reliably renders.
+    material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
     material.set_editor_property("two_sided", True)
-    material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_SINGLE_LAYER_WATER)
+    material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
 
     vertex_color = unreal.MaterialEditingLibrary.create_material_expression(
         material,
@@ -314,7 +320,7 @@ def create_yarlung_water_surface_material():
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Opacity", 1.0, -500, 280),
+        create_scalar_parameter(material, "Opacity", 0.74, -500, 280),
         unreal.MaterialProperty.MP_OPACITY,
         "yarlung water surface Opacity",
     )
@@ -362,51 +368,6 @@ def create_yarlung_water_surface_material():
         ),
         unreal.MaterialProperty.MP_EMISSIVE_COLOR,
         "yarlung water surface EmissiveColor",
-    )
-    # Single Layer Water absorption + scattering drive the glacial colour and how
-    # fast the channel goes opaque with depth. Coefficients are per-cm extinction
-    # (red absorbs fastest, so deep mid-channel reads teal while the shallow ~0.6m
-    # shoreline stays clear). Exposed as parameters so they are tunable on a
-    # material instance without recompiling.
-    water_output = unreal.MaterialEditingLibrary.create_material_expression(
-        material,
-        unreal.MaterialExpressionSingleLayerWaterMaterialOutput,
-        320,
-        420,
-    )
-    absorption = create_vector_parameter(
-        material,
-        "WaterAbsorption",
-        unreal.LinearColor(0.0042, 0.0019, 0.0016, 1.0),
-        -120,
-        360,
-    )
-    scattering = create_vector_parameter(
-        material,
-        "WaterScattering",
-        unreal.LinearColor(0.0011, 0.0021, 0.0020, 1.0),
-        -120,
-        520,
-    )
-    def connect_water_coefficient(source, input_names, label):
-        for input_name in input_names:
-            if unreal.MaterialEditingLibrary.connect_material_expressions(
-                source, "", water_output, input_name
-            ):
-                return
-        raise RuntimeError(f"Unable to connect yarlung water {label}")
-
-    # Input display names differ slightly between engine versions, so try the
-    # spaced and unspaced variants.
-    connect_water_coefficient(
-        absorption,
-        ("Absorption Coefficients", "AbsorptionCoefficients"),
-        "absorption coefficients",
-    )
-    connect_water_coefficient(
-        scattering,
-        ("Scattering Coefficients", "ScatteringCoefficients"),
-        "scattering coefficients",
     )
     set_optional_material_usage(material, "MATUSAGE_STATIC_MESH")
     set_optional_material_usage(material, "MATUSAGE_SPLINE_MESHES")
@@ -496,25 +457,25 @@ def create_mesh_terrain_material():
 
     forest_floor_color = create_constant3(
         material,
-        unreal.LinearColor(0.050, 0.170, 0.070, 1.0),
+        unreal.LinearColor(0.042, 0.112, 0.060, 1.0),
         -900,
         -440,
     )
     weathered_rock_color = create_constant3(
         material,
-        unreal.LinearColor(0.118, 0.126, 0.116, 1.0),
+        unreal.LinearColor(0.126, 0.128, 0.116, 1.0),
         -900,
         -300,
     )
     scree_color = create_constant3(
         material,
-        unreal.LinearColor(0.150, 0.142, 0.122, 1.0),
+        unreal.LinearColor(0.166, 0.156, 0.132, 1.0),
         -900,
         -160,
     )
     wet_rock_color = create_constant3(
         material,
-        unreal.LinearColor(0.055, 0.075, 0.070, 1.0),
+        unreal.LinearColor(0.052, 0.066, 0.064, 1.0),
         -900,
         -20,
     )
@@ -650,7 +611,7 @@ def create_mesh_terrain_material():
         1000,
         "mesh terrain wet-rock ambient occlusion",
     )
-    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 1.28, -900, -40)
+    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 1.20, -900, -40)
     macro_base_color_gain = create_multiply(
         material,
         macro_base_color,
@@ -677,7 +638,7 @@ def create_mesh_terrain_material():
         "",
         textured_base_color,
         "",
-        create_scalar_parameter(material, "TerrainSurfaceDetailStrength", detail_strength * 0.42, -620, 100),
+        create_scalar_parameter(material, "TerrainSurfaceDetailStrength", detail_strength * 0.90, -620, 100),
         "",
         620,
         -140,
