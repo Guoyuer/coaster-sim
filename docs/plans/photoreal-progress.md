@@ -19,19 +19,25 @@ Latest run:
 .\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Focus -Build -NamePrefix neartrack-rock-breakup-v2
 .\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -NamePrefix t30-near-apron-v1
 .\scripts\iterate-yarlung.ps1 -Mode ScreenshotOnly -Preset Standard -Build -NamePrefix t30-near-apron-v1-standard
+.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix river-footprint-clearance-v1
+.\scripts\test-yarlung.ps1 -Build
 ```
 
 Evidence:
 
 - Contact sheets: `Saved/Diagnostics/neartrack-rock-breakup-v2.png`,
   `Saved/Diagnostics/t30-near-apron-v1.png`,
-  `Saved/Diagnostics/t30-near-apron-v1-standard.png`
+  `Saved/Diagnostics/t30-near-apron-v1-standard.png`,
+  `Saved/Diagnostics/river-footprint-clearance-v1.png`
 - Manifest: `Saved/Diagnostics/t30-near-apron-v1-standard-run.json`
+- Latest focus manifest:
+  `Saved/Diagnostics/river-footprint-clearance-v1-run.json`
 - RiskGate: `FAIL`
-- Worst frame: `t30-near-apron-v1-standard-t90.png`, risk `1.520`
+- Standard worst frame: `t30-near-apron-v1-standard-t90.png`, risk `1.520`
+- Latest focus t90: `river-footprint-clearance-v1-t90.png`, risk `1.614`
 - Focus t30 improved from risk `1.549` / flat `0.775` to risk `1.165` /
   flat `0.545`
-- Map inspect: `t30-near-apron-v1` had 0 errors, 0 warnings
+- Map inspect: `river-footprint-clearance-v1` had 0 errors, 0 warnings
 - Automation: `.\scripts\test-yarlung.ps1 -Build` passed 15/15
 
 Implemented:
@@ -67,6 +73,13 @@ Implemented:
   import, and the new `Focus` preset captures the current worst frame at
   960x540. The first check ran in 19s versus roughly 107s for the Actor
   Standard loop.
+- Added footprint-aware river clearance for all scenery placement paths. River
+  clearance now uses `distance_to_river - scaled_mesh_radius`, so large boulder,
+  cliff, scree, and rock-wall meshes cannot pass validation with only their pivot
+  outside the protected water/shore band.
+- Recast `wet_rock_shore` from large dry boulders to smaller, lower, farther
+  bank stones. This removes the worst "rock sitting on water" read, but does
+  not solve the larger water/shore realism problem by itself.
 
 Visual read:
 
@@ -86,6 +99,10 @@ Visual read:
 - Standard validation moves the worst frame to t90. t90/t150 still show large
   dark or green corridor slopes and need the same set-piece/continuous-surface
   treatment across their real travel-distance ranges.
+- `river-footprint-clearance-v1` removes the most fake water boulders, but the
+  frame reads worse overall because the real bottleneck is now exposed: water is
+  still a smooth synthetic strip, the left near wall overpowers the composition,
+  and the shore lacks authored wet-rock/foam breakup.
 - Water still lacks photo-level flow, foam, reflection, and wet shore breakup;
   foreground coaster hardware remains too proxy-like.
 
@@ -93,19 +110,22 @@ Visual read:
 
 Highest-return next task:
 
-**Generalize the authored near-slope system to t90/t150 and convert chunked
-rock coverage into continuous forest-floor/scree/wet-rock surface reads.**
+**Change the water/shore approach before adding more rocks. Build a systemic
+rapid-water + wet-shore composition layer instead of placing visible boulders in
+the river.**
 
 Scope:
 
-- Use actual ride-distance/sample ranges when authoring first-person segments;
-  do not assume screenshot time equals early track samples.
-- Target t90 first, then t150. Both need fewer visible corridor-terrain fields
-  and more continuous canyon/forest-floor composition.
-- Keep the profile/segment system reusable. Avoid adding isolated one-off
-  lists that cannot be extended to the rest of the route.
+- Add flow/foam/breakup to the existing generated river surface so deep canyon
+  water reads as rapid glacial water, not a flat road-like ribbon.
+- Move visible stones out of open water. Allow only small, dark, wet, embedded
+  shore stones or partially submerged rapid hints with foam interaction.
+- Reduce left near-wall dominance with a route/composition-level solution, not
+  screenshot-specific exclusions.
+- Continue authored slope/wall work after the water/shore layer stops looking
+  synthetic.
 
-Do not simply increase HISM counts or relax cliff slope/clearance gates.
+Do not add screenshot-specific exclusion lists or more water boulders.
 
 ## Active Risks
 

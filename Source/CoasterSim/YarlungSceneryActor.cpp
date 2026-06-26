@@ -67,6 +67,15 @@ float ScaledHorizontalRadiusCm(const UStaticMesh& Mesh, const FVector& Scale)
     return FMath::Max(Extent.X * FMath::Abs(Scale.X), Extent.Y * FMath::Abs(Scale.Y));
 }
 
+bool HasRiverFootprintClearance(
+    const FYarlungRiverField& RiverField,
+    const FVector2D& Location,
+    float ScaledRadiusCm,
+    float ClearanceCm)
+{
+    return RiverField.DistanceCm(Location) - ScaledRadiusCm >= ClearanceCm;
+}
+
 float GroundedPivotZCm(const UStaticMesh& Mesh, const FVector& Scale, float SurfaceZCm, float HeightOffsetCm, float EmbedDepthCm)
 {
     const FBoxSphereBounds Bounds = Mesh.GetBounds();
@@ -601,6 +610,11 @@ void AYarlungSceneryActor::AddScatterRule(
                 : (bCanopyTree
                     ? FVector(ScaleBase * FMath::Lerp(0.85f, 1.55f, Hash01(Index * 9.0f + Seed, 1.0f)), ScaleBase * FMath::Lerp(0.85f, 1.55f, Hash01(Index * 7.0f + Seed, 2.0f)), ScaleBase * FMath::Lerp(0.80f, 1.35f, Hash01(Index * 5.0f + Seed, 3.0f)))
                     : FVector(ScaleBase * FMath::Lerp(0.8f, 1.55f, Hash01(Index * 9.0f + Seed, 1.0f)), ScaleBase * FMath::Lerp(0.75f, 1.3f, Hash01(Index * 7.0f + Seed, 2.0f)), ScaleBase * FMath::Lerp(0.75f, 1.8f, Hash01(Index * 5.0f + Seed, 3.0f)))));
+        const float ScaledRadiusCm = ScaledHorizontalRadiusCm(*Component->GetStaticMesh(), Scale);
+        if (!HasRiverFootprintClearance(RiverField, FVector2D(Location2D.X, Location2D.Y), ScaledRadiusCm, KindConfig.RiverClearanceCm))
+        {
+            continue;
+        }
         const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(*Component->GetStaticMesh(), Scale, Height, KindConfig.HeightOffsetCm, 0.0f));
         const FQuat Rotation = KindConfig.bAlignToSurface
             ? SurfaceAlignedRotation(Normal, Yaw)
@@ -692,12 +706,16 @@ void AYarlungSceneryActor::AddSurfaceCoverLayer(
                     ScaleBase * FMath::Lerp(0.92f, 1.55f, Hash01(SampleIndex * 4.0f + BandIndex + Seed, 53.0f)),
                     ScaleBase * FMath::Lerp(0.92f, 1.55f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
                     ScaleBase * FMath::Lerp(0.82f, 1.30f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f)))
-                : FVector(
-                    ScaleBase * FMath::Lerp(0.86f, 1.30f, Hash01(SampleIndex * 4.0f + BandIndex + Seed, 53.0f)),
-                    ScaleBase * FMath::Lerp(0.82f, 1.24f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
-                    ScaleBase * FMath::Lerp(0.62f, 1.18f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f))));
-        const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Profile.HeightOffsetCm, 0.0f));
+                    : FVector(
+                        ScaleBase * FMath::Lerp(0.86f, 1.30f, Hash01(SampleIndex * 4.0f + BandIndex + Seed, 53.0f)),
+                        ScaleBase * FMath::Lerp(0.82f, 1.24f, Hash01(SampleIndex * 6.0f + BandIndex + Seed, 59.0f)),
+                        ScaleBase * FMath::Lerp(0.62f, 1.18f, Hash01(SampleIndex * 8.0f + BandIndex + Seed, 61.0f))));
         const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
+        if (!HasRiverFootprintClearance(RiverField, FVector2D(Location2D.X, Location2D.Y), ScaledRadiusCm, Profile.RiverClearanceCm))
+        {
+            return;
+        }
+        const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Profile.HeightOffsetCm, 0.0f));
         FVector TrackCenter = FVector::ZeroVector;
         float SignedTrackOffsetCm = 0.0f;
         if (!ProjectOntoTrackCorridor(TrackSamples, FVector2D(Location2D.X, Location2D.Y), TrackCenter, SignedTrackOffsetCm))
@@ -862,8 +880,13 @@ void AYarlungSceneryActor::AddRockWallSegment(
                 Hash01(HashBase, 547.0f),
                 Hash01(HashBase, 557.0f),
                 Hash01(HashBase, 563.0f));
-            const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Profile.HeightOffsetCm, Profile.EmbedDepthCm));
             const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
+            if (!HasRiverFootprintClearance(RiverField, FVector2D(Location2D.X, Location2D.Y), ScaledRadiusCm, Profile.RiverClearanceCm))
+            {
+                ++LaneIndex;
+                continue;
+            }
+            const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Profile.HeightOffsetCm, Profile.EmbedDepthCm));
             if (FVector::Dist(Location, Center) - ScaledRadiusCm < Profile.TrackClearanceCm)
             {
                 ++LaneIndex;
@@ -951,8 +974,12 @@ void AYarlungSceneryActor::AddCliffBelt(
                     Hash01(SampleIndex * 7.0f + BandIndex + Seed, 41.0f),
                     Hash01(SampleIndex * 9.0f + BandIndex + Seed, 43.0f),
                     Hash01(SampleIndex * 5.0f + BandIndex + Seed, 47.0f));
-                const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Belt.HeightOffsetCm, 0.0f));
                 const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
+                if (!HasRiverFootprintClearance(RiverField, FVector2D(Location2D.X, Location2D.Y), ScaledRadiusCm, Belt.RiverClearanceCm))
+                {
+                    continue;
+                }
+                const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Belt.HeightOffsetCm, 0.0f));
                 if (FVector::Dist(Location, Center) - ScaledRadiusCm < Belt.TrackClearanceCm)
                 {
                     continue;
@@ -1049,6 +1076,10 @@ void AYarlungSceneryActor::AddRiverWallCliffs(
                     Hash01(RiverIndex * 7.0f + BandIndex + Seed, 103.0f),
                     Hash01(RiverIndex * 9.0f + BandIndex + Seed, 107.0f));
                 const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
+                if (!HasRiverFootprintClearance(RiverField, LocationXY, ScaledRadiusCm, Belt.RiverClearanceCm))
+                {
+                    continue;
+                }
                 const float HorizontalTrackDistanceCm = FVector2D::Distance(LocationXY, FVector2D(TrackCenter.X, TrackCenter.Y));
                 if (HorizontalTrackDistanceCm - ScaledRadiusCm < Belt.TrackClearanceCm)
                 {
