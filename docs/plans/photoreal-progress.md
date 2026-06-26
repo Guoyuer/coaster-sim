@@ -18,16 +18,20 @@ Latest run:
 ```powershell
 .\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Standard -Build -NamePrefix low-slope-coverage-v3
 .\scripts\iterate-yarlung.ps1 -Mode Material -Preset Standard -Build -NamePrefix cleanup-material-v1
+.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Standard -Build -NamePrefix authored-wall-massing-v1
+.\scripts\iterate-yarlung.ps1 -Mode ScreenshotOnly -Preset Focus -Build -NamePrefix authored-wall-focus-v2
 ```
 
 Evidence:
 
 - Contact sheets: `Saved/Diagnostics/low-slope-coverage-v3.png`,
-  `Saved/Diagnostics/cleanup-material-v1.png`
-- Manifest: `Saved/Diagnostics/cleanup-material-v1-run.json`
+  `Saved/Diagnostics/cleanup-material-v1.png`,
+  `Saved/Diagnostics/authored-wall-massing-v1.png`,
+  `Saved/Diagnostics/authored-wall-focus-v2.png`
+- Manifest: `Saved/Diagnostics/authored-wall-focus-v2-run.json`
 - RiskGate: `FAIL`
-- Worst frame: `cleanup-material-v1-t30.png`, risk `1.710`
-- Map inspect: 0 errors, 0 warnings
+- Worst frame: `authored-wall-focus-v2-t30.png`, risk `1.531`
+- Map inspect: `authored-wall-massing-v1` had 0 errors, 0 warnings
 - Automation: `.\scripts\test-yarlung.ps1 -Build` passed 15/15
 
 Implemented:
@@ -46,6 +50,14 @@ Implemented:
   and material detail contributes more to final terrain albedo.
 - Preserved the previous large-rock hardening: no visible return of the
   paper-thin slab or large floating-rock bug in the validated contact sheet.
+- Restored the rock-wall massing path from sparse placement to continuous
+  coverage. Rock-wall instances went from 450 in the previous validated map to
+  4696 in `authored-wall-massing-v1`; near-slope wall profiles can now align to
+  terrain while mid/far wall profiles stay upright and river-facing.
+- Added a fast visual loop: `ScreenshotOnly -Build` now compiles without map
+  import, and the new `Focus` preset captures the current worst frame at
+  960x540. The first check ran in 19s versus roughly 107s for the Actor
+  Standard loop.
 
 Visual read:
 
@@ -56,6 +68,11 @@ Visual read:
   terrain-driven. This is a partial improvement, not AAA.
 - Rock placement remains cleaner, but the composition is still sparse; the
   hero view needs authored wall/slope set pieces, not more global scatter.
+- `authored-wall-massing-v1` improves t90/t150 by breaking up smooth slopes, but
+  it still reads as many rock chunks rather than continuous geology.
+- `authored-wall-focus-v2` is faster and shows more near-wall presence, but t30
+  still has a large smooth left foreground slope. That is the next visual bug
+  to attack.
 - Water still lacks photo-level flow, foam, reflection, and wet shore breakup;
   foreground coaster hardware remains too proxy-like.
 
@@ -63,19 +80,17 @@ Visual read:
 
 Highest-return next task:
 
-**Build authored slope/wall set pieces over the remaining smooth corridor
-terrain**, without relaxing the grounded-rock gates.
+**Fix the t30 foreground slope read, then confirm with Standard.**
 
 Scope:
 
-- Add explicit authored near/mid slope patches or rock-wall kitbash groups at
-  the hero time windows where v3 still shows smooth terrain as the main subject.
-- Keep large cliff modules on steep surfaces/river walls only; low slopes get
-  ground-hugging scree, wet-rock shore, and forest-floor coverage.
-- Improve composition at the same time: make the rail guide the eye across the
-  river/along the wall instead of pointing at a broad empty slope.
-- Validate in `Actor` or `Terrain` mode, then open the first-person contact
-  sheet. Treat new floating/hovering/sheet-like assets as pipeline bugs.
+- Use `.\scripts\iterate-yarlung.ps1 -Mode ScreenshotOnly -Preset Focus -Build`
+  for config/Actor visual tuning while targeting t30.
+- Do not keep adding small rock chunks. The t30 left foreground needs a system
+  that reads as continuous ground-hugging rock/scree/forest-floor cover or a
+  better composed foreground wall.
+- Once the Focus frame looks materially better, validate with `Actor` or
+  `ScreenshotOnly` `Standard` and open the contact sheet.
 
 Do not simply increase HISM counts or relax cliff slope/clearance gates.
 

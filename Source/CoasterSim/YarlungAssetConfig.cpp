@@ -158,6 +158,7 @@ FYarlungRockWallProfileConfig ParseRockWallProfile(const FString& Name, const TS
     Config.AlongJitterCm = RequiredNumberField(Object, TEXT("along_jitter_cm"), Context);
     Config.LateralJitterCm = RequiredNumberField(Object, TEXT("lateral_jitter_cm"), Context);
     Config.YawJitterDegrees = RequiredNumberField(Object, TEXT("yaw_jitter_degrees"), Context);
+    Config.bAlignToSurface = RequiredBoolField(Object, TEXT("align_to_surface"), Context);
     return Config;
 }
 

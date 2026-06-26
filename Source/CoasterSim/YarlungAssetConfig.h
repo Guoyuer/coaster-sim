@@ -116,6 +116,7 @@ struct FYarlungRockWallProfileConfig
     float AlongJitterCm = 0.0f;
     float LateralJitterCm = 0.0f;
     float YawJitterDegrees = 0.0f;
+    bool bAlignToSurface = false;
 };
 
 struct FYarlungRockWallSegmentConfig

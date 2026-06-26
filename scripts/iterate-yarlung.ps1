@@ -1,7 +1,7 @@
 param(
     [ValidateSet("Auto", "Actor", "Material", "Terrain", "Full", "ScreenshotOnly")]
     [string]$Mode = "Auto",
-    [ValidateSet("Quick", "Standard", "Route", "Hero", "Final")]
+    [ValidateSet("Quick", "Focus", "Standard", "Route", "Hero", "Final")]
     [string]$Preset = "Standard",
     [string]$NamePrefix = "",
     [int[]]$Times = @(),
@@ -130,7 +130,13 @@ if ($Mode -ne "ScreenshotOnly") {
         & (Join-Path $ScriptRoot "import-yarlung-corridor.ps1") @Params
     }
 } elseif ($Build) {
-    throw "-Build is only valid when Mode is not ScreenshotOnly; build with Mode Actor/Material/Terrain/Full."
+    $Steps += Invoke-Step -Name "build" -StepArgs @($RepoRoot) -Script {
+        param([string]$Root)
+        & "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" CoasterSimEditor Win64 Development "-Project=$Root\CoasterSim.uproject" -WaitMutex -NoHotReloadFromIDE
+        if ($LASTEXITCODE -ne 0) {
+            throw "Unreal build failed with exit code $LASTEXITCODE"
+        }
+    }
 }
 
 $SurveyCsv = Join-Path $RepoRoot "Saved\Diagnostics\$NamePrefix.csv"

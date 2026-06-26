@@ -9,6 +9,12 @@
       "timeout_seconds": 160,
       "purpose": "Fast smoke while editing harnesses or checking that the map still loads."
     },
+    "Focus": {
+      "times": [30],
+      "resolution": { "x": 960, "y": 540 },
+      "timeout_seconds": 180,
+      "purpose": "Fast visual tuning loop for the current worst first-person frame; use Standard before committing."
+    },
     "Standard": {
       "times": [30, 90, 150],
       "resolution": { "x": 1280, "y": 720 },

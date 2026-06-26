@@ -870,7 +870,10 @@ void AYarlungSceneryActor::AddRockWallSegment(
                 continue;
             }
 
-            Component->AddInstance(FTransform(UprightYawRotation(Yaw), Location, Scale));
+            const FQuat Rotation = Profile.bAlignToSurface
+                ? SurfaceAlignedRotation(SurfaceNormal, Yaw)
+                : UprightYawRotation(Yaw);
+            Component->AddInstance(FTransform(Rotation, Location, Scale));
             ++InOutPlacedCount;
             ++LaneIndex;
         }
