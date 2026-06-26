@@ -110,7 +110,7 @@ protected:
     TObjectPtr<UInstancedStaticMeshComponent> Supports;
 
     UPROPERTY(EditAnywhere, Category = "Track", meta = (ClampMin = "0.0"))
-    float RailGaugeCm = 170.0f;
+    float RailGaugeCm = 218.0f;
 
     UPROPERTY(EditAnywhere, Category = "Ride", meta = (ClampMin = "0.0"))
     float LiftTargetSpeedMps = 12.0f;

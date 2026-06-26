@@ -19,6 +19,9 @@ Latest run:
 .\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix river-footprint-clearance-v1
 .\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Focus -Build -Times 90 -NamePrefix rapid-water-width-v1
 .\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Focus -Build -Times 90 -NamePrefix rapid-shore-edge-v1
+.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix foreground-track-v1
+.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix foreground-track-v2
+.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix foreground-track-v3
 .\scripts\test-yarlung.ps1 -Build
 ```
 
@@ -26,14 +29,15 @@ Evidence:
 
 - Contact sheets: `Saved/Diagnostics/river-footprint-clearance-v1.png`,
   `Saved/Diagnostics/rapid-water-width-v1.png`,
-  `Saved/Diagnostics/rapid-shore-edge-v1.png`
-- Latest focus manifest: `Saved/Diagnostics/rapid-shore-edge-v1-run.json`
-- RiskGate: `FAIL`
-- Latest focus t90: `rapid-shore-edge-v1-t90.png`, risk `1.534`,
+  `Saved/Diagnostics/rapid-shore-edge-v1.png`,
+  `Saved/Diagnostics/foreground-track-v3.png`
+- Latest focus manifest: `Saved/Diagnostics/foreground-track-v3-run.json`
+- RiskGate: `WARN`
+- Latest focus t90: `foreground-track-v3-t90.png`, risk `1.442`,
+  flat `0.573`
+- Previous water/shore focus: `rapid-shore-edge-v1-t90.png`, risk `1.534`,
   flat `0.675`
-- Previous water/shore focus: `rapid-water-width-v1-t90.png`, risk `1.638`,
-  flat `0.707`
-- Map inspect: `rapid-shore-edge-v1` had 0 errors, 0 warnings
+- Map inspect: `foreground-track-v3` had 0 errors, 0 warnings
 - Automation: `.\scripts\test-yarlung.ps1 -Build` passed 15/15
 
 Implemented:
@@ -54,35 +58,43 @@ Implemented:
 - Recast `wet_rock_shore` as smaller embedded bank stones near the visible
   water edge. The latest generated map places `1547` wet-shore instances,
   compared with `949` in the previous wide-water pass.
+- Upgraded the first-person track proxy into a more useful authored-system
+  placeholder: wider gauge, darker oxide rails, box-beam cross ties, thinner
+  steel braces, more frequent structural rhythm, and a right-seat camera offset.
+- Tested a more extreme right/open camera (`foreground-track-v2`) and rejected
+  it as `DIRECTION-LIMIT`: it opened the valley but weakened the foreground
+  coaster anchor without solving the left-wall dominance. The kept v3 uses the
+  stronger v1 camera with lighter/thinner internal steel.
 
 Visual read:
 
 - Water/shore is clearly better than `river-footprint-clearance-v1`: open-water
   fake boulders are gone, the river is wider, and the surface has readable
   longitudinal rapid streaks instead of a flat narrow road.
+- Foreground track now reads less like toy red pipes. It is still not a final
+  coaster/train asset, but it gives the frame a more believable first-person
+  structural anchor.
 - The latest frame is still not AAA. The left near wall dominates as a dark,
-  smooth foreground mass, the center track is still proxy-like red tubing, and
-  the far canyon still reads as repeated rock chunks over terrain instead of
-  continuous authored geology.
-- This was an effective direction, not a failed one. Remaining issues are now
-  composition, near-wall massing, foreground coaster hardware, and continuous
-  cliff forms more than water visibility.
+  smooth foreground mass, and the far canyon still reads as repeated rock chunks
+  over terrain instead of continuous authored geology.
+- This was an effective foreground pass, not a failed one. Remaining issues are
+  now near-wall composition, continuous cliff forms, and a real cockpit/car nose.
 
 ## Next Task
 
 Highest-return next task:
 
-**Reduce the left near-wall dominance and improve first-person composition
-before adding more scatter.**
+**Replace the left near-wall read with a composed cliff/window or reroute-style
+valley reveal before adding more scatter.**
 
 Scope:
 
-- Treat the current t90 view as a composition problem: left foreground wall,
-  centered proxy track, and visible smooth terrain are carrying the frame.
+- Treat the current t90 view as a composition problem: left foreground wall and
+  visible smooth terrain are carrying too much of the frame.
 - Prefer route/camera/segment-level composition and continuous cliff forms over
   more HISM density.
-- Start the foreground coaster pass soon: rail profile, cross ties, supports,
-  and cockpit/car nose are now a major realism blocker.
+- Continue foreground coaster work only as a real cockpit/car-nose pass, not
+  more proxy rail tweaks.
 
 Do not add screenshot-specific exclusion lists or more water boulders.
 
@@ -94,7 +106,8 @@ Do not add screenshot-specific exclusion lists or more water boulders.
 - Water is visible, wider, and better contacted to the riverbed. It still needs
   better reflection/depth variation and localized foam, but it is no longer the
   only blocker.
-- Lack of real cockpit/train foreground hurts first-person scale and photo read.
+- Lack of real cockpit/train foreground still hurts first-person scale and photo
+  read, although the rail proxy is now less toy-like.
 - Long docs were archived on 2026-06-23; if a future task needs old rationale,
   search `docs/archive/` deliberately instead of reading it by default.
 

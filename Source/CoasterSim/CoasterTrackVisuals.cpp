@@ -47,6 +47,18 @@ FTransform MakeTubeTransform(const FVector& Start, const FVector& End, float Dia
     return FTransform(Rotation, Mid, FVector(Diameter / 100.0f, Diameter / 100.0f, Length / 100.0f));
 }
 
+FTransform MakeBeamTransform(const FVector& Start, const FVector& End, float WidthCm, float DepthCm)
+{
+    const FVector Mid = (Start + End) * 0.5f;
+    const FVector Delta = End - Start;
+    const float Length = FMath::Max(Delta.Length(), 1.0f);
+    const FRotator Rotation = FRotationMatrix::MakeFromZ(Delta.GetSafeNormal()).Rotator();
+    return FTransform(
+        Rotation,
+        Mid,
+        FVector(FMath::Max(WidthCm, 1.0f) / 100.0f, FMath::Max(DepthCm, 1.0f) / 100.0f, Length / 100.0f));
+}
+
 void ApplyTint(UMeshComponent* Component, const FLinearColor& Color, float Metallic, float Roughness)
 {
     if (!Component)
@@ -92,14 +104,19 @@ void ConfigureMeshes(
     {
         UE_LOG(LogTemp, Fatal, TEXT("Required tube track mesh is missing: /Engine/BasicShapes/Cylinder.Cylinder"));
     }
+    UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+    if (!CubeMesh)
+    {
+        UE_LOG(LogTemp, Fatal, TEXT("Required beam track mesh is missing: /Engine/BasicShapes/Cube.Cube"));
+    }
 
     ConfigureTrackProxyComponent(LeftRail, CylinderMesh, true);
     ConfigureTrackProxyComponent(RightRail, CylinderMesh, true);
     ConfigureTrackProxyComponent(CenterSpine, CylinderMesh, false);
     ConfigureTrackProxyComponent(LeftGuardRail, CylinderMesh, false);
     ConfigureTrackProxyComponent(RightGuardRail, CylinderMesh, false);
-    ConfigureTrackProxyComponent(Ties, CylinderMesh, false);
-    ConfigureTrackProxyComponent(TrackBraces, CylinderMesh, false);
+    ConfigureTrackProxyComponent(Ties, CubeMesh, false);
+    ConfigureTrackProxyComponent(TrackBraces, CubeMesh, false);
     ConfigureSupportProxyComponent(Supports, CylinderMesh);
 }
 
@@ -113,17 +130,18 @@ void ApplyMaterials(
     UInstancedStaticMeshComponent* TrackBraces,
     UInstancedStaticMeshComponent* Supports)
 {
-    const FLinearColor TrackRed(0.76f, 0.12f, 0.08f);
-    const FLinearColor DarkRed(0.45f, 0.06f, 0.04f);
-    const FLinearColor SupportSteel(0.36f, 0.43f, 0.40f);
-    ApplyTint(LeftRail, TrackRed, 0.9f, 0.30f);
-    ApplyTint(RightRail, TrackRed, 0.9f, 0.30f);
-    ApplyTint(CenterSpine, DarkRed, 0.9f, 0.34f);
-    ApplyTint(LeftGuardRail, TrackRed, 0.85f, 0.36f);
-    ApplyTint(RightGuardRail, TrackRed, 0.85f, 0.36f);
-    ApplyTint(Ties, DarkRed, 0.85f, 0.42f);
-    ApplyTint(TrackBraces, TrackRed, 0.85f, 0.40f);
-    ApplyTint(Supports, SupportSteel, 0.65f, 0.58f);
+    const FLinearColor OxideRail(0.44f, 0.045f, 0.030f);
+    const FLinearColor DarkOxide(0.18f, 0.025f, 0.020f);
+    const FLinearColor WeatheredSteel(0.30f, 0.34f, 0.32f);
+    const FLinearColor DarkSteel(0.095f, 0.110f, 0.105f);
+    ApplyTint(LeftRail, OxideRail, 0.85f, 0.38f);
+    ApplyTint(RightRail, OxideRail, 0.85f, 0.38f);
+    ApplyTint(CenterSpine, DarkSteel, 0.82f, 0.46f);
+    ApplyTint(LeftGuardRail, DarkOxide, 0.70f, 0.48f);
+    ApplyTint(RightGuardRail, DarkOxide, 0.70f, 0.48f);
+    ApplyTint(Ties, DarkSteel, 0.78f, 0.52f);
+    ApplyTint(TrackBraces, WeatheredSteel, 0.70f, 0.50f);
+    ApplyTint(Supports, WeatheredSteel, 0.62f, 0.62f);
 }
 
 void SetVisible(
@@ -175,10 +193,10 @@ void Rebuild(
     Supports->ClearInstances();
 
     const float RailHalfGauge = RailGaugeCm * 0.5f;
-    constexpr float SegmentStep = 160.0f;
-    constexpr float TieStep = 260.0f;
-    constexpr float BraceStep = 520.0f;
-    constexpr float SupportStep = 22000.0f;
+    constexpr float SegmentStep = 130.0f;
+    constexpr float TieStep = 190.0f;
+    constexpr float BraceStep = 380.0f;
+    constexpr float SupportStep = 18000.0f;
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += SegmentStep)
     {
@@ -196,19 +214,19 @@ void Rebuild(
         FRotator RotationB;
         SampleFrame(FMath::Fmod(Distance + SegmentStep, TrackLengthCm), LocationB, RotationB, ForwardB, RightB, UpB);
 
-        const FVector RailDropA = UpA * 18.0f;
-        const FVector RailDropB = UpB * 18.0f;
-        LeftRail->AddInstance(MakeTubeTransform(LocationA - RightA * RailHalfGauge - RailDropA, LocationB - RightB * RailHalfGauge - RailDropB, 16.0f));
-        RightRail->AddInstance(MakeTubeTransform(LocationA + RightA * RailHalfGauge - RailDropA, LocationB + RightB * RailHalfGauge - RailDropB, 16.0f));
+        const FVector RailDropA = UpA * 20.0f;
+        const FVector RailDropB = UpB * 20.0f;
+        LeftRail->AddInstance(MakeTubeTransform(LocationA - RightA * RailHalfGauge - RailDropA, LocationB - RightB * RailHalfGauge - RailDropB, 18.0f));
+        RightRail->AddInstance(MakeTubeTransform(LocationA + RightA * RailHalfGauge - RailDropA, LocationB + RightB * RailHalfGauge - RailDropB, 18.0f));
 
-        const FVector SpineDropA = UpA * 52.0f;
-        const FVector SpineDropB = UpB * 52.0f;
-        CenterSpine->AddInstance(MakeTubeTransform(LocationA - SpineDropA, LocationB - SpineDropB, 22.0f));
+        const FVector SpineDropA = UpA * 74.0f;
+        const FVector SpineDropB = UpB * 74.0f;
+        CenterSpine->AddInstance(MakeTubeTransform(LocationA - SpineDropA, LocationB - SpineDropB, 16.0f));
 
-        const FVector GuardLiftA = UpA * 16.0f;
-        const FVector GuardLiftB = UpB * 16.0f;
-        LeftGuardRail->AddInstance(MakeTubeTransform(LocationA - RightA * (RailHalfGauge + 34.0f) + GuardLiftA, LocationB - RightB * (RailHalfGauge + 34.0f) + GuardLiftB, 4.0f));
-        RightGuardRail->AddInstance(MakeTubeTransform(LocationA + RightA * (RailHalfGauge + 34.0f) + GuardLiftA, LocationB + RightB * (RailHalfGauge + 34.0f) + GuardLiftB, 4.0f));
+        const FVector GuardLiftA = UpA * 18.0f;
+        const FVector GuardLiftB = UpB * 18.0f;
+        LeftGuardRail->AddInstance(MakeTubeTransform(LocationA - RightA * (RailHalfGauge + 42.0f) + GuardLiftA, LocationB - RightB * (RailHalfGauge + 42.0f) + GuardLiftB, 5.0f));
+        RightGuardRail->AddInstance(MakeTubeTransform(LocationA + RightA * (RailHalfGauge + 42.0f) + GuardLiftA, LocationB + RightB * (RailHalfGauge + 42.0f) + GuardLiftB, 5.0f));
     }
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += TieStep)
@@ -220,10 +238,10 @@ void Rebuild(
         FRotator Rotation;
         SampleFrame(Distance, Location, Rotation, Forward, Right, Up);
 
-        const FVector TieCenter = Location - Up * 38.0f;
-        const FVector TieStart = TieCenter - Right * (RailHalfGauge + 34.0f);
-        const FVector TieEnd = TieCenter + Right * (RailHalfGauge + 34.0f);
-        Ties->AddInstance(MakeTubeTransform(TieStart, TieEnd, 7.0f));
+        const FVector TieCenter = Location - Up * 48.0f;
+        const FVector TieStart = TieCenter - Right * (RailHalfGauge + 50.0f);
+        const FVector TieEnd = TieCenter + Right * (RailHalfGauge + 50.0f);
+        Ties->AddInstance(MakeBeamTransform(TieStart, TieEnd, 14.0f, 10.0f));
     }
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += BraceStep)
@@ -235,11 +253,13 @@ void Rebuild(
         FRotator Rotation;
         SampleFrame(Distance, Location, Rotation, Forward, Right, Up);
 
-        const FVector Spine = Location - Up * 58.0f;
-        const FVector LeftRailPoint = Location - Right * RailHalfGauge - Up * 20.0f;
-        const FVector RightRailPoint = Location + Right * RailHalfGauge - Up * 20.0f;
-        TrackBraces->AddInstance(MakeTubeTransform(Spine, LeftRailPoint, 5.0f));
-        TrackBraces->AddInstance(MakeTubeTransform(Spine, RightRailPoint, 5.0f));
+        const FVector Spine = Location - Up * 74.0f;
+        const FVector LeftRailPoint = Location - Right * RailHalfGauge - Up * 22.0f;
+        const FVector RightRailPoint = Location + Right * RailHalfGauge - Up * 22.0f;
+        TrackBraces->AddInstance(MakeBeamTransform(Spine, LeftRailPoint, 6.0f, 5.0f));
+        TrackBraces->AddInstance(MakeBeamTransform(Spine, RightRailPoint, 6.0f, 5.0f));
+        TrackBraces->AddInstance(MakeBeamTransform(LeftRailPoint - Forward * 68.0f, RightRailPoint + Forward * 68.0f, 4.5f, 4.5f));
+        TrackBraces->AddInstance(MakeBeamTransform(RightRailPoint - Forward * 68.0f, LeftRailPoint + Forward * 68.0f, 4.5f, 4.5f));
     }
 
     for (float Distance = 0.0f; Distance < TrackLengthCm; Distance += SupportStep)
