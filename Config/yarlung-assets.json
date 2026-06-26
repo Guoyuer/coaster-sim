@@ -329,6 +329,44 @@
         "yaw_jitter_degrees": 10,
         "align_to_surface": true
       },
+      "foreground_slope_patch": {
+        "lateral_min_cm": 16000,
+        "lateral_max_cm": 146000,
+        "lateral_step_cm": 14000,
+        "track_clearance_cm": 8000,
+        "river_clearance_cm": 4500,
+        "min_height_cm": 250000,
+        "max_height_cm": 545000,
+        "min_slope": 0,
+        "max_slope": 1,
+        "scale_min": 1.75,
+        "scale_max": 4.4,
+        "height_offset_cm": -760,
+        "embed_depth_cm": 1450,
+        "along_jitter_cm": 1200,
+        "lateral_jitter_cm": 2200,
+        "yaw_jitter_degrees": 8,
+        "align_to_surface": true
+      },
+      "foreground_near_apron": {
+        "lateral_min_cm": 6000,
+        "lateral_max_cm": 52000,
+        "lateral_step_cm": 6500,
+        "track_clearance_cm": 2500,
+        "river_clearance_cm": 3500,
+        "min_height_cm": 250000,
+        "max_height_cm": 545000,
+        "min_slope": 0,
+        "max_slope": 1,
+        "scale_min": 0.70,
+        "scale_max": 1.85,
+        "height_offset_cm": -320,
+        "embed_depth_cm": 520,
+        "along_jitter_cm": 900,
+        "lateral_jitter_cm": 1200,
+        "yaw_jitter_degrees": 18,
+        "align_to_surface": true
+      },
       "mid_cliff_mass": {
         "lateral_min_cm": 50000,
         "lateral_max_cm": 186000,
@@ -369,6 +407,46 @@
       }
     },
     "rock_wall_segments": [
+      {
+        "name": "t30_left_foreground_slope_patch",
+        "profile": "foreground_slope_patch",
+        "component": "SlopeRockWallA",
+        "start_sample": 84,
+        "end_sample": 124,
+        "sample_stride": 1,
+        "side": -1,
+        "seed": 601
+      },
+      {
+        "name": "t30_left_near_track_apron",
+        "profile": "foreground_near_apron",
+        "component": "SlopeRockWallA",
+        "start_sample": 88,
+        "end_sample": 116,
+        "sample_stride": 1,
+        "side": -1,
+        "seed": 631
+      },
+      {
+        "name": "t30_right_near_track_apron",
+        "profile": "foreground_near_apron",
+        "component": "SlopeRockWallB",
+        "start_sample": 88,
+        "end_sample": 116,
+        "sample_stride": 1,
+        "side": 1,
+        "seed": 647
+      },
+      {
+        "name": "t30_right_foreground_slope_patch",
+        "profile": "foreground_slope_patch",
+        "component": "SlopeRockWallB",
+        "start_sample": 84,
+        "end_sample": 124,
+        "sample_stride": 1,
+        "side": 1,
+        "seed": 617
+      },
       {
         "name": "left_near_slope_coverage",
         "profile": "near_slope_coverage",
@@ -558,15 +636,15 @@
       "normal": "/Game/Fab/Megascans/Surfaces/Forest_Floor_sfjmafua/Medium/sfjmafua_tier_2/Textures/T_sfjmafua_2K_N.T_sfjmafua_2K_N",
       "orm": "/Game/Fab/Megascans/Surfaces/Forest_Floor_sfjmafua/Medium/sfjmafua_tier_2/Textures/T_sfjmafua_2K_ORM.T_sfjmafua_2K_ORM",
       "tiling": 44,
-      "detail_strength": 0.48,
-      "roughness_strength": 0.42,
-      "ao_strength": 0.3
+      "detail_strength": 0.68,
+      "roughness_strength": 0.5,
+      "ao_strength": 0.38
     },
     "rock_surface": {
       "base_color": "/Game/Fab/Megascans/3D/Quarry_Cliff_uchwaffda/High/uchwaffda_tier_1/Textures/T_uchwaffda_4K_B.T_uchwaffda_4K_B",
       "normal": "/Game/Fab/Megascans/3D/Quarry_Cliff_uchwaffda/High/uchwaffda_tier_1/Textures/T_uchwaffda_4K_N.T_uchwaffda_4K_N",
       "orm": "/Game/Fab/Megascans/3D/Quarry_Cliff_uchwaffda/High/uchwaffda_tier_1/Textures/T_uchwaffda_4K_ORM.T_uchwaffda_4K_ORM",
-      "tiling": 16,
+      "tiling": 20,
       "blend_strength": 1
     }
   }

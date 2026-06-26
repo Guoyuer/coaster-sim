@@ -57,7 +57,14 @@ float YarlungRavineMask(float X, float Y, const FYarlungRiverField& RiverField)
     return FMath::Pow(FMath::Clamp(Signal, 0.0f, 1.0f), 5.0f);
 }
 
-FLinearColor YarlungSurfaceCoverageAtPosition(float X, float Y, float Height, const FVector& Normal, float WetRockMask, const FYarlungRiverField& RiverField)
+FLinearColor YarlungSurfaceCoverageAtPosition(
+    float X,
+    float Y,
+    float Height,
+    const FVector& Normal,
+    float WetRockMask,
+    float TrackDistanceCm,
+    const FYarlungRiverField& RiverField)
 {
     const float Height01 = YarlungTerrain::NormalizeEncodedHeightCm(Height);
     const float RiverDistance = RiverField.DistanceCm(FVector2D(X, Y));
@@ -82,6 +89,16 @@ FLinearColor YarlungSurfaceCoverageAtPosition(float X, float Y, float Height, co
             + YarlungDeterministicNoise::Value01(X * 0.091f - Height * 0.016f, Y * 0.077f + Height * 0.010f) * 0.45f,
         0.0f,
         1.0f);
+    const float NearTrackSlopeBand = YarlungTerrain::Smooth01((TrackDistanceCm - 9000.0f) / 26000.0f)
+        * (1.0f - YarlungTerrain::Smooth01((TrackDistanceCm - 125000.0f) / 82000.0f));
+    const float NearTrackPatchNoise = FMath::Clamp(
+        YarlungDeterministicNoise::Value01(X * 0.074f - Height * 0.015f, Y * 0.067f + Height * 0.012f) * 0.58f
+            + YarlungDeterministicNoise::Value01(X * 0.141f + Height * 0.010f, Y * 0.103f - Height * 0.018f) * 0.42f,
+        0.0f,
+        1.0f);
+    const float NearTrackGroundBreakup = NearTrackSlopeBand
+        * (1.0f - SteepSlope * 0.45f)
+        * YarlungTerrain::Smooth01((NearTrackPatchNoise - 0.16f) / 0.62f);
     const float CanyonSlopeBand = YarlungTerrain::Smooth01((RiverDistance - 18000.0f) / 90000.0f)
         * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 300000.0f) / 150000.0f));
     const float LowSlopeCanyonFloor = CanyonSlopeBand * (1.0f - SteepSlope) * YarlungTerrain::Smooth01((RiverDistance - 22000.0f) / 110000.0f);
@@ -111,10 +128,11 @@ FLinearColor YarlungSurfaceCoverageAtPosition(float X, float Y, float Height, co
         4.0f);
 
     const float ForestFloorMask = FMath::Clamp(
-        Forest * (0.36f - SteepSlope * 0.18f)
+        (Forest * (0.36f - SteepSlope * 0.18f)
             + SlopePatch * (1.0f - SteepSlope) * 0.10f
             + CanopyMask * ForestDistance * 0.06f
-            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((LowSlopeBreakup - 0.18f) / 0.62f) * 0.16f,
+            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((LowSlopeBreakup - 0.18f) / 0.62f) * 0.16f)
+            * (1.0f - NearTrackGroundBreakup * 0.72f),
         0.0f,
         1.0f);
     const float ScreeMask = FMath::Clamp(
@@ -123,7 +141,8 @@ FLinearColor YarlungSurfaceCoverageAtPosition(float X, float Y, float Height, co
             + SlopePatch * SteepSlope * 0.28f
             + Ravine * 0.45f
             + WetBank * 0.10f
-            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((LowSlopeBreakup - 0.48f) / 0.30f) * 0.42f,
+            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((LowSlopeBreakup - 0.48f) / 0.30f) * 0.42f
+            + NearTrackGroundBreakup * YarlungTerrain::Smooth01((NearTrackPatchNoise - 0.34f) / 0.34f) * 0.86f,
         0.0f,
         1.0f);
     const float WetRockCoverage = FMath::Clamp(
@@ -131,7 +150,8 @@ FLinearColor YarlungSurfaceCoverageAtPosition(float X, float Y, float Height, co
             + WetBank * 0.58f
             + SlopePatch * (0.08f + SteepSlope * 0.14f)
             + Ravine * 0.18f
-            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((0.50f - LowSlopeBreakup) / 0.34f) * 0.30f,
+            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((0.50f - LowSlopeBreakup) / 0.34f) * 0.30f
+            + NearTrackGroundBreakup * YarlungTerrain::Smooth01((0.62f - NearTrackPatchNoise) / 0.40f) * 0.70f,
         0.0f,
         1.0f);
 
@@ -261,7 +281,15 @@ void ComputeBaseTerrainNormalsAndCoverageMasks(
             Normals[VertexIndex] = Normal.IsNearlyZero() ? FVector::UpVector : Normal;
             const FVector& Position = Positions[VertexIndex];
             const float WetRockMask = YarlungCanyonWetRockMask(Position.X, Position.Y, Position.Z, Normals[VertexIndex], RiverField);
-            CoverageMasks[VertexIndex] = YarlungSurfaceCoverageAtPosition(Position.X, Position.Y, Position.Z, Normals[VertexIndex], WetRockMask, RiverField);
+            const float TrackDistanceCm = YarlungViewCorridor::DistanceToTrackCm(TrackPoints, FVector2D(Position.X, Position.Y));
+            CoverageMasks[VertexIndex] = YarlungSurfaceCoverageAtPosition(
+                Position.X,
+                Position.Y,
+                Position.Z,
+                Normals[VertexIndex],
+                WetRockMask,
+                TrackDistanceCm,
+                RiverField);
         }
     }
 }

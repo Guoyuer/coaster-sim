@@ -16,26 +16,35 @@ or `docs/reviews/archive/`.
 Latest run:
 
 ```powershell
-.\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Standard -Build -NamePrefix low-slope-coverage-v3
-.\scripts\iterate-yarlung.ps1 -Mode Material -Preset Standard -Build -NamePrefix cleanup-material-v1
-.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Standard -Build -NamePrefix authored-wall-massing-v1
-.\scripts\iterate-yarlung.ps1 -Mode ScreenshotOnly -Preset Focus -Build -NamePrefix authored-wall-focus-v2
+.\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Focus -Build -NamePrefix neartrack-rock-breakup-v2
+.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -NamePrefix t30-near-apron-v1
+.\scripts\iterate-yarlung.ps1 -Mode ScreenshotOnly -Preset Standard -Build -NamePrefix t30-near-apron-v1-standard
 ```
 
 Evidence:
 
-- Contact sheets: `Saved/Diagnostics/low-slope-coverage-v3.png`,
-  `Saved/Diagnostics/cleanup-material-v1.png`,
-  `Saved/Diagnostics/authored-wall-massing-v1.png`,
-  `Saved/Diagnostics/authored-wall-focus-v2.png`
-- Manifest: `Saved/Diagnostics/authored-wall-focus-v2-run.json`
+- Contact sheets: `Saved/Diagnostics/neartrack-rock-breakup-v2.png`,
+  `Saved/Diagnostics/t30-near-apron-v1.png`,
+  `Saved/Diagnostics/t30-near-apron-v1-standard.png`
+- Manifest: `Saved/Diagnostics/t30-near-apron-v1-standard-run.json`
 - RiskGate: `FAIL`
-- Worst frame: `authored-wall-focus-v2-t30.png`, risk `1.531`
-- Map inspect: `authored-wall-massing-v1` had 0 errors, 0 warnings
+- Worst frame: `t30-near-apron-v1-standard-t90.png`, risk `1.520`
+- Focus t30 improved from risk `1.549` / flat `0.775` to risk `1.165` /
+  flat `0.545`
+- Map inspect: `t30-near-apron-v1` had 0 errors, 0 warnings
 - Automation: `.\scripts\test-yarlung.ps1 -Build` passed 15/15
 
 Implemented:
 
+- Added a t30 authored slope set-piece using reusable rock-wall profiles:
+  `foreground_slope_patch` for larger midground rock mass and
+  `foreground_near_apron` for close ground-hugging breakup. The first attempt
+  missed because it was incorrectly placed at opening samples; the live segment
+  is now aligned to the actual t30 travel distance from `CoasterStartRatio=0.34`.
+- Added near-track terrain coverage breakup so first-person-adjacent slopes
+  reduce forest-floor dominance and gain wet-rock/scree masks. It is only a
+  base-layer improvement; geometry coverage is still doing most of the visible
+  t30 work.
 - Fixed a material pipeline bug exposed by screenshot fail-close:
   `M_YarlungWaterSurface` still contained an invalid UE 5.8
   `SingleLayerWaterMaterialOutput` graph, so `-game` screenshots compiled it
@@ -70,9 +79,13 @@ Visual read:
   hero view needs authored wall/slope set pieces, not more global scatter.
 - `authored-wall-massing-v1` improves t90/t150 by breaking up smooth slopes, but
   it still reads as many rock chunks rather than continuous geology.
-- `authored-wall-focus-v2` is faster and shows more near-wall presence, but t30
-  still has a large smooth left foreground slope. That is the next visual bug
-  to attack.
+- `t30-near-apron-v1` materially improves the t30 foreground slope read: the
+  pure smooth plane is now broken by rock massing and close apron geometry.
+  It is still not AAA because it reads as placed chunks over terrain, not a
+  continuous authored forest-floor/scree/wet-rock surface.
+- Standard validation moves the worst frame to t90. t90/t150 still show large
+  dark or green corridor slopes and need the same set-piece/continuous-surface
+  treatment across their real travel-distance ranges.
 - Water still lacks photo-level flow, foam, reflection, and wet shore breakup;
   foreground coaster hardware remains too proxy-like.
 
@@ -80,17 +93,17 @@ Visual read:
 
 Highest-return next task:
 
-**Fix the t30 foreground slope read, then confirm with Standard.**
+**Generalize the authored near-slope system to t90/t150 and convert chunked
+rock coverage into continuous forest-floor/scree/wet-rock surface reads.**
 
 Scope:
 
-- Use `.\scripts\iterate-yarlung.ps1 -Mode ScreenshotOnly -Preset Focus -Build`
-  for config/Actor visual tuning while targeting t30.
-- Do not keep adding small rock chunks. The t30 left foreground needs a system
-  that reads as continuous ground-hugging rock/scree/forest-floor cover or a
-  better composed foreground wall.
-- Once the Focus frame looks materially better, validate with `Actor` or
-  `ScreenshotOnly` `Standard` and open the contact sheet.
+- Use actual ride-distance/sample ranges when authoring first-person segments;
+  do not assume screenshot time equals early track samples.
+- Target t90 first, then t150. Both need fewer visible corridor-terrain fields
+  and more continuous canyon/forest-floor composition.
+- Keep the profile/segment system reusable. Avoid adding isolated one-off
+  lists that cannot be extended to the rest of the route.
 
 Do not simply increase HISM counts or relax cliff slope/clearance gates.
 
