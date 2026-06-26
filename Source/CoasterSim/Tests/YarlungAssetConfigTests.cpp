@@ -62,12 +62,15 @@ bool FYarlungRockWallSegmentsCoverTheCorridorTest::RunTest(const FString& Parame
             Config.RockWallProfiles.Contains(Segment.ProfileName));
         if (const FYarlungRockWallProfileConfig* Profile = Config.RockWallProfiles.Find(Segment.ProfileName))
         {
-            TestTrue(
-                FString::Printf(TEXT("%s uses surface-aligned rock placement"), *Segment.Name),
+            TestFalse(
+                FString::Printf(TEXT("%s keeps authored cliff faces upright instead of lying on the slope"), *Segment.Name),
                 Profile->bAlignToSurface);
             TestTrue(
-                FString::Printf(TEXT("%s only places rock-wall modules on cliff-like slopes"), *Segment.Name),
-                Profile->MinSlope >= 0.16f);
+                FString::Printf(TEXT("%s avoids placing rock-wall modules on fully flat terrain"), *Segment.Name),
+                Profile->MinSlope >= 0.03f);
+            TestTrue(
+                FString::Printf(TEXT("%s embeds cliff modules into the terrain"), *Segment.Name),
+                Profile->EmbedDepthCm >= 1200.0f);
         }
         TestTrue(
             FString::Printf(TEXT("%s targets a slope rock-wall component"), *Segment.Name),
@@ -85,6 +88,10 @@ bool FYarlungRockWallSegmentsCoverTheCorridorTest::RunTest(const FString& Parame
         if (Segment.Name == TEXT("left_near_slope_coverage"))
         {
             bLeftCoverageUsesValleyWindow = Segment.ProfileName == TEXT("left_valley_window_coverage");
+        }
+        if (Segment.Name == TEXT("right_near_slope_coverage"))
+        {
+            TestEqual(TEXT("Right near-slope coverage samples every track segment"), Segment.SampleStride, 1);
         }
     }
 
