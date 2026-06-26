@@ -83,11 +83,72 @@ bool HasRiverFootprintClearance(
     return RiverQuery.DistanceCm - VisibleWaterHalfWidthCm - ScaledRadiusCm >= ClearanceCm;
 }
 
-float GroundedPivotZCm(const UStaticMesh& Mesh, const FVector& Scale, float SurfaceZCm, float HeightOffsetCm, float EmbedDepthCm)
+float GroundedPivotZCm(
+    const UStaticMesh& Mesh,
+    const FVector& Scale,
+    const FQuat& Rotation,
+    float SurfaceZCm,
+    float HeightOffsetCm,
+    float EmbedDepthCm)
 {
     const FBoxSphereBounds Bounds = Mesh.GetBounds();
-    const float LocalBottomZ = Bounds.Origin.Z - Bounds.BoxExtent.Z;
-    return SurfaceZCm - LocalBottomZ * Scale.Z + HeightOffsetCm - EmbedDepthCm;
+    const FVector BoundsMin = Bounds.Origin - Bounds.BoxExtent;
+    const FVector BoundsMax = Bounds.Origin + Bounds.BoxExtent;
+    float LowestRelativeZ = TNumericLimits<float>::Max();
+
+    for (const float X : { BoundsMin.X, BoundsMax.X })
+    {
+        for (const float Y : { BoundsMin.Y, BoundsMax.Y })
+        {
+            for (const float Z : { BoundsMin.Z, BoundsMax.Z })
+            {
+                const FVector ScaledCorner(X * Scale.X, Y * Scale.Y, Z * Scale.Z);
+                LowestRelativeZ = FMath::Min(LowestRelativeZ, Rotation.RotateVector(ScaledCorner).Z);
+            }
+        }
+    }
+
+    return SurfaceZCm - LowestRelativeZ + HeightOffsetCm - EmbedDepthCm;
+}
+
+float FootprintGroundedPivotZCm(
+    const UStaticMesh& Mesh,
+    const FVector& Scale,
+    const FQuat& Rotation,
+    const FVector2D& PivotXY,
+    const TArray<uint16>& EncodedHeights,
+    const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
+    const FYarlungRiverField& RiverField,
+    float CenterSurfaceZCm,
+    float HeightOffsetCm,
+    float EmbedDepthCm)
+{
+    const FBoxSphereBounds Bounds = Mesh.GetBounds();
+    const FVector BoundsMin = Bounds.Origin - Bounds.BoxExtent;
+    const FVector BoundsMax = Bounds.Origin + Bounds.BoxExtent;
+    const float SampleXs[] = { BoundsMin.X, Bounds.Origin.X, BoundsMax.X };
+    const float SampleYs[] = { BoundsMin.Y, Bounds.Origin.Y, BoundsMax.Y };
+    const float BottomZ = BoundsMin.Z;
+    float PivotZCm = GroundedPivotZCm(Mesh, Scale, Rotation, CenterSurfaceZCm, HeightOffsetCm, EmbedDepthCm);
+
+    for (const float X : SampleXs)
+    {
+        for (const float Y : SampleYs)
+        {
+            const FVector Relative = Rotation.RotateVector(FVector(X * Scale.X, Y * Scale.Y, BottomZ * Scale.Z));
+            const FVector2D SampleXY(PivotXY.X + Relative.X, PivotXY.Y + Relative.Y);
+            const float SampleSurfaceZCm = YarlungTerrainSurface::SurfaceZCm(
+                EncodedHeights,
+                TerrainTrackPoints,
+                RiverField,
+                SampleXY);
+            PivotZCm = FMath::Min(
+                PivotZCm,
+                SampleSurfaceZCm - Relative.Z + HeightOffsetCm - EmbedDepthCm);
+        }
+    }
+
+    return PivotZCm;
 }
 
 float YawFacingDirection(const FVector2D& Direction)
@@ -175,36 +236,6 @@ AYarlungSceneryActor::AYarlungSceneryActor()
     UnderstoryClumps->SetCastShadow(false);
     UnderstoryClumps->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    CliffRockFacesA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesA"));
-    CliffRockFacesA->SetupAttachment(SceneRoot);
-    CliffRockFacesA->SetCastShadow(true);
-    CliffRockFacesA->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    CliffRockFacesB = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesB"));
-    CliffRockFacesB->SetupAttachment(SceneRoot);
-    CliffRockFacesB->SetCastShadow(true);
-    CliffRockFacesB->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    CliffRockFacesC = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesC"));
-    CliffRockFacesC->SetupAttachment(SceneRoot);
-    CliffRockFacesC->SetCastShadow(true);
-    CliffRockFacesC->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    CliffRockFacesD = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesD"));
-    CliffRockFacesD->SetupAttachment(SceneRoot);
-    CliffRockFacesD->SetCastShadow(true);
-    CliffRockFacesD->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    CliffRockFacesE = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesE"));
-    CliffRockFacesE->SetupAttachment(SceneRoot);
-    CliffRockFacesE->SetCastShadow(true);
-    CliffRockFacesE->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-    CliffRockFacesF = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("CliffRockFacesF"));
-    CliffRockFacesF->SetupAttachment(SceneRoot);
-    CliffRockFacesF->SetCastShadow(true);
-    CliffRockFacesF->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
     SlopeRockWallA = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("SlopeRockWallA"));
     SlopeRockWallA->SetupAttachment(SceneRoot);
     SlopeRockWallA->SetCastShadow(true);
@@ -260,12 +291,6 @@ void AYarlungSceneryActor::BeginPlay()
         RiverbankBoulders->SetVisibility(false, true);
         ScreeBoulders->SetVisibility(false, true);
         UnderstoryClumps->SetVisibility(false, true);
-        CliffRockFacesA->SetVisibility(false, true);
-        CliffRockFacesB->SetVisibility(false, true);
-        CliffRockFacesC->SetVisibility(false, true);
-        CliffRockFacesD->SetVisibility(false, true);
-        CliffRockFacesE->SetVisibility(false, true);
-        CliffRockFacesF->SetVisibility(false, true);
         SlopeRockWallA->SetVisibility(false, true);
         SlopeRockWallB->SetVisibility(false, true);
         ForestShrubsA->SetVisibility(false, true);
@@ -323,12 +348,6 @@ UHierarchicalInstancedStaticMeshComponent* AYarlungSceneryActor::ComponentByName
     if (Name == TEXT("RiverbankBoulders")) { return RiverbankBoulders; }
     if (Name == TEXT("ScreeBoulders")) { return ScreeBoulders; }
     if (Name == TEXT("UnderstoryClumps")) { return UnderstoryClumps; }
-    if (Name == TEXT("CliffRockFacesA")) { return CliffRockFacesA; }
-    if (Name == TEXT("CliffRockFacesB")) { return CliffRockFacesB; }
-    if (Name == TEXT("CliffRockFacesC")) { return CliffRockFacesC; }
-    if (Name == TEXT("CliffRockFacesD")) { return CliffRockFacesD; }
-    if (Name == TEXT("CliffRockFacesE")) { return CliffRockFacesE; }
-    if (Name == TEXT("CliffRockFacesF")) { return CliffRockFacesF; }
     if (Name == TEXT("SlopeRockWallA")) { return SlopeRockWallA; }
     if (Name == TEXT("SlopeRockWallB")) { return SlopeRockWallB; }
     if (Name == TEXT("ForestShrubsA")) { return ForestShrubsA; }
@@ -345,12 +364,6 @@ void AYarlungSceneryActor::ClearAllInstances()
     RiverbankBoulders->ClearInstances();
     ScreeBoulders->ClearInstances();
     UnderstoryClumps->ClearInstances();
-    CliffRockFacesA->ClearInstances();
-    CliffRockFacesB->ClearInstances();
-    CliffRockFacesC->ClearInstances();
-    CliffRockFacesD->ClearInstances();
-    CliffRockFacesE->ClearInstances();
-    CliffRockFacesF->ClearInstances();
     SlopeRockWallA->ClearInstances();
     SlopeRockWallB->ClearInstances();
     ForestShrubsA->ClearInstances();
@@ -453,9 +466,6 @@ void AYarlungSceneryActor::BuildScatter(
         case EYarlungSceneryPlacement::Scatter:
             AddScatterRule(Component, ComponentConfig, *KindConfig, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
             break;
-        case EYarlungSceneryPlacement::CliffBelt:
-            AddCliffBelt(Component, AssetConfig.CliffBelt, ComponentConfig.Seed, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
-            break;
         case EYarlungSceneryPlacement::SurfaceCover:
         {
             const FYarlungSurfaceCoverProfileConfig* Profile = AssetConfig.SurfaceCoverProfiles.Find(ComponentConfig.SurfaceCoverProfileName);
@@ -476,17 +486,11 @@ void AYarlungSceneryActor::BuildScatter(
     UE_LOG(
         LogTemp,
         Display,
-        TEXT("Yarlung scatter instances: rocks=%d riverbank=%d scree=%d understory=%d cliff_a=%d cliff_b=%d cliff_c=%d cliff_d=%d cliff_e=%d cliff_f=%d slope_rock_a=%d slope_rock_b=%d shrubs_a=%d shrubs_b=%d canopy_a=%d canopy_b=%d canopy_c=%d"),
+        TEXT("Yarlung scatter instances: rocks=%d riverbank=%d scree=%d understory=%d slope_rock_a=%d slope_rock_b=%d shrubs_a=%d shrubs_b=%d canopy_a=%d canopy_b=%d canopy_c=%d"),
         RockOutcrops->GetInstanceCount(),
         RiverbankBoulders->GetInstanceCount(),
         ScreeBoulders->GetInstanceCount(),
         UnderstoryClumps->GetInstanceCount(),
-        CliffRockFacesA->GetInstanceCount(),
-        CliffRockFacesB->GetInstanceCount(),
-        CliffRockFacesC->GetInstanceCount(),
-        CliffRockFacesD->GetInstanceCount(),
-        CliffRockFacesE->GetInstanceCount(),
-        CliffRockFacesF->GetInstanceCount(),
         SlopeRockWallA->GetInstanceCount(),
         SlopeRockWallB->GetInstanceCount(),
         ForestShrubsA->GetInstanceCount(),
@@ -622,10 +626,13 @@ void AYarlungSceneryActor::AddScatterRule(
         {
             continue;
         }
-        const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(*Component->GetStaticMesh(), Scale, Height, KindConfig.HeightOffsetCm, 0.0f));
         const FQuat Rotation = KindConfig.bAlignToSurface
             ? SurfaceAlignedRotation(Normal, Yaw)
             : FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw));
+        const FVector Location(
+            Location2D.X,
+            Location2D.Y,
+            GroundedPivotZCm(*Component->GetStaticMesh(), Scale, Rotation, Height, KindConfig.HeightOffsetCm, 0.0f));
         Component->AddInstance(FTransform(Rotation, Location, Scale));
     }
 }
@@ -722,7 +729,6 @@ void AYarlungSceneryActor::AddSurfaceCoverLayer(
         {
             return;
         }
-        const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Profile.HeightOffsetCm, 0.0f));
         FVector TrackCenter = FVector::ZeroVector;
         float SignedTrackOffsetCm = 0.0f;
         if (!ProjectOntoTrackCorridor(TrackSamples, FVector2D(Location2D.X, Location2D.Y), TrackCenter, SignedTrackOffsetCm))
@@ -736,6 +742,10 @@ void AYarlungSceneryActor::AddSurfaceCoverLayer(
         const FQuat Rotation = Profile.bAlignToSurface
             ? SurfaceAlignedRotation(Normal, Yaw)
             : FQuat(FVector::UpVector, FMath::DegreesToRadians(Yaw));
+        const FVector Location(
+            Location2D.X,
+            Location2D.Y,
+            GroundedPivotZCm(Mesh, Scale, Rotation, Height, Profile.HeightOffsetCm, 0.0f));
         Component->AddInstance(FTransform(Rotation, Location, Scale));
         ++PlacedCount;
     };
@@ -893,209 +903,32 @@ void AYarlungSceneryActor::AddRockWallSegment(
                 ++LaneIndex;
                 continue;
             }
-            const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Profile.HeightOffsetCm, Profile.EmbedDepthCm));
+            const FQuat Rotation = Profile.bAlignToSurface
+                ? SurfaceAlignedRotation(SurfaceNormal, Yaw)
+                : UprightYawRotation(Yaw);
+            const FVector Location(
+                Location2D.X,
+                Location2D.Y,
+                FootprintGroundedPivotZCm(
+                    Mesh,
+                    Scale,
+                    Rotation,
+                    FVector2D(Location2D.X, Location2D.Y),
+                    EncodedHeights,
+                    TerrainTrackPoints,
+                    RiverField,
+                    Height,
+                    Profile.HeightOffsetCm,
+                    Profile.EmbedDepthCm));
             if (FVector::Dist(Location, Center) - ScaledRadiusCm < Profile.TrackClearanceCm)
             {
                 ++LaneIndex;
                 continue;
             }
 
-            const FQuat Rotation = Profile.bAlignToSurface
-                ? SurfaceAlignedRotation(SurfaceNormal, Yaw)
-                : UprightYawRotation(Yaw);
             Component->AddInstance(FTransform(Rotation, Location, Scale));
             ++InOutPlacedCount;
             ++LaneIndex;
-        }
-    }
-}
-
-void AYarlungSceneryActor::AddCliffBelt(
-    UHierarchicalInstancedStaticMeshComponent* Component,
-    const FYarlungCliffBeltConfig& Belt,
-    float Seed,
-    const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-    const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
-    const TArray<uint16>& EncodedHeights,
-    const FYarlungRiverField& RiverField)
-{
-    if (!Component || !Component->GetStaticMesh())
-    {
-        return;
-    }
-    const UStaticMesh& Mesh = *Component->GetStaticMesh();
-
-    for (int32 SampleIndex = 0; SampleIndex < TrackSamples.Num() - 1; SampleIndex += FMath::Max(1, Belt.SampleStride))
-    {
-        const FYarlungSceneryTrackSample& A = TrackSamples[SampleIndex];
-        const FYarlungSceneryTrackSample& B = TrackSamples[SampleIndex + 1];
-        const FVector Center = (A.Position + B.Position) * 0.5f;
-        const FVector Forward = HorizontalForward(TrackSamples, SampleIndex);
-        const FVector Right = RightFromForward(Forward);
-
-        for (float Side : { -1.0f, 1.0f })
-        {
-            for (int32 BandIndex = 0; BandIndex < Belt.LateralBandsCm.Num(); ++BandIndex)
-            {
-                const float Keep = Hash01(SampleIndex * 1.271f + BandIndex * 8.991f + Seed, Side > 0.0f ? 5.13f : 7.67f);
-                if (Keep > Belt.Occupancy)
-                {
-                    continue;
-                }
-
-                const float AlongJitterCm = FMath::Lerp(-Belt.AlongJitterCm, Belt.AlongJitterCm, Hash01(SampleIndex * 2.381f + BandIndex + Seed, 11.0f));
-                const float LateralJitterCm = FMath::Lerp(-Belt.LateralJitterCm, Belt.LateralJitterCm, Hash01(SampleIndex * 4.619f + BandIndex + Seed, 17.0f));
-                const float LateralCm = FMath::Max(0.0f, Belt.LateralBandsCm[BandIndex] + LateralJitterCm);
-                const float SignedOffsetCm = Side * LateralCm;
-                const FVector Location2D = Center + Forward * AlongJitterCm + Right * SignedOffsetCm;
-
-                float Height = 0.0f;
-                FVector Normal = FVector::UpVector;
-                if (!TryResolvePlacement(
-                    EncodedHeights,
-                    TerrainTrackPoints,
-                    RiverField,
-                    Location2D,
-                    Belt.RiverClearanceCm,
-                    Belt.MinHeightCm,
-                    Belt.MaxHeightCm,
-                    Belt.MinSlope,
-                    Belt.MaxSlope,
-                    Height,
-                    Normal))
-                {
-                    continue;
-                }
-
-                const FYarlungRiverQuery RiverQuery = RiverField.QueryNearest(FVector2D(Location2D.X, Location2D.Y));
-                const FVector2D FaceRiverDirection(
-                    RiverQuery.Row.PositionCm.X - Location2D.X,
-                    RiverQuery.Row.PositionCm.Y - Location2D.Y);
-                const FVector2D FallbackInwardDirection(-Side * Right.X, -Side * Right.Y);
-                const float FaceInwardYaw = YawFacingDirection(
-                    FaceRiverDirection.IsNearlyZero() ? FallbackInwardDirection : FaceRiverDirection);
-                const float Yaw = FaceInwardYaw + FMath::Lerp(-Belt.YawJitterDegrees, Belt.YawJitterDegrees, Hash01(SampleIndex * 3.017f + BandIndex + Seed, 23.0f));
-                const float ScaleBase = FMath::Lerp(Belt.ScaleMin, Belt.ScaleMax, Hash01(SampleIndex * 6.971f + BandIndex + Seed, 31.0f));
-                const FVector Scale = GeologicWallScale(
-                    ScaleBase,
-                    Hash01(SampleIndex * 7.0f + BandIndex + Seed, 41.0f),
-                    Hash01(SampleIndex * 9.0f + BandIndex + Seed, 43.0f),
-                    Hash01(SampleIndex * 5.0f + BandIndex + Seed, 47.0f));
-                const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
-                if (!HasRiverFootprintClearance(RiverField, FVector2D(Location2D.X, Location2D.Y), ScaledRadiusCm, Belt.RiverClearanceCm))
-                {
-                    continue;
-                }
-                const FVector Location(Location2D.X, Location2D.Y, GroundedPivotZCm(Mesh, Scale, Height, Belt.HeightOffsetCm, 0.0f));
-                if (FVector::Dist(Location, Center) - ScaledRadiusCm < Belt.TrackClearanceCm)
-                {
-                    continue;
-                }
-                Component->AddInstance(FTransform(UprightYawRotation(Yaw), Location, Scale));
-            }
-        }
-    }
-
-    AddRiverWallCliffs(Component, Belt, Seed, TrackSamples, TerrainTrackPoints, EncodedHeights, RiverField);
-}
-
-void AYarlungSceneryActor::AddRiverWallCliffs(
-    UHierarchicalInstancedStaticMeshComponent* Component,
-    const FYarlungCliffBeltConfig& Belt,
-    float Seed,
-    const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-    const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
-    const TArray<uint16>& EncodedHeights,
-    const FYarlungRiverField& RiverField)
-{
-    if (!Component || !Component->GetStaticMesh())
-    {
-        return;
-    }
-
-    const TArray<FYarlungRiverRow>& RiverRows = RiverField.GetRows();
-    if (RiverRows.Num() < 3)
-    {
-        return;
-    }
-
-    const UStaticMesh& Mesh = *Component->GetStaticMesh();
-    for (int32 RiverIndex = 1; RiverIndex + 1 < RiverRows.Num(); RiverIndex += FMath::Max(1, Belt.RiverWallSampleStride))
-    {
-        const FYarlungRiverRow& Row = RiverRows[RiverIndex];
-        const FVector2D RiverCenter(Row.PositionCm.X, Row.PositionCm.Y);
-        const FVector2D Prev(RiverRows[RiverIndex - 1].PositionCm.X, RiverRows[RiverIndex - 1].PositionCm.Y);
-        const FVector2D Next(RiverRows[RiverIndex + 1].PositionCm.X, RiverRows[RiverIndex + 1].PositionCm.Y);
-        const FVector2D Tangent = (Next - Prev).GetSafeNormal();
-        if (Tangent.IsNearlyZero())
-        {
-            continue;
-        }
-        const FVector2D Right(-Tangent.Y, Tangent.X);
-
-        for (float Side : { -1.0f, 1.0f })
-        {
-            for (int32 BandIndex = 0; BandIndex < Belt.RiverWallLateralBandsCm.Num(); ++BandIndex)
-            {
-                const float Keep = Hash01(RiverIndex * 1.119f + BandIndex * 5.771f + Seed, Side > 0.0f ? 61.0f : 73.0f);
-                if (Keep > Belt.RiverWallOccupancy)
-                {
-                    continue;
-                }
-
-                const float AlongJitterCm = FMath::Lerp(-Belt.RiverWallAlongJitterCm, Belt.RiverWallAlongJitterCm, Hash01(RiverIndex * 2.871f + BandIndex + Seed, 79.0f));
-                const float LateralJitterCm = FMath::Lerp(-Belt.RiverWallLateralJitterCm, Belt.RiverWallLateralJitterCm, Hash01(RiverIndex * 3.493f + BandIndex + Seed, 83.0f));
-                const float LateralCm = FMath::Max(Belt.RiverClearanceCm, Belt.RiverWallLateralBandsCm[BandIndex] + LateralJitterCm);
-                const FVector2D LocationXY = RiverCenter + Tangent * AlongJitterCm + Right * Side * LateralCm;
-
-                FVector TrackCenter = FVector::ZeroVector;
-                float SignedOffsetCm = 0.0f;
-                if (!ProjectOntoTrackCorridor(TrackSamples, LocationXY, TrackCenter, SignedOffsetCm))
-                {
-                    continue;
-                }
-
-                float Height = 0.0f;
-                FVector Normal = FVector::UpVector;
-                const FVector Location2D(LocationXY.X, LocationXY.Y, 0.0f);
-                if (!TryResolvePlacement(
-                    EncodedHeights,
-                    TerrainTrackPoints,
-                    RiverField,
-                    Location2D,
-                    Belt.RiverClearanceCm,
-                    Belt.MinHeightCm,
-                    Belt.MaxHeightCm,
-                    Belt.MinSlope,
-                    Belt.MaxSlope,
-                    Height,
-                    Normal))
-                {
-                    continue;
-                }
-
-                const float FaceRiverYaw = YawFacingDirection(RiverCenter - LocationXY);
-                const float Yaw = FaceRiverYaw + FMath::Lerp(-Belt.RiverWallYawJitterDegrees, Belt.RiverWallYawJitterDegrees, Hash01(RiverIndex * 4.113f + BandIndex + Seed, 89.0f));
-                const float ScaleBase = FMath::Lerp(Belt.RiverWallScaleMin, Belt.RiverWallScaleMax, Hash01(RiverIndex * 6.331f + BandIndex + Seed, 97.0f));
-                const FVector Scale = GeologicWallScale(
-                    ScaleBase,
-                    Hash01(RiverIndex * 5.0f + BandIndex + Seed, 101.0f),
-                    Hash01(RiverIndex * 7.0f + BandIndex + Seed, 103.0f),
-                    Hash01(RiverIndex * 9.0f + BandIndex + Seed, 107.0f));
-                const float ScaledRadiusCm = ScaledHorizontalRadiusCm(Mesh, Scale);
-                if (!HasRiverFootprintClearance(RiverField, LocationXY, ScaledRadiusCm, Belt.RiverClearanceCm))
-                {
-                    continue;
-                }
-                const float HorizontalTrackDistanceCm = FVector2D::Distance(LocationXY, FVector2D(TrackCenter.X, TrackCenter.Y));
-                if (HorizontalTrackDistanceCm - ScaledRadiusCm < Belt.TrackClearanceCm)
-                {
-                    continue;
-                }
-
-                const FVector Location(LocationXY.X, LocationXY.Y, GroundedPivotZCm(Mesh, Scale, Height, Belt.RiverWallHeightOffsetCm, 0.0f));
-                Component->AddInstance(FTransform(UprightYawRotation(Yaw), Location, Scale));
-            }
         }
     }
 }

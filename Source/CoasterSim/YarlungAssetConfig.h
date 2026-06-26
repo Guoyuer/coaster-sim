@@ -5,7 +5,6 @@
 enum class EYarlungSceneryPlacement : uint8
 {
     Scatter,
-    CliffBelt,
     SurfaceCover,
     RockWallSource
 };
@@ -44,34 +43,6 @@ struct FYarlungSceneryComponentConfig
     float Seed = 0.0f;
     bool bUseTint = false;
     FLinearColor Tint = FLinearColor::White;
-};
-
-struct FYarlungCliffBeltConfig
-{
-    int32 SampleStride = 2;
-    TArray<float> LateralBandsCm;
-    float Occupancy = 0.0f;
-    float TrackClearanceCm = 0.0f;
-    float RiverClearanceCm = 0.0f;
-    float MinHeightCm = 0.0f;
-    float MaxHeightCm = 0.0f;
-    float MinSlope = 0.0f;
-    float MaxSlope = 1.0f;
-    float ScaleMin = 1.0f;
-    float ScaleMax = 1.0f;
-    float HeightOffsetCm = 0.0f;
-    float AlongJitterCm = 0.0f;
-    float LateralJitterCm = 0.0f;
-    float YawJitterDegrees = 0.0f;
-    int32 RiverWallSampleStride = 8;
-    TArray<float> RiverWallLateralBandsCm;
-    float RiverWallOccupancy = 0.0f;
-    float RiverWallScaleMin = 1.0f;
-    float RiverWallScaleMax = 1.0f;
-    float RiverWallHeightOffsetCm = 0.0f;
-    float RiverWallAlongJitterCm = 0.0f;
-    float RiverWallLateralJitterCm = 0.0f;
-    float RiverWallYawJitterDegrees = 0.0f;
 };
 
 struct FYarlungSurfaceCoverProfileConfig
@@ -140,7 +111,6 @@ struct FYarlungAssetConfig
 {
     TArray<FYarlungSceneryComponentConfig> SceneryComponents;
     TMap<FString, FYarlungScatterKindConfig> ScatterKinds;
-    FYarlungCliffBeltConfig CliffBelt;
     TMap<FString, FYarlungSurfaceCoverProfileConfig> SurfaceCoverProfiles;
     TMap<FString, FYarlungRockWallProfileConfig> RockWallProfiles;
     TArray<FYarlungRockWallSegmentConfig> RockWallSegments;

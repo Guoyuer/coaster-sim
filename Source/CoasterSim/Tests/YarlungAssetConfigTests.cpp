@@ -15,6 +15,21 @@ bool FYarlungRockWallSegmentsCoverTheCorridorTest::RunTest(const FString& Parame
     TestTrue(TEXT("Reusable rock-wall profiles are declared"), Config.RockWallProfiles.Num() >= 3);
     TestTrue(TEXT("Full-corridor rock-wall segments are declared"), Config.RockWallSegments.Num() >= 6);
 
+    const FYarlungRockWallProfileConfig* NearSlopeProfile = Config.RockWallProfiles.Find(TEXT("near_slope_coverage"));
+    const FYarlungRockWallProfileConfig* LeftValleyWindowProfile =
+        Config.RockWallProfiles.Find(TEXT("left_valley_window_coverage"));
+    TestNotNull(TEXT("Right-side near-slope profile exists"), NearSlopeProfile);
+    TestNotNull(TEXT("Left-side valley-window profile exists"), LeftValleyWindowProfile);
+    if (NearSlopeProfile && LeftValleyWindowProfile)
+    {
+        TestTrue(
+            TEXT("Left valley-window profile preserves first-person valley visibility"),
+            LeftValleyWindowProfile->TrackClearanceCm > NearSlopeProfile->TrackClearanceCm);
+        TestTrue(
+            TEXT("Left valley-window profile uses smaller wall modules than the close near-slope wall"),
+            LeftValleyWindowProfile->ScaleMax < NearSlopeProfile->ScaleMax);
+    }
+
     int32 RockWallSourceCount = 0;
     for (const FYarlungSceneryComponentConfig& Component : Config.SceneryComponents)
     {
@@ -37,6 +52,7 @@ bool FYarlungRockWallSegmentsCoverTheCorridorTest::RunTest(const FString& Parame
     int32 HighestEndSample = 0;
     bool bHasLeftSide = false;
     bool bHasRightSide = false;
+    bool bLeftCoverageUsesValleyWindow = false;
 
     for (const FYarlungRockWallSegmentConfig& Segment : Config.RockWallSegments)
     {
@@ -44,6 +60,15 @@ bool FYarlungRockWallSegmentsCoverTheCorridorTest::RunTest(const FString& Parame
         TestTrue(
             FString::Printf(TEXT("%s references a known reusable profile"), *Segment.Name),
             Config.RockWallProfiles.Contains(Segment.ProfileName));
+        if (const FYarlungRockWallProfileConfig* Profile = Config.RockWallProfiles.Find(Segment.ProfileName))
+        {
+            TestTrue(
+                FString::Printf(TEXT("%s uses surface-aligned rock placement"), *Segment.Name),
+                Profile->bAlignToSurface);
+            TestTrue(
+                FString::Printf(TEXT("%s only places rock-wall modules on cliff-like slopes"), *Segment.Name),
+                Profile->MinSlope >= 0.16f);
+        }
         TestTrue(
             FString::Printf(TEXT("%s targets a slope rock-wall component"), *Segment.Name),
             Segment.ComponentName == TEXT("SlopeRockWallA") || Segment.ComponentName == TEXT("SlopeRockWallB"));
@@ -57,12 +82,17 @@ bool FYarlungRockWallSegmentsCoverTheCorridorTest::RunTest(const FString& Parame
         HighestEndSample = FMath::Max(HighestEndSample, Segment.EndSampleIndex);
         bHasLeftSide = bHasLeftSide || Segment.Side == -1.0f;
         bHasRightSide = bHasRightSide || Segment.Side == 1.0f;
+        if (Segment.Name == TEXT("left_near_slope_coverage"))
+        {
+            bLeftCoverageUsesValleyWindow = Segment.ProfileName == TEXT("left_valley_window_coverage");
+        }
     }
 
     TestEqual(TEXT("Rock-wall segment system starts at the launch corridor"), LowestStartSample, 0);
     TestTrue(TEXT("Rock-wall segment system reaches the end of the ride corridor"), HighestEndSample >= 224);
     TestTrue(TEXT("Rock-wall segment system covers the left side"), bHasLeftSide);
     TestTrue(TEXT("Rock-wall segment system covers the right side"), bHasRightSide);
+    TestTrue(TEXT("Left full-corridor coverage is a valley window, not a close wall"), bLeftCoverageUsesValleyWindow);
 
     return true;
 }
@@ -96,10 +126,14 @@ bool FYarlungSurfaceCoverProfilesDriveGroundAndCanopyTest::RunTest(const FString
     if (TalusScree)
     {
         TestEqual(TEXT("talus_scree anchors to the track corridor"), TalusScree->Anchor, EYarlungSurfaceCoverAnchor::Track);
+        TestTrue(TEXT("talus_scree reaches the near first-person slope"), TalusScree->TrackClearanceCm <= 12000.0f);
+        TestTrue(TEXT("talus_scree stays in small rubble scale"), TalusScree->ScaleMax <= 1.5f);
     }
     if (ForestFloor)
     {
         TestEqual(TEXT("forest_floor anchors to the track corridor"), ForestFloor->Anchor, EYarlungSurfaceCoverAnchor::Track);
+        TestTrue(TEXT("forest_floor reaches the near first-person slope"), ForestFloor->TrackClearanceCm <= 16000.0f);
+        TestTrue(TEXT("forest_floor can cover steep corridor banks"), ForestFloor->MaxSlope >= 0.9f);
     }
     if (CanopyMass)
     {

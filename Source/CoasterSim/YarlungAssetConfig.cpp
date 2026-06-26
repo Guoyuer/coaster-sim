@@ -376,10 +376,6 @@ EYarlungSceneryPlacement ParsePlacement(const FString& Value, const FString& Con
     {
         return EYarlungSceneryPlacement::Scatter;
     }
-    if (Value.Equals(TEXT("cliff_belt"), ESearchCase::IgnoreCase))
-    {
-        return EYarlungSceneryPlacement::CliffBelt;
-    }
     if (Value.Equals(TEXT("surface_cover"), ESearchCase::IgnoreCase))
     {
         return EYarlungSceneryPlacement::SurfaceCover;
@@ -414,10 +410,12 @@ FYarlungAssetConfig LoadConfigFromDisk()
     }
 
     const TSharedPtr<FJsonObject> Scenery = RequiredObject(Root, TEXT("scenery"), Path);
-    if (Scenery->HasField(TEXT("canopy_belt")) || Scenery->HasField(TEXT("ground_cover_belt")))
+    if (Scenery->HasField(TEXT("canopy_belt")) ||
+        Scenery->HasField(TEXT("ground_cover_belt")) ||
+        Scenery->HasField(TEXT("cliff_belt")))
     {
         FatalAssetConfigError(FString::Printf(
-            TEXT("%s uses removed scenery canopy/ground-cover belt fields; use scenery.surface_cover_profiles instead"),
+            TEXT("%s uses removed scenery belt fields; use scenery.surface_cover_profiles and scenery.rock_wall_segments instead"),
             *Path));
     }
 
@@ -502,33 +500,6 @@ FYarlungAssetConfig LoadConfigFromDisk()
         }
     }
 
-    const TSharedPtr<FJsonObject> CliffBelt = RequiredObject(Scenery, TEXT("cliff_belt"), Path);
-    const FString CliffBeltContext = FString::Printf(TEXT("%s scenery.cliff_belt"), *Path);
-    Config.CliffBelt.SampleStride = RequiredIntegerField(CliffBelt, TEXT("sample_stride"), CliffBeltContext);
-    Config.CliffBelt.LateralBandsCm = RequiredNumberArrayField(CliffBelt, TEXT("lateral_bands_cm"), CliffBeltContext);
-    Config.CliffBelt.Occupancy = RequiredNumberField(CliffBelt, TEXT("occupancy"), CliffBeltContext);
-    Config.CliffBelt.TrackClearanceCm = RequiredNumberField(CliffBelt, TEXT("track_clearance_cm"), CliffBeltContext);
-    Config.CliffBelt.RiverClearanceCm = RequiredNumberField(CliffBelt, TEXT("river_clearance_cm"), CliffBeltContext);
-    Config.CliffBelt.MinHeightCm = RequiredNumberField(CliffBelt, TEXT("min_height_cm"), CliffBeltContext);
-    Config.CliffBelt.MaxHeightCm = RequiredNumberField(CliffBelt, TEXT("max_height_cm"), CliffBeltContext);
-    Config.CliffBelt.MinSlope = RequiredNumberField(CliffBelt, TEXT("min_slope"), CliffBeltContext);
-    Config.CliffBelt.MaxSlope = RequiredNumberField(CliffBelt, TEXT("max_slope"), CliffBeltContext);
-    Config.CliffBelt.ScaleMin = RequiredNumberField(CliffBelt, TEXT("scale_min"), CliffBeltContext);
-    Config.CliffBelt.ScaleMax = RequiredNumberField(CliffBelt, TEXT("scale_max"), CliffBeltContext);
-    Config.CliffBelt.HeightOffsetCm = RequiredNumberField(CliffBelt, TEXT("height_offset_cm"), CliffBeltContext);
-    Config.CliffBelt.AlongJitterCm = RequiredNumberField(CliffBelt, TEXT("along_jitter_cm"), CliffBeltContext);
-    Config.CliffBelt.LateralJitterCm = RequiredNumberField(CliffBelt, TEXT("lateral_jitter_cm"), CliffBeltContext);
-    Config.CliffBelt.YawJitterDegrees = RequiredNumberField(CliffBelt, TEXT("yaw_jitter_degrees"), CliffBeltContext);
-    Config.CliffBelt.RiverWallSampleStride = RequiredIntegerField(CliffBelt, TEXT("river_wall_sample_stride"), CliffBeltContext);
-    Config.CliffBelt.RiverWallLateralBandsCm = RequiredNumberArrayField(CliffBelt, TEXT("river_wall_lateral_bands_cm"), CliffBeltContext);
-    Config.CliffBelt.RiverWallOccupancy = RequiredNumberField(CliffBelt, TEXT("river_wall_occupancy"), CliffBeltContext);
-    Config.CliffBelt.RiverWallScaleMin = RequiredNumberField(CliffBelt, TEXT("river_wall_scale_min"), CliffBeltContext);
-    Config.CliffBelt.RiverWallScaleMax = RequiredNumberField(CliffBelt, TEXT("river_wall_scale_max"), CliffBeltContext);
-    Config.CliffBelt.RiverWallHeightOffsetCm = RequiredNumberField(CliffBelt, TEXT("river_wall_height_offset_cm"), CliffBeltContext);
-    Config.CliffBelt.RiverWallAlongJitterCm = RequiredNumberField(CliffBelt, TEXT("river_wall_along_jitter_cm"), CliffBeltContext);
-    Config.CliffBelt.RiverWallLateralJitterCm = RequiredNumberField(CliffBelt, TEXT("river_wall_lateral_jitter_cm"), CliffBeltContext);
-    Config.CliffBelt.RiverWallYawJitterDegrees = RequiredNumberField(CliffBelt, TEXT("river_wall_yaw_jitter_degrees"), CliffBeltContext);
-
     ParseSurfaceCoverProfiles(Scenery, Path, Config.SurfaceCoverProfiles);
     ParseRockWallProfiles(Scenery, Path, Config.RockWallProfiles);
     ParseRockWallSegments(Scenery, Path, Config.RockWallSegments);
@@ -544,16 +515,6 @@ FYarlungAssetConfig LoadConfigFromDisk()
     if (Config.Water.SurfaceMaterialPath.IsEmpty())
     {
         FatalAssetConfigError(FString::Printf(TEXT("%s is missing water.surface_material"), *Path));
-    }
-    if (Config.CliffBelt.SampleStride <= 0 || Config.CliffBelt.LateralBandsCm.IsEmpty() ||
-        Config.CliffBelt.Occupancy < 0.0f || Config.CliffBelt.Occupancy > 1.0f ||
-        Config.CliffBelt.TrackClearanceCm < 0.0f ||
-        Config.CliffBelt.ScaleMin <= 0.0f || Config.CliffBelt.ScaleMax < Config.CliffBelt.ScaleMin ||
-        Config.CliffBelt.RiverWallSampleStride <= 0 || Config.CliffBelt.RiverWallLateralBandsCm.IsEmpty() ||
-        Config.CliffBelt.RiverWallOccupancy < 0.0f || Config.CliffBelt.RiverWallOccupancy > 1.0f ||
-        Config.CliffBelt.RiverWallScaleMin <= 0.0f || Config.CliffBelt.RiverWallScaleMax < Config.CliffBelt.RiverWallScaleMin)
-    {
-        FatalAssetConfigError(FString::Printf(TEXT("%s has invalid scenery.cliff_belt settings"), *Path));
     }
     ValidateSurfaceCoverProfiles(Config.SurfaceCoverProfiles, Path);
     for (const FYarlungSceneryComponentConfig& Component : Config.SceneryComponents)

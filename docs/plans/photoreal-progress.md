@@ -22,22 +22,23 @@ Latest run:
 .\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix foreground-track-v1
 .\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix foreground-track-v2
 .\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix foreground-track-v3
+.\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix slope-gated-rockwall-v1
 .\scripts\test-yarlung.ps1 -Build
 ```
 
 Evidence:
 
-- Contact sheets: `Saved/Diagnostics/river-footprint-clearance-v1.png`,
-  `Saved/Diagnostics/rapid-water-width-v1.png`,
-  `Saved/Diagnostics/rapid-shore-edge-v1.png`,
-  `Saved/Diagnostics/foreground-track-v3.png`
-- Latest focus manifest: `Saved/Diagnostics/foreground-track-v3-run.json`
-- RiskGate: `WARN`
-- Latest focus t90: `foreground-track-v3-t90.png`, risk `1.442`,
-  flat `0.573`
+- Contact sheets: `Saved/Diagnostics/foreground-track-v3.png`,
+  `Saved/Diagnostics/footprint-grounding-v1.png`,
+  `Saved/Diagnostics/no-cliff-belt-v1.png`,
+  `Saved/Diagnostics/slope-gated-rockwall-v1.png`
+- Latest focus manifest: `Saved/Diagnostics/slope-gated-rockwall-v1-run.json`
+- RiskGate: `FAIL`
+- Latest focus t90: `slope-gated-rockwall-v1-t90.png`, risk `1.589`,
+  flat `0.695`
 - Previous water/shore focus: `rapid-shore-edge-v1-t90.png`, risk `1.534`,
   flat `0.675`
-- Map inspect: `foreground-track-v3` had 0 errors, 0 warnings
+- Map inspect: `slope-gated-rockwall-v1` had 0 errors, 0 warnings
 - Automation: `.\scripts\test-yarlung.ps1 -Build` passed 15/15
 
 Implemented:
@@ -65,6 +66,16 @@ Implemented:
   it as `DIRECTION-LIMIT`: it opened the valley but weakened the foreground
   coaster anchor without solving the left-wall dominance. The kept v3 uses the
   stronger v1 camera with lighter/thinner internal steel.
+- Removed the legacy `cliff_belt` pipeline and its `CliffRockFacesA-F`
+  components. This path scattered isolated cliff chunks over smooth terrain and
+  was a major source of fake/floating rock reads.
+- Added rotation-aware and footprint-aware grounding for large rock-wall
+  modules, then gated rock-wall profiles to cliff-like slopes. Rock-wall
+  instances dropped from `2690` in `no-cliff-belt-v1` to `237` in
+  `slope-gated-rockwall-v1`, removing most fake random blocks from ordinary
+  slopes.
+- Added fail-close tests so removed belt fields are rejected and rock-wall
+  profiles must remain surface-aligned and slope-gated.
 
 Visual read:
 
@@ -79,22 +90,27 @@ Visual read:
   over terrain instead of continuous authored geology.
 - This was an effective foreground pass, not a failed one. Remaining issues are
   now near-wall composition, continuous cliff forms, and a real cockpit/car nose.
+- The latest rock cleanup is a bug/pipeline fix, not a final visual win. It
+  removes the floating/fake rock-block read, but exposes how much of the image
+  is still smooth corridor terrain. The frame is cleaner but more barren.
 
 ## Next Task
 
 Highest-return next task:
 
-**Replace the left near-wall read with a composed cliff/window or reroute-style
-valley reveal before adding more scatter.**
+**Build a real continuous authored slope/cliff surface to replace the now-exposed
+smooth corridor terrain.**
 
 Scope:
 
-- Treat the current t90 view as a composition problem: left foreground wall and
-  visible smooth terrain are carrying too much of the frame.
-- Prefer route/camera/segment-level composition and continuous cliff forms over
-  more HISM density.
-- Continue foreground coaster work only as a real cockpit/car-nose pass, not
-  more proxy rail tweaks.
+- Treat `slope-gated-rockwall-v1` as the clean baseline after removing fake
+  rock clutter.
+- Do not re-enable `cliff_belt` or loosen rock-wall slope gates to hide naked
+  terrain.
+- Add continuous authored geology/forest-floor coverage: slope surface
+  material, scree/wet-rock bands, canopy mass, and large coherent cliff forms.
+- Continue foreground coaster work only after the macro terrain/cliff read is
+  no longer a smooth corridor.
 
 Do not add screenshot-specific exclusion lists or more water boulders.
 

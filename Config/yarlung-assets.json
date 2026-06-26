@@ -39,48 +39,6 @@
         "profile": "forest_floor"
       },
       {
-        "name": "CliffRockFacesA",
-        "mesh": "/Game/Fab/Megascans/3D/Huge_Nordic_Coastal_Cliff_venrdcgga/High/venrdcgga_tier_1/StaticMeshes/venrdcgga_tier_1.venrdcgga_tier_1",
-        "kind": "cliff",
-        "placement": "cliff_belt",
-        "seed": 17
-      },
-      {
-        "name": "CliffRockFacesB",
-        "mesh": "/Game/Fab/Megascans/3D/Massive_Nordic_Coastal_Cliff_vdssailfa/High/vdssailfa_tier_1/StaticMeshes/vdssailfa_tier_1.vdssailfa_tier_1",
-        "kind": "cliff",
-        "placement": "cliff_belt",
-        "seed": 31
-      },
-      {
-        "name": "CliffRockFacesC",
-        "mesh": "/Game/Fab/Alaskan_Cliff_Rock_1_Free/alaskan_cliff_rock_1_free/StaticMeshes/alaskan_cliff_rock_1_free.alaskan_cliff_rock_1_free",
-        "kind": "cliff",
-        "placement": "cliff_belt",
-        "seed": 37
-      },
-      {
-        "name": "CliffRockFacesD",
-        "mesh": "/Game/Fab/Megascans/3D/Nordic_Forest_Cliff_Large_xibsff1/Raw/xibsff1_tier_0/StaticMeshes/xibsff1_tier_0.xibsff1_tier_0",
-        "kind": "cliff",
-        "placement": "cliff_belt",
-        "seed": 41
-      },
-      {
-        "name": "CliffRockFacesE",
-        "mesh": "/Game/Fab/Megascans/3D/Quarry_Cliff_uchwaffda/High/uchwaffda_tier_1/StaticMeshes/uchwaffda_tier_1.uchwaffda_tier_1",
-        "kind": "cliff",
-        "placement": "cliff_belt",
-        "seed": 53
-      },
-      {
-        "name": "CliffRockFacesF",
-        "mesh": "/Game/Fab/Megascans/3D/Nordic_Forest_Cliff_Large_xibsff1/Medium/xibsff1_tier_2/StaticMeshes/xibsff1_tier_2.xibsff1_tier_2",
-        "kind": "cliff",
-        "placement": "cliff_belt",
-        "seed": 67
-      },
-      {
         "name": "SlopeRockWallA",
         "mesh": "/Game/Fab/Megascans/3D/Huge_Nordic_Coastal_Cliff_venrdcgga/High/venrdcgga_tier_1/StaticMeshes/venrdcgga_tier_1.venrdcgga_tier_1",
         "kind": "slope_rock_wall",
@@ -267,48 +225,6 @@
         "align_to_surface": true
       }
     },
-    "cliff_belt": {
-      "sample_stride": 2,
-      "lateral_bands_cm": [
-        26000,
-        34000,
-        45000,
-        65000,
-        85000,
-        120000,
-        160000,
-        220000
-      ],
-      "occupancy": 0.68,
-      "track_clearance_cm": 42000,
-      "river_clearance_cm": 15000,
-      "min_height_cm": 250000,
-      "max_height_cm": 540000,
-      "min_slope": 0.08,
-      "max_slope": 1,
-      "scale_min": 2.4,
-      "scale_max": 7.2,
-      "height_offset_cm": -180,
-      "along_jitter_cm": 7200,
-      "lateral_jitter_cm": 11000,
-      "yaw_jitter_degrees": 34,
-      "river_wall_sample_stride": 5,
-      "river_wall_lateral_bands_cm": [
-        30000,
-        36000,
-        62000,
-        98000,
-        142000,
-        190000
-      ],
-      "river_wall_occupancy": 0.74,
-      "river_wall_scale_min": 2.4,
-      "river_wall_scale_max": 9.2,
-      "river_wall_height_offset_cm": -220,
-      "river_wall_along_jitter_cm": 5600,
-      "river_wall_lateral_jitter_cm": 9000,
-      "river_wall_yaw_jitter_degrees": 24
-    },
     "rock_wall_profiles": {
       "near_slope_coverage": {
         "lateral_min_cm": 12000,
@@ -318,7 +234,7 @@
         "river_clearance_cm": 5200,
         "min_height_cm": 250000,
         "max_height_cm": 545000,
-        "min_slope": 0,
+        "min_slope": 0.16,
         "max_slope": 1,
         "scale_min": 1.25,
         "scale_max": 2.9,
@@ -329,42 +245,23 @@
         "yaw_jitter_degrees": 10,
         "align_to_surface": true
       },
-      "foreground_slope_patch": {
-        "lateral_min_cm": 16000,
-        "lateral_max_cm": 146000,
-        "lateral_step_cm": 14000,
-        "track_clearance_cm": 8000,
-        "river_clearance_cm": 4500,
+      "left_valley_window_coverage": {
+        "lateral_min_cm": 42000,
+        "lateral_max_cm": 122000,
+        "lateral_step_cm": 18000,
+        "track_clearance_cm": 42000,
+        "river_clearance_cm": 7000,
         "min_height_cm": 250000,
         "max_height_cm": 545000,
-        "min_slope": 0,
+        "min_slope": 0.16,
         "max_slope": 1,
-        "scale_min": 1.75,
-        "scale_max": 4.4,
-        "height_offset_cm": -760,
-        "embed_depth_cm": 1450,
-        "along_jitter_cm": 1200,
-        "lateral_jitter_cm": 2200,
-        "yaw_jitter_degrees": 8,
-        "align_to_surface": true
-      },
-      "foreground_near_apron": {
-        "lateral_min_cm": 6000,
-        "lateral_max_cm": 52000,
-        "lateral_step_cm": 6500,
-        "track_clearance_cm": 2500,
-        "river_clearance_cm": 3500,
-        "min_height_cm": 250000,
-        "max_height_cm": 545000,
-        "min_slope": 0,
-        "max_slope": 1,
-        "scale_min": 0.70,
-        "scale_max": 1.85,
-        "height_offset_cm": -320,
-        "embed_depth_cm": 520,
-        "along_jitter_cm": 900,
-        "lateral_jitter_cm": 1200,
-        "yaw_jitter_degrees": 18,
+        "scale_min": 0.95,
+        "scale_max": 2.25,
+        "height_offset_cm": -560,
+        "embed_depth_cm": 900,
+        "along_jitter_cm": 2000,
+        "lateral_jitter_cm": 4200,
+        "yaw_jitter_degrees": 12,
         "align_to_surface": true
       },
       "mid_cliff_mass": {
@@ -375,7 +272,7 @@
         "river_clearance_cm": 9500,
         "min_height_cm": 250000,
         "max_height_cm": 545000,
-        "min_slope": 0.025,
+        "min_slope": 0.18,
         "max_slope": 1,
         "scale_min": 2.0,
         "scale_max": 4.7,
@@ -384,7 +281,7 @@
         "along_jitter_cm": 2400,
         "lateral_jitter_cm": 4800,
         "yaw_jitter_degrees": 12,
-        "align_to_surface": false
+        "align_to_surface": true
       },
       "far_backwall": {
         "lateral_min_cm": 112000,
@@ -394,7 +291,7 @@
         "river_clearance_cm": 2600,
         "min_height_cm": 250000,
         "max_height_cm": 550000,
-        "min_slope": 0.03,
+        "min_slope": 0.20,
         "max_slope": 1,
         "scale_min": 2.4,
         "scale_max": 5.6,
@@ -403,53 +300,13 @@
         "along_jitter_cm": 3400,
         "lateral_jitter_cm": 6400,
         "yaw_jitter_degrees": 11,
-        "align_to_surface": false
+        "align_to_surface": true
       }
     },
     "rock_wall_segments": [
       {
-        "name": "t30_left_foreground_slope_patch",
-        "profile": "foreground_slope_patch",
-        "component": "SlopeRockWallA",
-        "start_sample": 84,
-        "end_sample": 124,
-        "sample_stride": 1,
-        "side": -1,
-        "seed": 601
-      },
-      {
-        "name": "t30_left_near_track_apron",
-        "profile": "foreground_near_apron",
-        "component": "SlopeRockWallA",
-        "start_sample": 88,
-        "end_sample": 116,
-        "sample_stride": 1,
-        "side": -1,
-        "seed": 631
-      },
-      {
-        "name": "t30_right_near_track_apron",
-        "profile": "foreground_near_apron",
-        "component": "SlopeRockWallB",
-        "start_sample": 88,
-        "end_sample": 116,
-        "sample_stride": 1,
-        "side": 1,
-        "seed": 647
-      },
-      {
-        "name": "t30_right_foreground_slope_patch",
-        "profile": "foreground_slope_patch",
-        "component": "SlopeRockWallB",
-        "start_sample": 84,
-        "end_sample": 124,
-        "sample_stride": 1,
-        "side": 1,
-        "seed": 617
-      },
-      {
         "name": "left_near_slope_coverage",
-        "profile": "near_slope_coverage",
+        "profile": "left_valley_window_coverage",
         "component": "SlopeRockWallA",
         "start_sample": 0,
         "end_sample": 224,
@@ -552,16 +409,16 @@
           178000,
           220000
         ],
-        "occupancy": 0.9,
-        "track_clearance_cm": 18000,
+        "occupancy": 0.96,
+        "track_clearance_cm": 9500,
         "river_clearance_cm": 7500,
         "min_height_cm": 250000,
         "max_height_cm": 515000,
         "min_slope": 0.015,
         "max_slope": 1,
-        "scale_min": 0.35,
-        "scale_max": 2.35,
-        "height_offset_cm": 10,
+        "scale_min": 0.24,
+        "scale_max": 1.45,
+        "height_offset_cm": -30,
         "along_jitter_cm": 2600,
         "lateral_jitter_cm": 3400,
         "yaw_jitter_degrees": 28,
@@ -581,13 +438,13 @@
           90000,
           124000
         ],
-        "occupancy": 0.94,
-        "track_clearance_cm": 26000,
+        "occupancy": 0.98,
+        "track_clearance_cm": 14500,
         "river_clearance_cm": 12500,
-        "min_height_cm": 255000,
+        "min_height_cm": 250000,
         "max_height_cm": 465000,
         "min_slope": 0,
-        "max_slope": 0.82,
+        "max_slope": 0.92,
         "scale_min": 0.28,
         "scale_max": 0.82,
         "height_offset_cm": 8,

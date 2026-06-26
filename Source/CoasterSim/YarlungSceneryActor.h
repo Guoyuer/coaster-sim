@@ -8,7 +8,6 @@
 
 class UHierarchicalInstancedStaticMeshComponent;
 struct FYarlungAssetConfig;
-struct FYarlungCliffBeltConfig;
 struct FYarlungRockWallProfileConfig;
 struct FYarlungRockWallSegmentConfig;
 struct FYarlungSceneryComponentConfig;
@@ -50,24 +49,6 @@ private:
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> UnderstoryClumps;
-
-    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
-    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesA;
-
-    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
-    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesB;
-
-    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
-    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesC;
-
-    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
-    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesD;
-
-    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
-    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesE;
-
-    UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
-    TObjectPtr<UHierarchicalInstancedStaticMeshComponent> CliffRockFacesF;
 
     UPROPERTY(VisibleAnywhere, Category = "Yarlung Scenery")
     TObjectPtr<UHierarchicalInstancedStaticMeshComponent> SlopeRockWallA;
@@ -119,22 +100,6 @@ private:
         UHierarchicalInstancedStaticMeshComponent* Component,
         const FYarlungSceneryComponentConfig& ComponentConfig,
         const FYarlungScatterKindConfig& KindConfig,
-        const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-        const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
-        const TArray<uint16>& EncodedHeights,
-        const class FYarlungRiverField& RiverField);
-    void AddCliffBelt(
-        UHierarchicalInstancedStaticMeshComponent* Component,
-        const FYarlungCliffBeltConfig& BeltConfig,
-        float Seed,
-        const TArray<FYarlungSceneryTrackSample>& TrackSamples,
-        const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
-        const TArray<uint16>& EncodedHeights,
-        const class FYarlungRiverField& RiverField);
-    void AddRiverWallCliffs(
-        UHierarchicalInstancedStaticMeshComponent* Component,
-        const FYarlungCliffBeltConfig& BeltConfig,
-        float Seed,
         const TArray<FYarlungSceneryTrackSample>& TrackSamples,
         const TArray<YarlungViewCorridor::FTrackPoint>& TerrainTrackPoints,
         const TArray<uint16>& EncodedHeights,
