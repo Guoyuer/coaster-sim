@@ -73,7 +73,14 @@ bool HasRiverFootprintClearance(
     float ScaledRadiusCm,
     float ClearanceCm)
 {
-    return RiverField.DistanceCm(Location) - ScaledRadiusCm >= ClearanceCm;
+    const FYarlungRiverQuery RiverQuery = RiverField.QueryNearest(Location);
+    if (!RiverQuery.bIsValid)
+    {
+        return false;
+    }
+
+    const float VisibleWaterHalfWidthCm = FYarlungRiverField::VisibleRibbonHalfWidthCm(RiverQuery.Row.HalfWidthCm);
+    return RiverQuery.DistanceCm - VisibleWaterHalfWidthCm - ScaledRadiusCm >= ClearanceCm;
 }
 
 float GroundedPivotZCm(const UStaticMesh& Mesh, const FVector& Scale, float SurfaceZCm, float HeightOffsetCm, float EmbedDepthCm)

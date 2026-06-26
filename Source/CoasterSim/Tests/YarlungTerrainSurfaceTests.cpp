@@ -142,7 +142,7 @@ bool FYarlungRiverWidthConstantsStayOrderedTest::RunTest(const FString& Paramete
         const float ChannelHalfWidth = FYarlungRiverField::CarvedChannelHalfWidthCm(RiverHalfWidthCm);
         const float VisibleHalfWidth = FYarlungRiverField::VisibleRibbonHalfWidthCm(RiverHalfWidthCm);
         TestTrue(TEXT("Visible water ribbon stays inside carved river channel"), VisibleHalfWidth < ChannelHalfWidth);
-        TestTrue(TEXT("River channel leaves a real bank shelf outside the visible water"), ChannelHalfWidth - VisibleHalfWidth >= 1500.0f);
+        TestTrue(TEXT("River channel leaves a real bank shelf outside the visible water"), ChannelHalfWidth - VisibleHalfWidth >= 2000.0f);
     }
     return true;
 }
@@ -177,6 +177,7 @@ bool FYarlungRiverBedMeetsWaterlineAtRibbonEdgeTest::RunTest(const FString& Para
 
         // The bank climbs out of the water beyond the ribbon edge.
         TestTrue(TEXT("Bank rises above the water surface past the ribbon edge"), BankZ > WaterSurfaceZCm + 3000.0f);
+        TestTrue(TEXT("Bank does not form an immediate hard wall at the ribbon edge"), BankZ < WaterSurfaceZCm + 9000.0f);
     }
     return true;
 }

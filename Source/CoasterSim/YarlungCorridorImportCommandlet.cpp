@@ -41,8 +41,12 @@ float YarlungCanyonWetRockMask(float X, float Y, float Height, const FVector& Su
 {
     const float SlopeMask = YarlungTerrain::Smooth01(((1.0f - SurfaceNormal.Z) - 0.08f) / 0.30f);
     const float HeightMask = 1.0f - 0.55f * YarlungTerrain::Smooth01((Height - 515000.0f) / 120000.0f);
-    const float RiverDistance = RiverField.DistanceCm(FVector2D(X, Y));
-    const float DistanceMask = YarlungTerrain::Smooth01((RiverDistance - 16000.0f) / 115000.0f)
+    const FYarlungRiverQuery RiverQuery = RiverField.QueryNearest(FVector2D(X, Y));
+    const float RiverDistance = RiverQuery.bIsValid ? RiverQuery.DistanceCm : TNumericLimits<float>::Max();
+    const float VisibleWaterEdgeDistanceCm = RiverQuery.bIsValid
+        ? FMath::Max(0.0f, RiverDistance - FYarlungRiverField::VisibleRibbonHalfWidthCm(RiverQuery.Row.HalfWidthCm))
+        : TNumericLimits<float>::Max();
+    const float DistanceMask = YarlungTerrain::Smooth01((VisibleWaterEdgeDistanceCm - 2000.0f) / 115000.0f)
         * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 360000.0f) / 150000.0f));
     const float Strata = 0.5f + 0.5f * FMath::Sin(X * 0.0019f - Y * 0.0023f + Height * 0.0041f);
     return FMath::Clamp(DistanceMask * SlopeMask * HeightMask * (0.82f + Strata * 0.50f), 0.0f, 1.0f);
@@ -67,14 +71,18 @@ FLinearColor YarlungSurfaceCoverageAtPosition(
     const FYarlungRiverField& RiverField)
 {
     const float Height01 = YarlungTerrain::NormalizeEncodedHeightCm(Height);
-    const float RiverDistance = RiverField.DistanceCm(FVector2D(X, Y));
+    const FYarlungRiverQuery RiverQuery = RiverField.QueryNearest(FVector2D(X, Y));
+    const float RiverDistance = RiverQuery.bIsValid ? RiverQuery.DistanceCm : TNumericLimits<float>::Max();
+    const float VisibleWaterEdgeDistanceCm = RiverQuery.bIsValid
+        ? FMath::Max(0.0f, RiverDistance - FYarlungRiverField::VisibleRibbonHalfWidthCm(RiverQuery.Row.HalfWidthCm))
+        : TNumericLimits<float>::Max();
     const float Slope = 1.0f - Normal.GetSafeNormal(UE_SMALL_NUMBER, FVector::UpVector).Z;
     const float MidSlope = YarlungTerrain::Smooth01((Slope - 0.08f) / 0.24f);
     const float SteepSlope = YarlungTerrain::Smooth01((Slope - 0.22f) / 0.30f);
     const float ForestElevation = 1.0f - 0.36f * YarlungTerrain::Smooth01((Height01 - 0.88f) / 0.16f);
     const float ForestDistance = YarlungTerrain::Smooth01((RiverDistance - 1200.0f) / 38000.0f)
         * (1.0f - YarlungTerrain::Smooth01((RiverDistance - 430000.0f) / 190000.0f));
-    const float WetBank = (1.0f - YarlungTerrain::Smooth01((RiverDistance - 6000.0f) / 24000.0f))
+    const float WetBank = (1.0f - YarlungTerrain::Smooth01((VisibleWaterEdgeDistanceCm - 1500.0f) / 42000.0f))
         * (1.0f - YarlungTerrain::Smooth01((Height01 - 0.86f) / 0.14f));
     const float BroadCanopyPatch = 0.5f + 0.5f * FMath::Sin(X * 0.00088f - Y * 0.00116f + Height * 0.0011f);
     const float FineCanopyPatch = YarlungDeterministicNoise::Value01(X * 1.7f, Y * 1.7f);

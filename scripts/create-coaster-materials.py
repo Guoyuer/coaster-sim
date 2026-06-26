@@ -274,11 +274,11 @@ def create_yarlung_water_surface_material():
         -860,
         -180,
     )
-    vertex_color_gain = create_scalar_parameter(material, "VertexColorBlend", 0.78, -620, -20)
+    vertex_color_gain = create_scalar_parameter(material, "VertexColorBlend", 0.94, -620, -20)
     base_color_param = create_vector_parameter(
         material,
         "BaseColor",
-        unreal.LinearColor(0.002, 0.038, 0.046, 1.0),
+        unreal.LinearColor(0.004, 0.060, 0.072, 1.0),
         -640,
         -300,
     )
@@ -302,19 +302,19 @@ def create_yarlung_water_surface_material():
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Roughness", 0.06, -500, -40),
+        create_scalar_parameter(material, "Roughness", 0.18, -500, -40),
         unreal.MaterialProperty.MP_ROUGHNESS,
         "yarlung water surface Roughness",
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Specular", 0.58, -500, 120),
+        create_scalar_parameter(material, "Specular", 0.72, -500, 120),
         unreal.MaterialProperty.MP_SPECULAR,
         "yarlung water surface Specular",
     )
     connect_material_property(
         material,
-        create_scalar_parameter(material, "Opacity", 0.74, -500, 280),
+        create_scalar_parameter(material, "Opacity", 0.88, -500, 280),
         unreal.MaterialProperty.MP_OPACITY,
         "yarlung water surface Opacity",
     )
@@ -327,7 +327,7 @@ def create_yarlung_water_surface_material():
     fresnel_tint = create_vector_parameter(
         material,
         "GrazingHighlight",
-        unreal.LinearColor(0.008, 0.024, 0.030, 1.0),
+        unreal.LinearColor(0.018, 0.056, 0.065, 1.0),
         -500,
         640,
     )
@@ -344,7 +344,7 @@ def create_yarlung_water_surface_material():
     subtle_emissive = create_vector_parameter(
         material,
         "SubtleWaterLift",
-        unreal.LinearColor(0.0002, 0.0008, 0.0009, 1.0),
+        unreal.LinearColor(0.0020, 0.0060, 0.0065, 1.0),
         -500,
         820,
     )

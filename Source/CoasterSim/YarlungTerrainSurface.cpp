@@ -110,9 +110,10 @@ float RiverBedTargetHeightCm(
     const float SubmergeCm = FMath::Lerp(ChannelBedDepthCm, ShorelineSubmergeCm, ChannelT);
 
     const float ShoreOffsetCm = FMath::Max(0.0f, DistanceCm - VisibleHalfWidthCm);
-    const float ImmediateBankRiseCm = YarlungTerrain::Smooth01(ShoreOffsetCm / 8500.0f) * 7800.0f;
-    const float OuterBankRiseCm = YarlungTerrain::Smooth01(ShoreOffsetCm / 32000.0f) * 18500.0f;
-    const float BankRiseCm = ImmediateBankRiseCm + OuterBankRiseCm;
+    const float WetShelfRiseCm = YarlungTerrain::Smooth01(ShoreOffsetCm / 16000.0f) * 2400.0f;
+    const float InnerBankRiseCm = YarlungTerrain::Smooth01(ShoreOffsetCm / 42000.0f) * 9500.0f;
+    const float OuterBankRiseCm = YarlungTerrain::Smooth01(ShoreOffsetCm / 98000.0f) * 22000.0f;
+    const float BankRiseCm = WetShelfRiseCm + InnerBankRiseCm + OuterBankRiseCm;
 
     return WaterSurfaceZCm - SubmergeCm + BankRiseCm;
 }

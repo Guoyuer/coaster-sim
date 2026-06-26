@@ -137,7 +137,7 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
     Builder.SetMeshDescription(MeshDescription);
     Builder.SetNumUVLayers(1);
 
-    constexpr int32 CrossSamples = 33;
+    constexpr int32 CrossSamples = 45;
     const int32 RowCount = Rows.Num();
     TArray<FVertexID> VertexIds;
     TArray<FVector> VertexPositions;
@@ -184,9 +184,17 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
         {
             const float Across01 = static_cast<float>(CrossIndex) / static_cast<float>(CrossSamples - 1);
             const float AcrossSigned = 1.0f - Across01 * 2.0f;
-            const float EdgeFoam = YarlungTerrain::Smooth01((FMath::Abs(AcrossSigned) - 0.78f) / 0.18f);
+            const float EdgeFoam = YarlungTerrain::Smooth01((FMath::Abs(AcrossSigned) - 0.54f) / 0.28f);
             const float CenterRapid = (1.0f - YarlungTerrain::Smooth01(FMath::Abs(AcrossSigned) / 0.34f))
-                * (0.45f + 0.55f * SlopeRapid);
+                * (0.62f + 0.38f * SlopeRapid);
+            const float LongStreakSource = FMath::Clamp(
+                0.46f * (0.5f + 0.5f * FMath::Sin(Flow * UE_TWO_PI * 42.0f + AcrossSigned * 9.0f))
+                    + 0.34f * (0.5f + 0.5f * FMath::Sin(Flow * UE_TWO_PI * 83.0f - AcrossSigned * 17.0f))
+                    + 0.20f * YarlungDeterministicNoise::Value01(Flow * 1510000.0f, AcrossSigned * 167000.0f),
+                0.0f,
+                1.0f);
+            const float LongStreak = YarlungTerrain::Smooth01((LongStreakSource - 0.48f) / 0.20f)
+                * FMath::Pow(1.0f - FMath::Abs(AcrossSigned), 0.72f);
             const float PatchNoise = FMath::Clamp(
                 YarlungDeterministicNoise::Value01(Flow * 220000.0f + AcrossSigned * 31000.0f, Flow * 113000.0f - AcrossSigned * 47000.0f) * 0.62f
                     + YarlungDeterministicNoise::Value01(Flow * 790000.0f - AcrossSigned * 19000.0f, Flow * 470000.0f + AcrossSigned * 29000.0f) * 0.38f,
@@ -212,16 +220,17 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
             const float CrossWake = FMath::Pow(1.0f - FMath::Abs(AcrossSigned), 2.2f);
             const float MidChannel = FMath::Pow(1.0f - FMath::Abs(AcrossSigned), 1.35f);
             const float Foam = FMath::Clamp(
-                EdgeFoam * (0.008f + 0.055f * BrokenRapid)
-                    + CenterRapid * (BrokenRapid * 0.09f + BoilPatch * 0.12f)
-                    + MidChannel * BoilPatch * 0.035f,
+                EdgeFoam * (0.075f + 0.22f * BrokenRapid + 0.18f * LongStreak)
+                    + CenterRapid * (BrokenRapid * 0.18f + BoilPatch * 0.20f + LongStreak * 0.24f)
+                    + MidChannel * BoilPatch * 0.070f,
                 0.0f,
-                0.24f);
-            const float RawRippleZ = (5.0f + 8.0f * CrossWake) * FMath::Sin(Flow * 287.0f + AcrossSigned * 23.0f + PatchNoise * 5.0f)
-                + 5.0f * FMath::Sin(Flow * 431.0f - AcrossSigned * 47.0f + BrokenRapid * 2.0f)
-                + 8.0f * YarlungDeterministicNoise::Signed(Flow * 360000.0f, AcrossSigned * 64000.0f)
-                + 4.0f * BoilPatch;
-            const float RippleZ = FMath::Clamp(RawRippleZ, -10.0f, 18.0f);
+                0.68f);
+            const float RawRippleZ = (7.0f + 15.0f * CrossWake) * FMath::Sin(Flow * 287.0f + AcrossSigned * 23.0f + PatchNoise * 5.0f)
+                + 11.0f * FMath::Sin(Flow * 431.0f - AcrossSigned * 47.0f + BrokenRapid * 2.0f)
+                + 14.0f * YarlungDeterministicNoise::Signed(Flow * 360000.0f, AcrossSigned * 64000.0f)
+                + 13.0f * LongStreak
+                + 8.0f * BoilPatch;
+            const float RippleZ = FMath::Clamp(RawRippleZ, -18.0f, 42.0f);
             const float SurfaceZ = Center.Z + FYarlungRiverField::DefaultWaterSurfaceLiftCm + RippleZ;
             MinSurfaceZ = FMath::Min(MinSurfaceZ, SurfaceZ);
             MaxSurfaceZ = FMath::Max(MaxSurfaceZ, SurfaceZ);
@@ -241,14 +250,14 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
             VertexIds[Id] = Builder.AppendVertex(Position);
             VertexUvs[Id] = FVector2D(Across01 + PatchNoise * 0.035f, Flow * 8.5f + BoilPatch * 0.22f);
 
-            const FLinearColor DeepWater(0.001f, 0.017f, 0.023f, 1.0f);
-            const FLinearColor GlacialGreen(0.004f, 0.055f, 0.052f, 1.0f);
-            const FLinearColor AeratedFoam(0.24f, 0.33f, 0.30f, 1.0f);
-            const float ChannelTint = 0.028f + 0.040f * PatchNoise + 0.034f * BoilPatch + 0.055f * (1.0f - CrossWake);
+            const FLinearColor DeepWater(0.002f, 0.026f, 0.034f, 1.0f);
+            const FLinearColor GlacialGreen(0.015f, 0.135f, 0.125f, 1.0f);
+            const FLinearColor AeratedFoam(0.52f, 0.68f, 0.62f, 1.0f);
+            const float ChannelTint = 0.055f + 0.065f * PatchNoise + 0.050f * BoilPatch + 0.080f * (1.0f - CrossWake) + 0.060f * LongStreak;
             const FLinearColor WaterColor = FMath::Lerp(DeepWater, GlacialGreen, FMath::Clamp(ChannelTint, 0.0f, 0.28f));
             const FLinearColor FinalColor = FMath::Lerp(WaterColor, AeratedFoam, Foam);
-            VertexColors[Id] = FVector4f(FinalColor.R, FinalColor.G, FinalColor.B, 1.0f);
-            if (Foam > 0.12f)
+            VertexColors[Id] = FVector4f(FinalColor.R, FinalColor.G, FinalColor.B, 0.86f + Foam * 0.13f);
+            if (Foam > 0.18f)
             {
                 ++FoamVertexCount;
             }
@@ -268,8 +277,8 @@ UStaticMesh* BuildStaticMesh(const FYarlungRiverField& RiverField)
             const FVector Across = VertexPositions[VertexIndex(Index, NextCross)] - VertexPositions[VertexIndex(Index, PrevCross)];
             FVector NormalAlong = Along;
             FVector NormalAcross = Across;
-            NormalAlong.Z *= 1.2f;
-            NormalAcross.Z *= 1.2f;
+            NormalAlong.Z *= 2.0f;
+            NormalAcross.Z *= 2.0f;
             FVector SurfaceNormal = FVector::CrossProduct(NormalAlong, NormalAcross).GetSafeNormal();
             if (SurfaceNormal.Z < 0.0f)
             {
