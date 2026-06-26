@@ -25,6 +25,11 @@ Latest run:
 .\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix slope-gated-rockwall-v1
 .\scripts\test-yarlung.ps1 -Build
 .\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Focus -Build -NamePrefix terrain-material-canopy-safe-v1
+.\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Focus -Build -NamePrefix continuous-strata-relief-v2
+.\scripts\test-yarlung.ps1 -Build
+.\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Focus -Build -NamePrefix canopy-mass-recover-v1
+.\scripts\test-yarlung.ps1 -Build
+.\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Focus -Build -NamePrefix terrain-material-cool-forest-v1
 ```
 
 Evidence:
@@ -33,15 +38,18 @@ Evidence:
   `Saved/Diagnostics/footprint-grounding-v1.png`,
   `Saved/Diagnostics/no-cliff-belt-v1.png`,
   `Saved/Diagnostics/slope-gated-rockwall-v1.png`,
-  `Saved/Diagnostics/terrain-material-canopy-safe-v1.png`
+  `Saved/Diagnostics/terrain-material-canopy-safe-v1.png`,
+  `Saved/Diagnostics/continuous-strata-relief-v2.png`,
+  `Saved/Diagnostics/canopy-mass-recover-v1.png`,
+  `Saved/Diagnostics/terrain-material-cool-forest-v1.png`
 - Latest focus manifest:
-  `Saved/Diagnostics/terrain-material-canopy-safe-v1-run.json`
-- RiskGate: `FAIL`
-- Latest focus t30: `terrain-material-canopy-safe-v1-t30.png`,
-  risk `1.467`, flat `0.725`
+  `Saved/Diagnostics/terrain-material-cool-forest-v1-run.json`
+- RiskGate: `WARN`
+- Latest focus t30: `terrain-material-cool-forest-v1-t30.png`,
+  risk `1.360`, flat `0.707`
 - Previous water/shore focus: `rapid-shore-edge-v1-t90.png`, risk `1.534`,
   flat `0.675`
-- Map inspect: `terrain-material-canopy-safe-v1` had 0 errors, 0 warnings
+- Map inspect: `terrain-material-cool-forest-v1` had 0 errors, 0 warnings
 - Automation: `.\scripts\test-yarlung.ps1 -Build` passed 15/15
 
 Implemented:
@@ -93,6 +101,18 @@ Implemented:
 - Increased safe-distance canopy mass without moving trees into the first-person
   track view. An attempted near-track 16m clearance pass caused a gray occlusion
   read and was rejected; the kept pass starts canopy at 30m clearance.
+- Tested heightfield strata/bench relief as a possible continuous cliff read
+  (`continuous-strata-relief-v2`) and rejected it. It increased terrain
+  displacement to roughly 70m but made the frame read as broad gray-green naked
+  terrain rather than authored geology.
+- Rechecked the previous canopy failure before keeping any near-track canopy
+  changes. A 22m canopy-mass pass did not reproduce the old black tree-wall bug,
+  but it also did not solve the exposed-terrain bottleneck, so the live config
+  stays on the previously validated 30m clearance.
+- Adjusted only the generated terrain material macro palette after the failed
+  geometry/canopy probes: forest-floor is slightly deeper green, exposed rock
+  and wet-rock colors are cooler/darker. This reduces the gray bare-slope read
+  without changing scenery placement or hiding the problem with extra trees.
 
 Visual read:
 
@@ -115,12 +135,20 @@ Visual read:
   t30 still reads as a smooth corridor valley with sparse tree points. This
   confirms the next bottleneck is authored continuous slope/cliff geometry, not
   another coverage or scatter-density tweak.
+- The rejected `continuous-strata-relief-v2` pass confirms the old lesson:
+  single-value heightfield relief is not the right representation for hero
+  cliff walls. It creates larger naked terrain forms instead of replacing the
+  terrain with believable cliff/forest surfaces.
+- The latest `terrain-material-cool-forest-v1` pass is a small visual recovery,
+  not a solution. The frame is less bare gray than `terrain-material-canopy-safe-v1`,
+  but the macro read is still corridor terrain plus sparse instances. The next
+  improvement must replace the visible hero slope surface, not merely recolor it.
 
 ## Next Task
 
 Highest-return next task:
 
-**Build a real continuous authored slope/cliff surface to replace the now-exposed
+**Build a real authored near-slope surface layer to replace the now-exposed
 smooth corridor terrain.**
 
 Scope:
@@ -129,8 +157,12 @@ Scope:
   rock clutter.
 - Do not re-enable `cliff_belt` or loosen rock-wall slope gates to hide naked
   terrain.
-- Add continuous authored geology/forest-floor coverage: large coherent cliff
-  forms and slope geometry first, then scree/wet-rock/canopy detail on top.
+- Add continuous authored geology/forest-floor coverage: a camera-facing
+  cliff/forest-floor surface layer or mesh-draped slope patch first, then
+  scree/wet-rock/canopy detail on top.
+- Do not continue heightfield strata relief or near-track canopy density as the
+  main solution; both have now been tested and rejected as low-upside for the
+  current hero frame.
 - Continue foreground coaster work only after the macro terrain/cliff read is
   no longer a smooth corridor.
 

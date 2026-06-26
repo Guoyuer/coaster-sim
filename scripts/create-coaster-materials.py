@@ -451,25 +451,25 @@ def create_mesh_terrain_material():
 
     forest_floor_color = create_constant3(
         material,
-        unreal.LinearColor(0.040, 0.165, 0.070, 1.0),
+        unreal.LinearColor(0.052, 0.190, 0.078, 1.0),
         -900,
         -440,
     )
     weathered_rock_color = create_constant3(
         material,
-        unreal.LinearColor(0.145, 0.160, 0.138, 1.0),
+        unreal.LinearColor(0.120, 0.142, 0.128, 1.0),
         -900,
         -300,
     )
     scree_color = create_constant3(
         material,
-        unreal.LinearColor(0.135, 0.145, 0.126, 1.0),
+        unreal.LinearColor(0.118, 0.130, 0.116, 1.0),
         -900,
         -160,
     )
     wet_rock_color = create_constant3(
         material,
-        unreal.LinearColor(0.055, 0.082, 0.074, 1.0),
+        unreal.LinearColor(0.040, 0.072, 0.068, 1.0),
         -900,
         -20,
     )

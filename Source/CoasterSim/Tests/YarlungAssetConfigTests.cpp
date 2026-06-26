@@ -138,6 +138,7 @@ bool FYarlungSurfaceCoverProfilesDriveGroundAndCanopyTest::RunTest(const FString
     if (CanopyMass)
     {
         TestEqual(TEXT("canopy_mass anchors to the track corridor"), CanopyMass->Anchor, EYarlungSurfaceCoverAnchor::Track);
+        TestTrue(TEXT("canopy_mass preserves the previously validated near-track clearance"), CanopyMass->TrackClearanceCm >= 30000.0f);
     }
 
     TSet<FString> ExpectedSurfaceCoverComponents;
