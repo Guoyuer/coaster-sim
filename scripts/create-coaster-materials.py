@@ -422,7 +422,7 @@ def create_mesh_terrain_material():
         material,
         vertex_color,
         "R",
-        create_scalar_parameter(material, "TerrainWetRockCoverageStrength", 0.96, -620, -360),
+        create_scalar_parameter(material, "TerrainWetRockCoverageStrength", 1.08, -620, -360),
         "",
         -620,
         -360,
@@ -432,7 +432,7 @@ def create_mesh_terrain_material():
         material,
         vertex_color,
         "G",
-        create_scalar_parameter(material, "TerrainForestFloorCoverageStrength", 0.88, -620, -180),
+        create_scalar_parameter(material, "TerrainForestFloorCoverageStrength", 1.05, -620, -180),
         "",
         -620,
         -180,
@@ -442,7 +442,7 @@ def create_mesh_terrain_material():
         material,
         vertex_color,
         "B",
-        create_scalar_parameter(material, "TerrainScreeCoverageStrength", rock_blend_strength, -620, 0),
+        create_scalar_parameter(material, "TerrainScreeCoverageStrength", rock_blend_strength * 1.12, -620, 0),
         "",
         -620,
         0,
@@ -451,25 +451,25 @@ def create_mesh_terrain_material():
 
     forest_floor_color = create_constant3(
         material,
-        unreal.LinearColor(0.042, 0.112, 0.060, 1.0),
+        unreal.LinearColor(0.040, 0.165, 0.070, 1.0),
         -900,
         -440,
     )
     weathered_rock_color = create_constant3(
         material,
-        unreal.LinearColor(0.126, 0.128, 0.116, 1.0),
+        unreal.LinearColor(0.145, 0.160, 0.138, 1.0),
         -900,
         -300,
     )
     scree_color = create_constant3(
         material,
-        unreal.LinearColor(0.166, 0.156, 0.132, 1.0),
+        unreal.LinearColor(0.135, 0.145, 0.126, 1.0),
         -900,
         -160,
     )
     wet_rock_color = create_constant3(
         material,
-        unreal.LinearColor(0.052, 0.066, 0.064, 1.0),
+        unreal.LinearColor(0.055, 0.082, 0.074, 1.0),
         -900,
         -20,
     )
@@ -605,7 +605,7 @@ def create_mesh_terrain_material():
         1000,
         "mesh terrain wet-rock ambient occlusion",
     )
-    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 1.20, -900, -40)
+    albedo_gain = create_scalar_parameter(material, "TerrainAlbedoGain", 1.34, -900, -40)
     macro_base_color_gain = create_multiply(
         material,
         macro_base_color,
@@ -616,23 +616,13 @@ def create_mesh_terrain_material():
         -240,
         "mesh terrain macro base color gain",
     )
-    textured_base_color = create_multiply(
+    final_base_color = create_lerp(
         material,
         macro_base_color_gain,
         "",
         wet_surface_base,
         "",
-        380,
-        -40,
-        "mesh terrain surface detail color",
-    )
-    final_base_color = create_lerp(
-        material,
-        macro_base_color_gain,
-        "",
-        textured_base_color,
-        "",
-        create_scalar_parameter(material, "TerrainSurfaceDetailStrength", detail_strength * 0.90, -620, 100),
+        create_scalar_parameter(material, "TerrainSurfaceColorDetailStrength", detail_strength * 0.22, -620, 100),
         "",
         620,
         -140,

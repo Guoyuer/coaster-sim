@@ -24,6 +24,7 @@ Latest run:
 .\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix foreground-track-v3
 .\scripts\iterate-yarlung.ps1 -Mode Actor -Preset Focus -Build -Times 90 -NamePrefix slope-gated-rockwall-v1
 .\scripts\test-yarlung.ps1 -Build
+.\scripts\iterate-yarlung.ps1 -Mode Terrain -Preset Focus -Build -NamePrefix terrain-material-canopy-safe-v1
 ```
 
 Evidence:
@@ -31,14 +32,16 @@ Evidence:
 - Contact sheets: `Saved/Diagnostics/foreground-track-v3.png`,
   `Saved/Diagnostics/footprint-grounding-v1.png`,
   `Saved/Diagnostics/no-cliff-belt-v1.png`,
-  `Saved/Diagnostics/slope-gated-rockwall-v1.png`
-- Latest focus manifest: `Saved/Diagnostics/slope-gated-rockwall-v1-run.json`
+  `Saved/Diagnostics/slope-gated-rockwall-v1.png`,
+  `Saved/Diagnostics/terrain-material-canopy-safe-v1.png`
+- Latest focus manifest:
+  `Saved/Diagnostics/terrain-material-canopy-safe-v1-run.json`
 - RiskGate: `FAIL`
-- Latest focus t90: `slope-gated-rockwall-v1-t90.png`, risk `1.589`,
-  flat `0.695`
+- Latest focus t30: `terrain-material-canopy-safe-v1-t30.png`,
+  risk `1.467`, flat `0.725`
 - Previous water/shore focus: `rapid-shore-edge-v1-t90.png`, risk `1.534`,
   flat `0.675`
-- Map inspect: `slope-gated-rockwall-v1` had 0 errors, 0 warnings
+- Map inspect: `terrain-material-canopy-safe-v1` had 0 errors, 0 warnings
 - Automation: `.\scripts\test-yarlung.ps1 -Build` passed 15/15
 
 Implemented:
@@ -76,6 +79,20 @@ Implemented:
   slopes.
 - Added fail-close tests so removed belt fields are rejected and rock-wall
   profiles must remain surface-aligned and slope-gated.
+- Fixed the mesh terrain material color pipeline. The previous graph multiplied
+  macro coverage color by Megascans base color, which double-darkened the
+  terrain in linear space. The material now keeps coverage color as the base and
+  uses texture color only as a restrained detail tint.
+- Corrected terrain material tiling from kilometer-scale reads to meter-scale
+  reads. Forest-floor tiling is now `850` and rock tiling is `620`, replacing
+  the old `44`/`20` values that repeated textures at roughly hundred-meter
+  scale.
+- Strengthened terrain vertex coverage masks for forest floor, wet rock, and
+  scree so the generated corridor terrain is no longer mostly unclassified base
+  rock.
+- Increased safe-distance canopy mass without moving trees into the first-person
+  track view. An attempted near-track 16m clearance pass caused a gray occlusion
+  read and was rejected; the kept pass starts canopy at 30m clearance.
 
 Visual read:
 
@@ -93,6 +110,11 @@ Visual read:
 - The latest rock cleanup is a bug/pipeline fix, not a final visual win. It
   removes the floating/fake rock-block read, but exposes how much of the image
   is still smooth corridor terrain. The frame is cleaner but more barren.
+- The latest terrain/material pass is also a pipeline fix, not a final visual
+  win. It restores correct color composition and readable material scale, but
+  t30 still reads as a smooth corridor valley with sparse tree points. This
+  confirms the next bottleneck is authored continuous slope/cliff geometry, not
+  another coverage or scatter-density tweak.
 
 ## Next Task
 
@@ -107,8 +129,8 @@ Scope:
   rock clutter.
 - Do not re-enable `cliff_belt` or loosen rock-wall slope gates to hide naked
   terrain.
-- Add continuous authored geology/forest-floor coverage: slope surface
-  material, scree/wet-rock bands, canopy mass, and large coherent cliff forms.
+- Add continuous authored geology/forest-floor coverage: large coherent cliff
+  forms and slope geometry first, then scree/wet-rock/canopy detail on top.
 - Continue foreground coaster work only after the macro terrain/cliff read is
   no longer a smooth corridor.
 

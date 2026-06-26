@@ -136,30 +136,31 @@ FLinearColor YarlungSurfaceCoverageAtPosition(
         4.0f);
 
     const float ForestFloorMask = FMath::Clamp(
-        (Forest * (0.36f - SteepSlope * 0.18f)
-            + SlopePatch * (1.0f - SteepSlope) * 0.10f
-            + CanopyMask * ForestDistance * 0.06f
-            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((LowSlopeBreakup - 0.18f) / 0.62f) * 0.16f)
-            * (1.0f - NearTrackGroundBreakup * 0.72f),
+        (Forest * (0.52f - SteepSlope * 0.24f)
+            + SlopePatch * (1.0f - SteepSlope) * 0.22f
+            + CanopyMask * ForestDistance * 0.10f
+            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((LowSlopeBreakup - 0.18f) / 0.62f) * 0.32f
+            + NearTrackGroundBreakup * YarlungTerrain::Smooth01((0.52f - NearTrackPatchNoise) / 0.46f) * 0.16f)
+            * (1.0f - NearTrackGroundBreakup * 0.35f),
         0.0f,
         1.0f);
     const float ScreeMask = FMath::Clamp(
         ScreePatch * 0.95f
-            + SteepSlope * (1.0f - ForestFloorMask) * (0.34f + RavineStreak * 0.24f)
-            + SlopePatch * SteepSlope * 0.28f
-            + Ravine * 0.45f
-            + WetBank * 0.10f
-            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((LowSlopeBreakup - 0.48f) / 0.30f) * 0.42f
-            + NearTrackGroundBreakup * YarlungTerrain::Smooth01((NearTrackPatchNoise - 0.34f) / 0.34f) * 0.86f,
+            + SteepSlope * (1.0f - ForestFloorMask) * (0.42f + RavineStreak * 0.30f)
+            + SlopePatch * SteepSlope * 0.38f
+            + Ravine * 0.56f
+            + WetBank * 0.12f
+            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((LowSlopeBreakup - 0.48f) / 0.30f) * 0.56f
+            + NearTrackGroundBreakup * YarlungTerrain::Smooth01((NearTrackPatchNoise - 0.34f) / 0.34f) * 0.68f,
         0.0f,
         1.0f);
     const float WetRockCoverage = FMath::Clamp(
-        WetRockMask * 0.52f
-            + WetBank * 0.58f
-            + SlopePatch * (0.08f + SteepSlope * 0.14f)
-            + Ravine * 0.18f
-            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((0.50f - LowSlopeBreakup) / 0.34f) * 0.30f
-            + NearTrackGroundBreakup * YarlungTerrain::Smooth01((0.62f - NearTrackPatchNoise) / 0.40f) * 0.70f,
+        WetRockMask * 0.62f
+            + WetBank * 0.74f
+            + SlopePatch * (0.12f + SteepSlope * 0.18f)
+            + Ravine * 0.26f
+            + LowSlopeCanyonFloor * YarlungTerrain::Smooth01((0.50f - LowSlopeBreakup) / 0.34f) * 0.46f
+            + NearTrackGroundBreakup * YarlungTerrain::Smooth01((0.62f - NearTrackPatchNoise) / 0.40f) * 0.52f,
         0.0f,
         1.0f);
 

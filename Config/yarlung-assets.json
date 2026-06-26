@@ -458,6 +458,8 @@
         "anchor": "track",
         "sample_stride": 1,
         "lateral_bands_cm": [
+          36000,
+          52000,
           76000,
           108000,
           146000,
@@ -465,15 +467,15 @@
           240000,
           296000
         ],
-        "occupancy": 0.62,
-        "track_clearance_cm": 68000,
+        "occupancy": 0.90,
+        "track_clearance_cm": 30000,
         "river_clearance_cm": 22000,
         "min_height_cm": 250000,
         "max_height_cm": 505000,
         "min_slope": 0,
-        "max_slope": 0.72,
-        "scale_min": 0.34,
-        "scale_max": 0.82,
+        "max_slope": 0.86,
+        "scale_min": 0.55,
+        "scale_max": 1.25,
         "height_offset_cm": 8,
         "along_jitter_cm": 3600,
         "lateral_jitter_cm": 5200,
@@ -491,16 +493,16 @@
       "base_color": "/Game/Fab/Megascans/Surfaces/Forest_Floor_sfjmafua/Medium/sfjmafua_tier_2/Textures/T_sfjmafua_2K_B.T_sfjmafua_2K_B",
       "normal": "/Game/Fab/Megascans/Surfaces/Forest_Floor_sfjmafua/Medium/sfjmafua_tier_2/Textures/T_sfjmafua_2K_N.T_sfjmafua_2K_N",
       "orm": "/Game/Fab/Megascans/Surfaces/Forest_Floor_sfjmafua/Medium/sfjmafua_tier_2/Textures/T_sfjmafua_2K_ORM.T_sfjmafua_2K_ORM",
-      "tiling": 44,
-      "detail_strength": 0.68,
-      "roughness_strength": 0.5,
-      "ao_strength": 0.38
+      "tiling": 850,
+      "detail_strength": 0.78,
+      "roughness_strength": 0.58,
+      "ao_strength": 0.48
     },
     "rock_surface": {
       "base_color": "/Game/Fab/Megascans/3D/Quarry_Cliff_uchwaffda/High/uchwaffda_tier_1/Textures/T_uchwaffda_4K_B.T_uchwaffda_4K_B",
       "normal": "/Game/Fab/Megascans/3D/Quarry_Cliff_uchwaffda/High/uchwaffda_tier_1/Textures/T_uchwaffda_4K_N.T_uchwaffda_4K_N",
       "orm": "/Game/Fab/Megascans/3D/Quarry_Cliff_uchwaffda/High/uchwaffda_tier_1/Textures/T_uchwaffda_4K_ORM.T_uchwaffda_4K_ORM",
-      "tiling": 20,
+      "tiling": 620,
       "blend_strength": 1
     }
   }
